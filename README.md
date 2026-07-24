@@ -1,126 +1,121 @@
 # Mifga (מפגע)
 
-Crowd-sourced road-hazard reporting app, Waze-style, built mobile-first with a dark theme aimed at teens (16+).
-This is the **local web prototype**: it runs entirely in the browser, no backend, no data leaves the device
-(everything is persisted to `localStorage`). It's structured so a real backend and a native iOS build can be
-added later without reworking the UI - see "Going to production" below.
+אפליקציית דיווח מפגעי דרכים בסגנון Waze, מבוססת קהילה, בנויה קודם כל למובייל עם עיצוב כהה שמכוון לבני נוער (16+).
+זהו **הפרוטוטייפ המקומי בדפדפן**: הוא רץ כולו בצד הלקוח, בלי שרת, בלי שום מידע יוצא מהמכשיר
+(הכל נשמר ב-`localStorage`). המבנה בנוי כך שאפשר להוסיף בהמשך שרת אמיתי ובניית iOS ילידית בלי לשכתב את הממשק -
+ראו "מה חסר כדי לעלות לייצור" בהמשך.
 
-## Stack
+## הטכנולוגיה
 
 - React + TypeScript + Vite
-- Tailwind CSS (dark/light theme, RTL Hebrew UI)
-- react-leaflet + OpenStreetMap/CARTO tiles for the map (no API key needed locally)
-- Nominatim (geocoding/address autocomplete) + OSRM demo router (routing) - free, keyless public OSM services
-- Capacitor scaffolding is in place (`capacitor.config.ts`) for the Android/iOS native build
+- Tailwind CSS (עיצוב כהה/בהיר, ממשק RTL בעברית)
+- react-leaflet + מפות OpenStreetMap/CARTO (לא נדרש מפתח API מקומית)
+- Nominatim (השלמה אוטומטית של כתובות) + מנתב OSRM לדוגמה (תכנון מסלול) - שני שירותי OSM חינמיים שלא דורשים מפתח,
+  בשימוש רק בטאב תכנון המסלול
+- שלד Capacitor כבר מוכן (`capacitor.config.ts`) לקראת בניית Android/iOS ילידית
 
-> Production note: swap the CARTO tile layer + Nominatim/OSRM calls for the Google Maps SDK / Directions API
-> when you're ready to go live, per the "based on Google Maps" requirement - the marker/report/data layer is
-> provider-agnostic and doesn't need to change.
+> הערת ייצור: כשתרצו לעלות לאוויר, יש להחליף את שכבת המפה של CARTO ואת הקריאות ל-Nominatim/OSRM ב-Google Maps
+> SDK / Directions API (בהתאם לדרישה המקורית "מבוסס Google Maps") - שכבת הסמנים/הדיווחים לא תלויה בספק המפה
+> ולא צריכה להשתנות.
 
-## Run locally
+## הרצה מקומית
 
 ```bash
 npm install
 npm run dev
 ```
 
-Opens at `http://localhost:5173`. Because `server.host` is enabled in `vite.config.ts`, you can also open the
-"Network" URL it prints on your phone (same wifi) to test at real mobile scale before building an APK.
+נפתח בכתובת `http://localhost:5173`. מכיוון ש-`server.host` מופעל ב-`vite.config.ts`, אפשר גם לפתוח את כתובת
+ה-"Network" שמודפסת בטרמינל ישירות מהטלפון (באותה רשת wifi) כדי לבדוק בגודל מובייל אמיתי לפני בניית ה-APK.
 
-## What's implemented
+## מה כבר מוכן
 
-**Map & reporting**
-- Home map screen, zoomed in tight on the user's live location; hazard markers per type
-- Two headline hazard types shown up-front (שוטר/פקח, larger, high-priority pulsing markers); the rest live
-  behind an "עוד" (more) drawer: pothole, blocking car, broken sidewalk, camera, accident, roadwork, closure,
-  flood, animal
-- One-tap report flow: pick type → location (current GPS, typed address with autocomplete, or drag a pin on
-  the map) → optional nickname for police/inspector reports → optional photo → points (1, or 5 with a photo) →
-  confetti burst on submit
-- Community "still there?" voting on any hazard: live like count + "last like" time, confetti on each vote;
-  5 "not there" votes auto-removes a hazard
-- Self marker shows the user's chosen vehicle icon (scooter / e-bike / e-motorcycle); tapping it opens a
-  read-only profile card (avatar, level, points, vehicle+model) - what a friend would see tapping you
+**מפה ודיווח**
+- מסך בית עם מפה, זום צמוד למיקום החי של המשתמש, וסמנים לכל סוג מפגע
+- שני סוגי מפגעים ראשיים מוצגים ישירות (שוטר/פקח, גדולים יותר, עם סמן פועם בעדיפות גבוהה); כל השאר נמצאים תחת
+  מגירת "עוד": חור בכביש, רכב מפריע, מדרכה משובשת, מצלמה, תאונה, עבודות בכביש, כביש חסום, הצפה, בעל חיים
+- תהליך דיווח בקליק אחד: בחירת סוג → מיקום (GPS נוכחי, הקלדת כתובת עם השלמה אוטומטית, או גרירת סיכה על המפה) →
+  כינוי אופציונלי לדיווחי שוטר/פקח → תמונה אופציונלית → נקודות (1, או 5 עם תמונה) → קונפטי בסיום השליחה
+- הצבעת קהילה "עדיין שם?" על כל מפגע: מספר לייקים חי + זמן הלייק האחרון, קונפטי על כל הצבעה; 5 דיווחי "כבר לא שם"
+  מסירים מפגע אוטומטית
+- הסמן העצמי מציג את אייקון הכלי שהמשתמש בחר (קורקינט / אופניים חשמליים / אופנוע חשמלי); לחיצה עליו פותחת כרטיס
+  פרופיל לצפייה בלבד (אווטאר, רמה, נקודות, כלי ודגם) - מה שחבר היה רואה בלחיצה עליכם
 
-**Friends & groups**
-- Friends tab: map presence, distance, points, "locate on map" shortcut, walkie-talkie voice message
-  (press-and-hold; uses the real mic when available, simulated otherwise so the flow always works)
-- Favorite up to 3 friends - they surface on the home screen with a one-tap inline mic button
-- Walkie-talkie groups: create/name a group, invite friends (pending until they "accept" - simulated), manage
-  membership (add/remove, see last-seen), send a group voice message and see per-member delivery receipts
+**חברים וקבוצות**
+- טאב חברים: נוכחות על המפה, מרחק, נקודות, קיצור "איתור על המפה", הודעת ווקי-טוקי קולית (החזקה ושחרור; משתמש
+  במיקרופון האמיתי כשזמין, ומדמה את הזרימה כשלא - כדי שהפעולה תמיד תעבוד)
+- אפשר לסמן עד 3 חברים כמועדפים - הם מופיעים במסך הבית עם כפתור מיקרופון מהיר
+- קבוצות ווקי-טוקי: יצירת קבוצה ומתן שם, הזמנת חברים (ממתינים עד ש"יאשרו" - מדומה), ניהול חברי הקבוצה
+  (הוספה/הסרה, צפייה בזמן חיבור אחרון), שליחת הודעה קולית לקבוצה וצפייה באישורי מסירה לכל חבר
 
-**Profile & gamification**
-- Editable name, photo, and vehicle (type + model, with autocomplete suggestions from a curated model list
-  plus free text for anything not listed)
-- Points, level/title progression bar, report stats, "top reporters" leaderboard
+**פרופיל וגיימיפיקציה**
+- עריכת שם, תמונה, וכלי (סוג + דגם, עם השלמה אוטומטית מרשימת דגמים מוכרת וגם טקסט חופשי לכל דגם שלא ברשימה)
+- נקודות, רמה/תואר עם פס התקדמות, סטטיסטיקת דיווחים, טבלת "המדווחים המובילים" מול החברים
 
-**Route planning**
-- "תכנון מסלול בטוח ממפגעים": address search → route + duration/distance, flags any reported hazards within
-  ~120m of the route
+**תכנון מסלול**
+- "תכנון מסלול בטוח ממפגעים": חיפוש כתובת → מסלול עם זמן/מרחק, ודגל לכל מפגע מדווח שנמצא בטווח של כ-120 מטר
+  מהמסלול
 
-**Settings**
-- Dark/light theme, notification permission + per-type toggles (police/inspector/other) + radius
-- Notification daily limit: free tier (3/day) vs. a locked "unlimited" tier, unlockable via a friend-referral
-  flow (enter a friend's phone, composes an invite mentioning who invited them and their vehicle) instead of a
-  real payment - there's no billing wired up, this only demonstrates the intended growth loop
-- Ad banner placeholder slot
+**הגדרות**
+- מצב כהה/בהיר, הרשאת התראות + בחירת סוגי מפגע להתראה (שוטר/פקח/אחר) + רדיוס התראה
+- מגבלת התראות יומית: מסלול חינמי (עד 3 ביום) מול מסלול "ללא הגבלה" נעול, שנפתח דרך הזמנת חבר (מזינים את הטלפון
+  שלו, נוצרת הודעת הזמנה שמציינת מי הזמין ומאיזה כלי הוא רוכב) במקום תשלום אמיתי - אין חיבור לסליקה בפועל, זו
+  רק הדגמה של מנגנון הצמיחה המיועד
+- מקום פרסומי (באנר) placeholder
 
-## Project structure
+## מבנה הפרויקט
 
 ```
 src/
-  screens/       MapScreen, FriendsScreen, ProfileScreen, RouteScreen - one per bottom-nav tab
-  components/    Bottom sheets, map icons, report flow, settings, etc.
-  context/       AppContext - the single source of truth (see "State & persistence" below)
-  data/          Static config: hazard type defs, vehicle model lists, demo seed data
+  screens/       MapScreen, FriendsScreen, ProfileScreen, RouteScreen - מסך אחד לכל טאב בתחתית
+  components/    גיליונות תחתונים (bottom sheets), אייקוני מפה, תהליך הדיווח, הגדרות וכו'
+  context/       AppContext - מקור האמת היחיד (ראו "מצב ושמירה" למטה)
+  data/          קונפיגורציה סטטית: הגדרות סוגי מפגע, רשימות דגמי כלים, נתוני דמו
   hooks/         useGeolocation, useWalkieRecorder
-  lib/           Small pure helpers: geo math, routing client, map icon builders, colors, storage
-  types/         Shared domain types (platform-agnostic, no DOM/Capacitor types)
+  lib/           פונקציות עזר קטנות: חישובי גיאוגרפיה, לקוח ניתוב, בניית אייקוני מפה, צבעים, שמירה
+  types/         טיפוסי דומיין משותפים (בלתי תלויים בפלטפורמה - בלי טיפוסי DOM/Capacitor)
 ```
 
-## State & persistence
+## מצב ושמירה
 
-Everything lives in `src/context/AppContext.tsx` and is persisted to `localStorage` (see `src/lib/storage.ts`),
-keyed per-domain (`mifga:user`, `mifga:friends`, `mifga:hazards`, `mifga:groups`, `mifga:settings`). Loaders
-backfill missing fields for state saved by an older version of the schema, so upgrading the app in place
-doesn't break existing local data.
+כל המצב חי בקובץ `src/context/AppContext.tsx` ונשמר ל-`localStorage` (ראו `src/lib/storage.ts`), עם מפתח נפרד
+לכל תחום (`mifga:user`, `mifga:friends`, `mifga:hazards`, `mifga:groups`, `mifga:settings`). הטעינה משלימה
+שדות חסרים עבור מידע שנשמר בגרסה ישנה יותר של הסכמה, כך ששדרוג האפליקציה במקום לא שובר מידע קיים על המכשיר.
 
-This is the main thing a real backend replaces - see below.
+זה בדיוק מה ששרת אמיתי מחליף - ראו למטה.
 
-## Going to production: what's missing
+## מה חסר כדי לעלות לייצור
 
-The APK this builds is a fully working **single-device demo**. To have multiple real users see and update
-shared data (hazards, friends, groups, points) live, `AppContext` needs to talk to a real backend instead of
-`localStorage`. Concretely:
+ה-APK שנבנה כאן הוא **הדגמה מלאה במכשיר בודד**. כדי שכמה משתמשים אמיתיים יראו ויעדכנו מידע משותף וחי (מפגעים,
+חברים, קבוצות, נקודות), `AppContext` צריך לדבר עם שרת אמיתי במקום `localStorage`. באופן קונקרטי:
 
-1. **A database + API.** Something like Supabase/Firebase (fastest to stand up, built-in auth + realtime) or a
-   small custom Node/Postgres API. Tables mirror the existing types in `src/types/index.ts` almost 1:1: users,
-   hazards, friends/relationships, groups, group_members, group_messages.
-2. **Auth.** Right now there's one hardcoded `DEMO_USER`. Real accounts (phone number is the natural choice
-   for this audience) are what makes "friends," "groups," and "who reported what" mean anything across devices.
-3. **Realtime sync.** Hazard reports, votes, and walkie-talkie messages need to push to other users live, not
-   just save locally - Supabase/Firebase realtime subscriptions (or plain WebSockets) replace the `setTimeout`
-   simulations currently used for "friend accepted the group invite" / "message delivered".
-4. **Real push notifications.** The Notification API calls in `SettingsSheet` only work while the app tab is
-   open. Shipping real push (new hazard nearby, group invite, walkie-talkie message) needs Firebase Cloud
-   Messaging wired into the Capacitor native build.
-5. **File storage** for report photos and profile pictures (Supabase Storage / S3 / Firebase Storage) instead
-   of embedding them as base64 data URLs.
-6. **Swap the map/geocoding providers** for Google Maps SDK + Directions API (billing key required), per the
-   original "based on Google Maps" requirement - everything else in the marker/report layer stays the same.
-7. **An SMS gateway** (e.g. Twilio) if the friend-referral invite in Settings should actually send a text,
-   rather than just composing the message locally.
+1. **בסיס נתונים + API.** הכי מהיר להקים: Supabase או Firebase (auth ו-realtime מובנים), או API קטן בבנייה
+   עצמית עם Node/Postgres. הטבלאות בעצם מעתיקות כמעט אחד לאחד את הטיפוסים שכבר קיימים ב-`src/types/index.ts`:
+   users, hazards, friends/relationships, groups, group_members, group_messages.
+2. **הזדהות משתמשים (Auth).** כרגע יש משתמש דמו קבוע אחד. חשבונות אמיתיים (מספר טלפון היא הבחירה הטבעית לקהל
+   הזה) הם מה שהופך את "חברים", "קבוצות" ו"מי דיווח מה" למשמעותיים בין מכשירים שונים.
+3. **סנכרון בזמן אמת.** דיווחי מפגעים, הצבעות, והודעות ווקי-טוקי צריכים להידחף לשאר המשתמשים בזמן אמת, לא רק
+   להישמר מקומית - subscriptions בזמן אמת של Supabase/Firebase (או WebSockets רגילים) מחליפים את הדימויים עם
+   `setTimeout` שמשמשים כרגע ל"החבר אישר את ההזמנה לקבוצה" / "ההודעה נמסרה".
+4. **התראות פוש אמיתיות.** קריאות ה-Notification API ב-`SettingsSheet` עובדות רק כשהטאב פתוח. כדי לשלוח התראה
+   אמיתית לטלפון (מפגע חדש בקרבתך, הזמנה לקבוצה, הודעת ווקי-טוקי) גם כשהאפליקציה סגורה, צריך לחבר Firebase Cloud
+   Messaging לתוך הבנייה הילידית של אנדרואיד.
+5. **אחסון קבצים** לתמונות דיווח ותמונות פרופיל (Supabase Storage / S3 / Firebase Storage) במקום הטמעה כ-data
+   URL בבסיס 64.
+6. **החלפת ספקי המפה/הכתובות** ל-Google Maps SDK + Directions API (דורש מפתח עם חיוב), בהתאם לדרישה המקורית
+   "מבוסס Google Maps" - כל שאר שכבת הסמנים/הדיווחים נשארת זהה.
+7. **שער שליחת SMS** (למשל Twilio) אם רוצים שהזמנת החבר במסך ההגדרות אכן תשלח מסרון אמיתי, ולא רק תרכיב את
+   ההודעה מקומית.
 
-None of this is a rewrite - it's mostly replacing the functions inside `AppContext.tsx` (`addReport`,
-`confirmHazard`, `createGroup`, etc.) with API calls, and swapping `localStorage` reads for a `user`
-subscription once someone's logged in. The screens/components don't need to change.
+שום דבר מכל זה הוא לא שכתוב - זו בעיקר החלפה של הפונקציות בתוך `AppContext.tsx` (`addReport`, `confirmHazard`,
+`createGroup` וכו') בקריאות API, והחלפת קריאות ה-`localStorage` במנוי (subscription) למשתמש אחרי התחברות.
+המסכים והרכיבים לא צריכים להשתנות.
 
-## Building the APK
+## בניית ה-APK
 
 1. `npm run build`
-2. `npx cap add android` (needs Android Studio/SDK locally, or run it via CI)
+2. `npx cap add android` (דורש Android Studio/SDK מקומית, או הרצה דרך CI)
 3. `npx cap sync android`
-4. Build the APK from Android Studio or `./gradlew assembleDebug`
+4. בניית ה-APK מתוך Android Studio או `./gradlew assembleDebug`
 
-`npx cap add ios` works the same way once there's a macOS/Xcode environment available - the web layer doesn't
-need any changes to support it.
+`npx cap add ios` עובד באותו אופן ברגע שיש סביבת macOS/Xcode זמינה - שכבת הווב לא דורשת שום שינוי כדי לתמוך בזה.
