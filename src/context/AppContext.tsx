@@ -1,12 +1,14 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import type {
   AppSettings,
+  FeedbackEntry,
   Friend,
   GroupMessage,
   HazardReport,
   HazardTypeId,
   LatLng,
   NotifyTypePrefs,
+  RideLogEntry,
   UserProfile,
   VehicleTypeId,
   WalkieGroup,
@@ -27,6 +29,8 @@ interface ProfileUpdate {
   avatarPhoto?: string | null;
   vehicleType?: VehicleTypeId | null;
   vehicleModel?: string | null;
+  phone?: string | null;
+  username?: string | null;
 }
 
 export const MAX_FAVORITE_FRIENDS = 3;
@@ -38,6 +42,8 @@ interface AppContextValue {
   groups: WalkieGroup[];
   settings: AppSettings;
   lastAwardedPoints: number | null;
+  onboardingComplete: boolean;
+  rideLog: RideLogEntry[];
   addReport: (input: NewReportInput) => void;
   confirmHazard: (id: string) => void;
   denyHazard: (id: string) => void;
@@ -52,6 +58,9 @@ interface AppContextValue {
   removeGroup: (groupId: string) => void;
   sendGroupMessage: (groupId: string) => void;
   clearLastAwarded: () => void;
+  completeOnboarding: () => void;
+  addRideLogEntry: (entry: Omit<RideLogEntry, "id">) => void;
+  submitFeedback: (liked: boolean, note: string) => void;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -62,6 +71,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   notifyTypes: { police: true, inspector: true, other: true },
   notifyRadiusM: 1000,
   notifyDailyLimit: "limited",
+  rideAlertRadiusM: 100,
 };
 
 // Real member approval / message delivery needs a backend push to the
@@ -76,7 +86,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [friends, setFriends] = useState<Friend[]>(() => {
     // backfill fields added after some users already had friends saved locally
     const stored = loadJSON("friends", DEMO_FRIENDS);
-    return stored.map((f) => ({ ...f, lastSeenAt: f.lastSeenAt ?? Date.now(), favorite: f.favorite ?? false }));
+    return stored.map((f, i) => ({
+      ...f,
+      lastSeenAt: f.lastSeenAt ?? Date.now(),
+      favorite: f.favorite ?? false,
+      username: f.username ?? `friend${i + 1}`,
+    }));
   });
   const [hazards, setHazards] = useState<HazardReport[]>(() => {
     const stored = loadJSON<HazardReport[] | null>("hazards", null);
@@ -98,12 +113,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
   });
   const [lastAwardedPoints, setLastAwardedPoints] = useState<number | null>(null);
+  const [onboardingComplete, setOnboardingComplete] = useState<boolean>(() => loadJSON("onboardingComplete", false));
+  const [rideLog, setRideLog] = useState<RideLogEntry[]>(() => loadJSON("rideLog", []));
+  const [feedbackEntries, setFeedbackEntries] = useState<FeedbackEntry[]>(() => loadJSON("feedback", []));
 
   useEffect(() => saveJSON("user", user), [user]);
   useEffect(() => saveJSON("friends", friends), [friends]);
   useEffect(() => saveJSON("hazards", hazards), [hazards]);
   useEffect(() => saveJSON("groups", groups), [groups]);
   useEffect(() => saveJSON("settings", settings), [settings]);
+  useEffect(() => saveJSON("onboardingComplete", onboardingComplete), [onboardingComplete]);
+  useEffect(() => saveJSON("rideLog", rideLog), [rideLog]);
+  useEffect(() => saveJSON("feedback", feedbackEntries), [feedbackEntries]);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -161,7 +182,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
       ...(patch.avatarPhoto !== undefined ? { avatarPhoto: patch.avatarPhoto ?? undefined } : {}),
       ...(patch.vehicleType !== undefined ? { vehicleType: patch.vehicleType ?? undefined } : {}),
       ...(patch.vehicleModel !== undefined ? { vehicleModel: patch.vehicleModel ?? undefined } : {}),
+      ...(patch.phone !== undefined ? { phone: patch.phone ?? undefined } : {}),
+      ...(patch.username !== undefined ? { username: patch.username ?? undefined } : {}),
     }));
+
+  const completeOnboarding = () => setOnboardingComplete(true);
+
+  const addRideLogEntry = (entry: Omit<RideLogEntry, "id">) => {
+    const logEntry: RideLogEntry = { id: `ride-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, ...entry };
+    setRideLog((prev) => [logEntry, ...prev].slice(0, 200));
+  };
+
+  const submitFeedback = (liked: boolean, note: string) => {
+    const entry: FeedbackEntry = {
+      id: `fb-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      liked,
+      note: note.trim(),
+      submittedAt: Date.now(),
+    };
+    setFeedbackEntries((prev) => [entry, ...prev]);
+  };
 
   const toggleFriendShare = (_id: string) => {
     // Friend location sharing is mutual/consent-based in the real product;
@@ -253,6 +293,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     groups,
     settings,
     lastAwardedPoints,
+    onboardingComplete,
+    rideLog,
     addReport,
     confirmHazard,
     denyHazard,
@@ -267,6 +309,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     removeGroup,
     sendGroupMessage,
     clearLastAwarded: () => setLastAwardedPoints(null),
+    completeOnboarding,
+    addRideLogEntry,
+    submitFeedback,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

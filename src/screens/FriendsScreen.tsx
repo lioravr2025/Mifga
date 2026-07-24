@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { Clock, MapPin, Mic, Navigation, Plus, Radio, Settings2, Square, Star, UserPlus, Users } from "lucide-react";
+import { Clock, MapPin, Mic, Navigation, Plus, Radio, Search, Settings2, Square, Star, Users } from "lucide-react";
 import { useApp, MAX_FAVORITE_FRIENDS } from "../context/AppContext";
 import { formatDistance, distanceMeters } from "../lib/geo";
 import { useGeolocation } from "../hooks/useGeolocation";
 import { useWalkieRecorder } from "../hooks/useWalkieRecorder";
 import CreateGroupSheet from "../components/CreateGroupSheet";
 import GroupManageSheet from "../components/GroupManageSheet";
+import InviteFriendButton from "../components/InviteFriendButton";
 import type { WalkieGroup } from "../types";
 
 export default function FriendsScreen({ onLocateFriend }: { onLocateFriend: (friendId: string) => void }) {
@@ -15,6 +16,7 @@ export default function FriendsScreen({ onLocateFriend }: { onLocateFriend: (fri
   const [favoriteNotice, setFavoriteNotice] = useState<string | null>(null);
   const [createGroupOpen, setCreateGroupOpen] = useState(false);
   const [manageGroup, setManageGroup] = useState<WalkieGroup | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const notify = (label: string) => {
     setLastSentLabel(label);
@@ -46,15 +48,33 @@ export default function FriendsScreen({ onLocateFriend }: { onLocateFriend: (fri
   // GroupManageSheet needs the live group object, not a stale snapshot from open-time
   const liveManageGroup = manageGroup ? groups.find((g) => g.id === manageGroup.id) ?? null : null;
 
+  const query = searchQuery.trim().toLowerCase();
+  const visibleFriends = query
+    ? friends.filter((f) => f.username.toLowerCase().includes(query) || f.name.toLowerCase().includes(query))
+    : friends;
+
   return (
     <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar px-5 pt-6 pb-4 safe-top">
       <div className="flex items-center justify-between mb-1">
         <h1 className="text-xl font-bold text-neutral-50">חברים</h1>
-        <button className="w-10 h-10 rounded-xl bg-bg-panel border border-bg-border flex items-center justify-center">
-          <UserPlus size={18} className="text-neutral-300" />
-        </button>
+        <InviteFriendButton variant="compact" label="הזמנת חבר" />
       </div>
-      <p className="text-xs text-neutral-400 mb-5">ראו איפה החברים שלכם נמצאים על המפה, ושלחו הודעת ווקי-טוקי מיידית</p>
+      <p className="text-xs text-neutral-400 mb-4">ראו איפה החברים שלכם נמצאים על המפה, ושלחו הודעת ווקי-טוקי מיידית</p>
+
+      <div className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-bg-panel2 border border-bg-border mb-4">
+        <Search size={15} className="text-neutral-400 shrink-0" />
+        <input
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="חיפוש חבר לפי שם משתמש"
+          dir="ltr"
+          className="flex-1 bg-transparent outline-none text-sm text-neutral-100 placeholder:text-neutral-500 text-right"
+        />
+      </div>
+
+      <div className="mb-5">
+        <InviteFriendButton />
+      </div>
 
       {lastSentLabel && (
         <div className="mb-4 px-4 py-2.5 rounded-2xl bg-green-500/15 border border-green-500/40 text-green-300 text-sm font-semibold text-center">
@@ -148,8 +168,13 @@ export default function FriendsScreen({ onLocateFriend }: { onLocateFriend: (fri
           <Star size={11} className="inline mb-0.5" /> {favoriteCount}/{MAX_FAVORITE_FRIENDS} מועדפים
         </span>
       </div>
+      {visibleFriends.length === 0 && (
+        <div className="p-4 rounded-2xl bg-bg-panel2 border border-dashed border-bg-border text-center text-xs text-neutral-500">
+          לא נמצא חבר בשם המשתמש "{searchQuery}"
+        </div>
+      )}
       <div className="space-y-3">
-        {friends.map((f) => {
+        {visibleFriends.map((f) => {
           const dist = distanceMeters(position, f.position);
           const recording = recordingFor === f.id;
           return (
@@ -161,7 +186,12 @@ export default function FriendsScreen({ onLocateFriend }: { onLocateFriend: (fri
                 />
               </div>
               <div className="flex-1 min-w-0">
-                <div className="text-sm font-semibold text-neutral-50">{f.name}</div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm font-semibold text-neutral-50">{f.name}</span>
+                  <span className="text-[11px] text-neutral-500" dir="ltr">
+                    @{f.username}
+                  </span>
+                </div>
                 <div className="flex items-center gap-1 text-[11px] text-neutral-400">
                   {f.shareLocation ? (
                     <>

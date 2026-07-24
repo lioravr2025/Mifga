@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Locate, Mic, Plus, Square, Star } from "lucide-react";
+import { Locate, Mic, Square, Star } from "lucide-react";
 import MapView from "../components/MapView";
 import TopBar from "../components/TopBar";
 import ReportFlow from "../components/ReportFlow";
@@ -7,15 +7,20 @@ import HazardDetailSheet from "../components/HazardDetailSheet";
 import MyProfileCard from "../components/MyProfileCard";
 import PointsToast from "../components/PointsToast";
 import Confetti from "../components/Confetti";
+import ScooterIcon from "../components/ScooterIcon";
+import PulseRing from "../components/PulseRing";
+import InviteFriendButton from "../components/InviteFriendButton";
 import { HazardIcon } from "../components/HazardIcon";
 import { PRIMARY_HAZARD_TYPES } from "../data/hazardTypes";
 import { HAZARD_COLOR_HEX } from "../lib/colors";
-import { useGeolocation } from "../hooks/useGeolocation";
 import { useWalkieRecorder } from "../hooks/useWalkieRecorder";
 import { useApp } from "../context/AppContext";
+import type { RideMonitor } from "../hooks/useRideMonitor";
 import type { HazardTypeId, LatLng } from "../types";
 
 export default function MapScreen({
+  position,
+  ride,
   onGoRoute,
   onGoFriends,
   onGoProfile,
@@ -23,6 +28,8 @@ export default function MapScreen({
   focusFriendId,
   onConsumeFocusFriend,
 }: {
+  position: LatLng;
+  ride: RideMonitor;
   onGoRoute: () => void;
   onGoFriends: () => void;
   onGoProfile: () => void;
@@ -30,7 +37,6 @@ export default function MapScreen({
   focusFriendId: string | null;
   onConsumeFocusFriend: () => void;
 }) {
-  const { position } = useGeolocation();
   const { hazards, friends, settings, lastAwardedPoints, clearLastAwarded } = useApp();
   const friendsInMotionCount = friends.filter((f) => f.online && f.shareLocation).length;
   const favoriteFriends = friends.filter((f) => f.favorite);
@@ -87,6 +93,7 @@ export default function MapScreen({
           theme={settings.theme}
           onSelectHazard={(h) => setSelectedHazardId(h.id)}
           onSelectSelf={() => setSelfCardOpen(true)}
+          rideActive={ride.rideActive}
           pickingLocation={isPicking}
           onPickedCenterChange={setPickedCenter}
         />
@@ -124,15 +131,20 @@ export default function MapScreen({
 
       {!isPicking && (
         <div className="shrink-0 bg-bg-panel border-t border-bg-border px-4 pt-3 pb-2">
-          <div className="flex flex-col items-center -mt-9 mb-2">
-            <span className="text-[11px] text-neutral-400 mb-1">דיווח בקליק!</span>
-            <button
-              onClick={() => openReport()}
-              className="w-14 h-14 rounded-full bg-gradient-to-br from-brand to-brand-light flex items-center justify-center shadow-glow shadow-brand border-4 border-bg-panel active:scale-95 transition"
-            >
-              <Plus size={26} className="text-white" strokeWidth={2.6} />
-            </button>
-            <span className="text-sm font-bold text-neutral-50 mt-1">דווח מפגע</span>
+          <div className="flex flex-col items-center mb-2">
+            <div className="relative z-[1400] w-20 h-20 -mt-[52px]">
+              {ride.rideActive && <PulseRing color="#ef4444" />}
+              <button
+                onClick={() => (ride.rideActive ? ride.stopRide() : ride.startRide())}
+                className={`absolute inset-0 rounded-full flex items-center justify-center shadow-glow border-4 border-bg-panel active:scale-95 transition ${
+                  ride.rideActive ? "bg-gradient-to-br from-red-600 to-red-500 shadow-red-500" : "bg-gradient-to-br from-green-600 to-green-500 shadow-green-500"
+                }`}
+              >
+                {ride.rideActive ? <Square size={30} className="text-white fill-white" /> : <ScooterIcon size={34} color="white" />}
+              </button>
+            </div>
+            <span className="text-[11px] text-neutral-400 mt-1">{ride.rideActive ? "נסיעה פעילה - נתריע על מפגעים בדרך" : "מוכנים לזוז?"}</span>
+            <span className="text-sm font-bold text-neutral-50">{ride.rideActive ? "הפסקת נסיעה" : "תחילת נסיעה"}</span>
           </div>
 
           <div className="flex justify-center gap-5 mb-3">
@@ -174,13 +186,15 @@ export default function MapScreen({
             </div>
           )}
           {favoriteFriends.length === 0 ? (
-            <button
-              onClick={onGoFriends}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl bg-bg-panel2 border border-dashed border-bg-border text-neutral-400 text-sm active:scale-[0.98] transition"
-            >
-              <Star size={16} />
-              <span>סמנו עד 3 חברים מועדפים בטאב חברים כדי לראות אותם כאן</span>
-            </button>
+            <div className="w-full flex items-start gap-3 px-4 py-3 rounded-2xl bg-bg-panel2 border border-dashed border-bg-border text-neutral-400 text-sm">
+              <Star size={16} className="shrink-0 mt-0.5" />
+              <p className="leading-relaxed">
+                <button onClick={onGoFriends} className="underline decoration-dotted underline-offset-2 text-neutral-300">
+                  סמנו עד 3 חברים מועדפים בטאב חברים
+                </button>{" "}
+                כדי לראות אותם כאן, או <InviteFriendButton variant="link" label="הזמינו חברים" />
+              </p>
+            </div>
           ) : (
             <div className="flex gap-2.5">
               {favoriteFriends.map((f) => {

@@ -2,13 +2,16 @@ import { useRef, useState, useEffect } from "react";
 import { Camera, X } from "lucide-react";
 import BottomSheet from "./BottomSheet";
 import VehicleModelInput from "./VehicleModelInput";
+import UsernameField from "./UsernameField";
 import { VEHICLE_DEFS } from "./VehicleIcons";
 import { useApp } from "../context/AppContext";
+import { isUsernameTaken, isValidUsernameFormat } from "../lib/username";
 import type { VehicleTypeId } from "../types";
 
 export default function EditProfileSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { user, updateProfile } = useApp();
+  const { user, friends, updateProfile } = useApp();
   const [name, setName] = useState(user.name);
+  const [username, setUsername] = useState(user.username ?? "");
   const [photo, setPhoto] = useState<string | undefined>(user.avatarPhoto);
   const [vehicleType, setVehicleType] = useState<VehicleTypeId | undefined>(user.vehicleType);
   const [vehicleModel, setVehicleModel] = useState(user.vehicleModel ?? "");
@@ -17,11 +20,14 @@ export default function EditProfileSheet({ open, onClose }: { open: boolean; onC
   useEffect(() => {
     if (open) {
       setName(user.name);
+      setUsername(user.username ?? "");
       setPhoto(user.avatarPhoto);
       setVehicleType(user.vehicleType);
       setVehicleModel(user.vehicleModel ?? "");
     }
-  }, [open, user.name, user.avatarPhoto, user.vehicleType, user.vehicleModel]);
+  }, [open, user.name, user.username, user.avatarPhoto, user.vehicleType, user.vehicleModel]);
+
+  const usernameOk = !username.trim() || (isValidUsernameFormat(username) && !isUsernameTaken(username, friends.map((f) => f.username), user.username));
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -36,9 +42,10 @@ export default function EditProfileSheet({ open, onClose }: { open: boolean; onC
   };
 
   const save = () => {
-    if (!name.trim()) return;
+    if (!name.trim() || !usernameOk) return;
     updateProfile({
       name: name.trim(),
+      username: username.trim() || null,
       avatarPhoto: photo ?? null,
       vehicleType: vehicleType ?? null,
       vehicleModel: vehicleType ? vehicleModel.trim() || null : null,
@@ -82,6 +89,11 @@ export default function EditProfileSheet({ open, onClose }: { open: boolean; onC
         className="w-full px-4 py-3 rounded-2xl bg-bg-panel2 border border-bg-border text-sm text-neutral-100 outline-none focus:border-brand mb-5"
       />
 
+      <label className="text-xs text-neutral-400 mb-1.5 block">שם משתמש (ייחודי)</label>
+      <div className="mb-5">
+        <UsernameField value={username} onChange={setUsername} excludeUsername={user.username} />
+      </div>
+
       <label className="text-xs text-neutral-400 mb-1.5 block">הכלי שלי</label>
       <div className="grid grid-cols-3 gap-2.5 mb-3">
         {VEHICLE_DEFS.map(({ id, label, Icon }) => {
@@ -116,7 +128,7 @@ export default function EditProfileSheet({ open, onClose }: { open: boolean; onC
 
       <button
         onClick={save}
-        disabled={!name.trim()}
+        disabled={!name.trim() || !usernameOk}
         className="w-full py-3.5 rounded-2xl bg-brand text-white font-bold text-base disabled:opacity-40 active:scale-95 transition"
       >
         שמירה

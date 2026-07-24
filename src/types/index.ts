@@ -65,11 +65,15 @@ export interface UserProfile {
   createdAt: number;
   vehicleType?: VehicleTypeId;
   vehicleModel?: string;
+  phone?: string;
+  /** unique handle used for friend search - checked for uniqueness against friends locally, see lib/username.ts */
+  username?: string;
 }
 
 export interface Friend {
   id: string;
   name: string;
+  username: string;
   avatarEmoji: string;
   online: boolean;
   points: number;
@@ -121,4 +125,21 @@ export interface AppSettings {
   notifyRadiusM: number;
   /** "limited" = free tier (3/day), "unlimited" is a locked paid feature not yet purchasable in this prototype */
   notifyDailyLimit: NotifyDailyLimit;
+  /** how close a hazard needs to be, in meters, to trigger an audio alert during an active ride (100-1000) */
+  rideAlertRadiusM: number;
+}
+
+export interface RideLogEntry {
+  id: string;
+  startedAt: number;
+  endedAt: number;
+  /** count of distinct hazards that triggered a beep alert during this ride */
+  hazardsAvoided: number;
+}
+
+export interface FeedbackEntry {
+  id: string;
+  liked: boolean;
+  note: string;
+  submittedAt: number;
 }

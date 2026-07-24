@@ -1,20 +1,21 @@
 import { useState } from "react";
-import { MapContainer, Marker, Polyline, TileLayer } from "react-leaflet";
-import { AlertTriangle, Loader2, MapPin, Navigation, Search, ShieldCheck } from "lucide-react";
+import { Circle, MapContainer, Marker, Polyline, TileLayer } from "react-leaflet";
+import { AlertTriangle, Loader2, MapPin, Navigation, Search, ShieldCheck, Square } from "lucide-react";
 import { useApp } from "../context/AppContext";
-import { useGeolocation } from "../hooks/useGeolocation";
+import ScooterIcon from "../components/ScooterIcon";
+import PulseRing from "../components/PulseRing";
 import { fetchRoute, geocode, minDistanceToPath } from "../lib/routing";
 import { formatDistance } from "../lib/geo";
 import { getHazardType } from "../data/hazardTypes";
 import { destinationDivIcon, hazardDivIcon, selfDivIcon } from "../lib/mapIcons";
+import type { RideMonitor } from "../hooks/useRideMonitor";
 import type { LatLng } from "../types";
 
 const DARK_TILES = "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
 const LIGHT_TILES = "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png";
 const HAZARD_ALERT_RADIUS_M = 120;
 
-export default function RouteScreen() {
-  const { position } = useGeolocation();
+export default function RouteScreen({ position, ride }: { position: LatLng; ride: RideMonitor }) {
   const { hazards, settings, user } = useApp();
   const [destination, setDestination] = useState("");
   const [loading, setLoading] = useState(false);
@@ -81,6 +82,14 @@ export default function RouteScreen() {
       <div className="flex-1 min-h-0 relative">
         <MapContainer center={[position.lat, position.lng]} zoom={13} zoomControl={false} className="w-full h-full">
           <TileLayer url={settings.theme === "dark" ? DARK_TILES : LIGHT_TILES} attribution="&copy; OpenStreetMap &copy; CARTO" />
+          {ride.rideActive && (
+            <Circle
+              center={[position.lat, position.lng]}
+              radius={settings.rideAlertRadiusM}
+              pathOptions={{ color: "#7c3aed", weight: 2, fillColor: "#7c3aed", fillOpacity: 0.08 }}
+              interactive={false}
+            />
+          )}
           <Marker position={[position.lat, position.lng]} icon={selfDivIcon(user.vehicleType)} />
           {destPoint && <Marker position={[destPoint.lat, destPoint.lng]} icon={destinationDivIcon()} />}
           {route && <Polyline positions={route.points.map((p) => [p.lat, p.lng])} pathOptions={{ color: "#7c3aed", weight: 5, opacity: 0.85 }} />}
@@ -89,43 +98,58 @@ export default function RouteScreen() {
           ))}
         </MapContainer>
 
-        {route && (
-          <div className="absolute bottom-3 inset-x-3 z-[500] bg-bg-panel/95 backdrop-blur border border-bg-border rounded-2xl p-4 shadow-2xl max-h-[45%] overflow-y-auto no-scrollbar">
-            <div className="flex items-center justify-between mb-3">
-              <div>
-                <div className="text-lg font-bold text-neutral-50">{Math.round(route.durationS / 60)} דק'</div>
-                <div className="text-xs text-neutral-400">{formatDistance(route.distanceM)}</div>
-              </div>
-              {hazardsOnRoute.length === 0 ? (
-                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-green-500/15 border border-green-500/40 text-green-300 text-xs font-semibold">
-                  <ShieldCheck size={14} />
-                  אין מפגעים ידועים בדרך
+        <div className="absolute bottom-3 inset-x-3 z-[500] flex flex-col gap-2">
+          <div className="relative">
+            {ride.rideActive && <PulseRing color="#ef4444" />}
+            <button
+              onClick={() => (ride.rideActive ? ride.stopRide() : ride.startRide())}
+              className={`relative w-full flex items-center justify-center gap-2 py-3.5 rounded-full shadow-lg border-4 border-bg-panel active:scale-95 transition ${
+                ride.rideActive ? "bg-gradient-to-br from-red-600 to-red-500" : "bg-gradient-to-br from-green-600 to-green-500"
+              }`}
+            >
+              {ride.rideActive ? <Square size={18} className="text-white fill-white" /> : <ScooterIcon size={20} color="white" />}
+              <span className="text-white text-base font-bold">{ride.rideActive ? "הפסקת נסיעה" : "תחילת נסיעה"}</span>
+            </button>
+          </div>
+
+          {route && (
+            <div className="bg-bg-panel/95 backdrop-blur border border-bg-border rounded-2xl p-4 shadow-2xl max-h-[40%] overflow-y-auto no-scrollbar">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <div className="text-lg font-bold text-neutral-50">{Math.round(route.durationS / 60)} דק'</div>
+                  <div className="text-xs text-neutral-400">{formatDistance(route.distanceM)}</div>
                 </div>
-              ) : (
-                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-500/15 border border-amber-500/40 text-amber-300 text-xs font-semibold">
-                  <AlertTriangle size={14} />
-                  {hazardsOnRoute.length} מפגעים בדרך
+                {hazardsOnRoute.length === 0 ? (
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-green-500/15 border border-green-500/40 text-green-300 text-xs font-semibold">
+                    <ShieldCheck size={14} />
+                    אין מפגעים ידועים בדרך
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-500/15 border border-amber-500/40 text-amber-300 text-xs font-semibold">
+                    <AlertTriangle size={14} />
+                    {hazardsOnRoute.length} מפגעים בדרך
+                  </div>
+                )}
+              </div>
+              {hazardsOnRoute.length > 0 && (
+                <div className="space-y-2">
+                  {hazardsOnRoute.map((h) => {
+                    const def = getHazardType(h.type);
+                    return (
+                      <div key={h.id} className="flex items-center gap-2 text-xs text-neutral-300">
+                        <AlertTriangle size={12} className="text-amber-400 shrink-0" />
+                        {def.label}
+                      </div>
+                    );
+                  })}
+                  <p className="text-[10px] text-neutral-500 pt-1">
+                    עקיפה אוטומטית של מפגעים בתכנון המסלול תתווסף בגרסה הבאה - כרגע אנו רק מתריעים על מפגעים שדווחו לאורך הדרך.
+                  </p>
                 </div>
               )}
             </div>
-            {hazardsOnRoute.length > 0 && (
-              <div className="space-y-2">
-                {hazardsOnRoute.map((h) => {
-                  const def = getHazardType(h.type);
-                  return (
-                    <div key={h.id} className="flex items-center gap-2 text-xs text-neutral-300">
-                      <AlertTriangle size={12} className="text-amber-400 shrink-0" />
-                      {def.label}
-                    </div>
-                  );
-                })}
-                <p className="text-[10px] text-neutral-500 pt-1">
-                  עקיפה אוטומטית של מפגעים בתכנון המסלול תתווסף בגרסה הבאה - כרגע אנו רק מתריעים על מפגעים שדווחו לאורך הדרך.
-                </p>
-              </div>
-            )}
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );

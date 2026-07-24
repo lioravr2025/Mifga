@@ -2,11 +2,13 @@ import { User, Users, MapPin, Navigation } from "lucide-react";
 import clsx from "clsx";
 import type { TabId } from "../App";
 
+// Order here is right-to-left visually (RTL row): ראשי sits rightmost, then
+// מסלול, חברים, פרופיל reading leftward - per product request.
 const TABS: { id: TabId; label: string; icon: typeof User }[] = [
-  { id: "profile", label: "פרופיל", icon: User },
-  { id: "friends", label: "חברים", icon: Users },
-  { id: "map", label: "מפה", icon: MapPin },
+  { id: "map", label: "ראשי", icon: MapPin },
   { id: "route", label: "מסלול", icon: Navigation },
+  { id: "friends", label: "חברים", icon: Users },
+  { id: "profile", label: "פרופיל", icon: User },
 ];
 
 export default function BottomNav({ tab, onChange }: { tab: TabId; onChange: (t: TabId) => void }) {

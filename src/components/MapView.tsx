@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { MapContainer, Marker, Popup, TileLayer, useMap, useMapEvents } from "react-leaflet";
+import { Circle, MapContainer, Marker, Popup, TileLayer, useMap, useMapEvents } from "react-leaflet";
 import type { Map as LeafletMap } from "leaflet";
 import type { Friend, HazardReport, LatLng } from "../types";
 import { getHazardType } from "../data/hazardTypes";
@@ -59,6 +59,8 @@ interface MapViewProps {
   onSelectSelf?: () => void;
   pickingLocation?: boolean;
   onPickedCenterChange?: (c: LatLng) => void;
+  /** shows a "protection radius" halo around the self marker, matching settings.rideAlertRadiusM, while a ride is active */
+  rideActive?: boolean;
 }
 
 export default function MapView({
@@ -73,9 +75,10 @@ export default function MapView({
   onSelectSelf,
   pickingLocation = false,
   onPickedCenterChange,
+  rideActive = false,
 }: MapViewProps) {
   const mapRef = useRef<LeafletMap | null>(null);
-  const { user } = useApp();
+  const { user, settings } = useApp();
 
   return (
     <div className="relative w-full h-full">
@@ -90,6 +93,15 @@ export default function MapView({
         <TileLayer url={theme === "dark" ? DARK_TILES : LIGHT_TILES} attribution="&copy; OpenStreetMap &copy; CARTO" />
         <RecenterController target={cameraTarget ?? userPosition} signal={recenterSignal} />
         {pickingLocation && onPickedCenterChange && <CenterTracker onChange={onPickedCenterChange} />}
+
+        {rideActive && (
+          <Circle
+            center={[userPosition.lat, userPosition.lng]}
+            radius={settings.rideAlertRadiusM}
+            pathOptions={{ color: "#7c3aed", weight: 2, fillColor: "#7c3aed", fillOpacity: 0.08 }}
+            interactive={false}
+          />
+        )}
 
         <Marker
           position={[userPosition.lat, userPosition.lng]}

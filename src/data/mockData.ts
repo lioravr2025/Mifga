@@ -45,6 +45,7 @@ export const DEMO_FRIENDS: Friend[] = [
   {
     id: "f1",
     name: "נועה",
+    username: "noa_g",
     avatarEmoji: "👧",
     online: true,
     points: 340,
@@ -56,6 +57,7 @@ export const DEMO_FRIENDS: Friend[] = [
   {
     id: "f2",
     name: "יונתן",
+    username: "yonatan_r",
     avatarEmoji: "🧑‍🦱",
     online: true,
     points: 215,
@@ -67,6 +69,7 @@ export const DEMO_FRIENDS: Friend[] = [
   {
     id: "f3",
     name: "מאיה",
+    username: "maya.b",
     avatarEmoji: "👩",
     online: false,
     points: 512,
@@ -78,6 +81,7 @@ export const DEMO_FRIENDS: Friend[] = [
   {
     id: "f4",
     name: "עידו",
+    username: "ido_k",
     avatarEmoji: "🧔",
     online: true,
     points: 88,

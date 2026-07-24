@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Bell, Check, Gift, Lock, Moon, Send, Shield, Siren, Sun, TriangleAlert, X } from "lucide-react";
+import { Bell, Check, Gift, Lock, Moon, Send, Shield, Siren, Sun, TriangleAlert, Volume2, X } from "lucide-react";
 import BottomSheet from "./BottomSheet";
 import { useApp } from "../context/AppContext";
 import { HAZARD_COLOR_HEX } from "../lib/colors";
@@ -94,6 +94,28 @@ export default function SettingsSheet({ open, onClose }: { open: boolean; onClos
             className={`absolute top-0.5 w-6 h-6 rounded-full bg-white transition-all ${settings.notificationsEnabled ? "right-0.5" : "right-[22px]"}`}
           />
         </button>
+      </div>
+
+      <div className="p-4 rounded-2xl bg-bg-panel2 border border-bg-border mb-3">
+        <div className="flex items-center gap-3 mb-3">
+          <span className="w-9 h-9 rounded-full bg-bg-panel flex items-center justify-center">
+            <Volume2 size={17} className="text-brand-light" />
+          </span>
+          <div>
+            <div className="text-sm font-semibold text-neutral-50">התרעות קוליות בזמן נסיעה</div>
+            <div className="text-xs text-neutral-400">צפצוף שונה לשוטר, לפקח ולמפגע אחר תוך כדי נסיעה</div>
+          </div>
+        </div>
+        <input
+          type="range"
+          min={100}
+          max={1000}
+          step={50}
+          value={settings.rideAlertRadiusM}
+          onChange={(e) => updateSettings({ rideAlertRadiusM: Number(e.target.value) })}
+          className="w-full accent-brand"
+        />
+        <div className="text-xs text-neutral-400 mt-1">רדיוס התרעה: {settings.rideAlertRadiusM} מטר</div>
       </div>
 
       {settings.notificationsEnabled && (

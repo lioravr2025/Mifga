@@ -1,13 +1,20 @@
-import { Award, Camera, FileText, Pencil, Settings, Star, Trophy } from "lucide-react";
+import { Award, Camera, FileText, History, Pencil, Settings, ShieldCheck, Star, Trophy } from "lucide-react";
 import { useState } from "react";
 import { useApp } from "../context/AppContext";
 import { levelForPoints } from "../lib/levels";
+import { timeAgo } from "../lib/geo";
 import EditProfileSheet from "../components/EditProfileSheet";
+import InviteFriendButton from "../components/InviteFriendButton";
+import RideHistorySheet from "../components/RideHistorySheet";
+
+const RECENT_RIDES_SHOWN = 3;
 
 export default function ProfileScreen({ onOpenSettings }: { onOpenSettings: () => void }) {
-  const { user, friends } = useApp();
+  const { user, friends, rideLog } = useApp();
   const { level, title, progress, pointsToNext, isMax } = levelForPoints(user.points);
   const [editOpen, setEditOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const totalHazardsAvoided = rideLog.reduce((sum, r) => sum + r.hazardsAvoided, 0);
 
   const board = [{ id: user.id, name: `${user.name} (את/ה)`, points: user.points, mine: true }, ...friends.map((f) => ({ id: f.id, name: f.name, points: f.points, mine: false }))]
     .sort((a, b) => b.points - a.points);
@@ -85,6 +92,58 @@ export default function ProfileScreen({ onOpenSettings }: { onOpenSettings: () =
         </div>
       </div>
 
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <History size={16} className="text-brand-light" />
+          <h2 className="text-sm font-bold text-neutral-100">יומן נסיעות</h2>
+        </div>
+        {rideLog.length > 0 && (
+          <span className="flex items-center gap-1 text-[11px] text-green-400 font-semibold">
+            <ShieldCheck size={12} />
+            {totalHazardsAvoided} מפגעים נחסכו בסך הכל
+          </span>
+        )}
+      </div>
+      {rideLog.length === 0 ? (
+        <div className="p-4 rounded-2xl bg-bg-panel2 border border-dashed border-bg-border text-center text-xs text-neutral-500 mb-6">
+          עדיין לא תיעדתם נסיעה - לחצו "תחילת נסיעה" במסך הראשי כדי להתחיל
+        </div>
+      ) : (
+        <div className="rounded-2xl bg-bg-panel2 border border-bg-border divide-y divide-bg-border overflow-hidden mb-3">
+          {rideLog.slice(0, RECENT_RIDES_SHOWN).map((r) => {
+            const minutes = Math.max(1, Math.round((r.endedAt - r.startedAt) / 60000));
+            return (
+              <div key={r.id} className="flex items-center gap-3 px-4 py-3">
+                <span className="w-9 h-9 rounded-full bg-brand/15 flex items-center justify-center shrink-0">
+                  <History size={15} className="text-brand-light" />
+                </span>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-semibold text-neutral-100">נסיעה {timeAgo(r.startedAt)}</div>
+                  <div className="text-[11px] text-neutral-400">{minutes} דק'</div>
+                </div>
+                <span className="flex items-center gap-1 text-xs font-bold text-green-400 shrink-0">
+                  <ShieldCheck size={13} />
+                  {r.hazardsAvoided}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {rideLog.length > RECENT_RIDES_SHOWN && (
+        <button
+          onClick={() => setHistoryOpen(true)}
+          className="w-full py-2.5 mb-6 rounded-2xl bg-bg-panel2 border border-bg-border text-xs font-semibold text-brand-light active:scale-[0.98] transition"
+        >
+          נסיעות קודמות ({rideLog.length - RECENT_RIDES_SHOWN}+)
+        </button>
+      )}
+      {rideLog.length > 0 && rideLog.length <= RECENT_RIDES_SHOWN && <div className="mb-6" />}
+
+      <div className="mb-6">
+        <InviteFriendButton />
+      </div>
+
       <div className="flex items-center gap-2 mb-3">
         <Award size={16} className="text-brand-light" />
         <h2 className="text-sm font-bold text-neutral-100">המדווחים המובילים</h2>
@@ -100,6 +159,7 @@ export default function ProfileScreen({ onOpenSettings }: { onOpenSettings: () =
       </div>
 
       <EditProfileSheet open={editOpen} onClose={() => setEditOpen(false)} />
+      <RideHistorySheet open={historyOpen} onClose={() => setHistoryOpen(false)} />
     </div>
   );
 }
