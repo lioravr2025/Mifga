@@ -38,14 +38,17 @@ export default function FriendsScreen({ onLocateFriend }: { onLocateFriend: (fri
     setTimeout(() => setLastSentLabel(null), 2200);
   };
 
-  const notifyError = () => {
-    setRecError("לא הצלחנו להקליט - בדקו הרשאת מיקרופון בהגדרות המכשיר");
-    setTimeout(() => setRecError(null), 3000);
+  const notifyError = (reason?: string) => {
+    // Shown to the user (not just logged) so a bug report can include the exact
+    // reason instead of everyone having to guess - reason is a DOMException
+    // name like NotAllowedError (permission denied) / NotFoundError (no mic).
+    setRecError(`לא הצלחנו להקליט - בדקו הרשאת מיקרופון בהגדרות המכשיר${reason ? ` (${reason})` : ""}`);
+    setTimeout(() => setRecError(null), 5000);
   };
 
-  const { recordingFor, start, stop, cancel } = useWalkieRecorder((targetId, blob) => {
+  const { recordingFor, start, stop, cancel } = useWalkieRecorder((targetId, blob, errorReason) => {
     if (isBackendConfigured && !blob) {
-      notifyError();
+      notifyError(errorReason);
       return;
     }
     if (targetId.startsWith("g-")) {

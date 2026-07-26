@@ -75,10 +75,10 @@ export default function MapScreen({
     if (lastAwardedPoints !== null) setConfettiTrigger((t) => t + 1);
   }, [lastAwardedPoints]);
 
-  const { recordingFor, start: startWalkie, stop: stopWalkie, cancel: cancelWalkie } = useWalkieRecorder((friendId, blob) => {
+  const { recordingFor, start: startWalkie, stop: stopWalkie, cancel: cancelWalkie } = useWalkieRecorder((friendId, blob, errorReason) => {
     if (isBackendConfigured && !blob) {
-      setWalkieSentLabel("לא הצלחנו להקליט - בדקו הרשאת מיקרופון");
-      setTimeout(() => setWalkieSentLabel(null), 3000);
+      setWalkieSentLabel(`לא הצלחנו להקליט - בדקו הרשאת מיקרופון${errorReason ? ` (${errorReason})` : ""}`);
+      setTimeout(() => setWalkieSentLabel(null), 5000);
       return;
     }
     const friend = friends.find((f) => f.id === friendId);

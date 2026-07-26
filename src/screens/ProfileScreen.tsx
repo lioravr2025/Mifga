@@ -6,6 +6,8 @@ import { timeAgo } from "../lib/geo";
 import EditProfileSheet from "../components/EditProfileSheet";
 import InviteFriendButton from "../components/InviteFriendButton";
 import RideHistorySheet from "../components/RideHistorySheet";
+import RideRouteSheet from "../components/RideRouteSheet";
+import type { RideLogEntry } from "../types";
 
 const RECENT_RIDES_SHOWN = 3;
 
@@ -14,6 +16,7 @@ export default function ProfileScreen({ onOpenSettings }: { onOpenSettings: () =
   const { level, title, progress, pointsToNext, isMax } = levelForPoints(user.points);
   const [editOpen, setEditOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [selectedRide, setSelectedRide] = useState<RideLogEntry | null>(null);
   const totalHazardsAvoided = rideLog.reduce((sum, r) => sum + r.hazardsAvoided, 0);
 
   const board = [{ id: user.id, name: `${user.name} (את/ה)`, points: user.points, mine: true }, ...friends.map((f) => ({ id: f.id, name: f.name, points: f.points, mine: false }))]
@@ -113,7 +116,11 @@ export default function ProfileScreen({ onOpenSettings }: { onOpenSettings: () =
           {rideLog.slice(0, RECENT_RIDES_SHOWN).map((r) => {
             const minutes = Math.max(1, Math.round((r.endedAt - r.startedAt) / 60000));
             return (
-              <div key={r.id} className="flex items-center gap-3 px-4 py-3">
+              <button
+                key={r.id}
+                onClick={() => setSelectedRide(r)}
+                className="w-full flex items-center gap-3 px-4 py-3 active:bg-bg-panel transition text-right"
+              >
                 <span className="w-9 h-9 rounded-full bg-brand/15 flex items-center justify-center shrink-0">
                   <History size={15} className="text-brand-light" />
                 </span>
@@ -125,7 +132,7 @@ export default function ProfileScreen({ onOpenSettings }: { onOpenSettings: () =
                   <ShieldCheck size={13} />
                   {r.hazardsAvoided}
                 </span>
-              </div>
+              </button>
             );
           })}
         </div>
@@ -160,6 +167,7 @@ export default function ProfileScreen({ onOpenSettings }: { onOpenSettings: () =
 
       <EditProfileSheet open={editOpen} onClose={() => setEditOpen(false)} />
       <RideHistorySheet open={historyOpen} onClose={() => setHistoryOpen(false)} />
+      <RideRouteSheet ride={selectedRide} onClose={() => setSelectedRide(null)} />
     </div>
   );
 }

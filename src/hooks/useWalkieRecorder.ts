@@ -16,7 +16,7 @@ const MAX_RECORDING_MS = 15_000;
  * Auto-stops and sends after MAX_RECORDING_MS so a held-too-long press can't
  * produce an endless clip.
  */
-export function useWalkieRecorder(onSent: (targetId: string, blob: Blob | null) => void) {
+export function useWalkieRecorder(onSent: (targetId: string, blob: Blob | null, errorReason?: string) => void) {
   const [recordingFor, setRecordingFor] = useState<string | null>(null);
   const mediaRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -30,12 +30,12 @@ export function useWalkieRecorder(onSent: (targetId: string, blob: Blob | null) 
     }
   };
 
-  const simulate = (targetId: string) => {
+  const simulate = (targetId: string, errorReason?: string) => {
     setRecordingFor(targetId);
     setTimeout(() => {
       setRecordingFor(null);
       activeTargetRef.current = null; // otherwise every future press is silently ignored - see start()'s guard
-      onSent(targetId, null);
+      onSent(targetId, null, errorReason);
     }, SIMULATED_RECORDING_MS);
   };
 
@@ -46,7 +46,7 @@ export function useWalkieRecorder(onSent: (targetId: string, blob: Blob | null) 
     activeTargetRef.current = targetId;
 
     if (!("mediaDevices" in navigator) || !navigator.mediaDevices?.getUserMedia) {
-      simulate(targetId);
+      simulate(targetId, "getUserMedia-unsupported");
       return;
     }
     try {
@@ -61,8 +61,13 @@ export function useWalkieRecorder(onSent: (targetId: string, blob: Blob | null) 
       setRecordingFor(targetId);
       maxTimerRef.current = setTimeout(() => stop(targetId), MAX_RECORDING_MS);
     } catch (err) {
+      // The DOMException name (NotAllowedError/NotFoundError/NotSupportedError/...)
+      // is the only reliable way to tell "permission denied" apart from "no mic
+      // hardware" or "insecure context" - surfacing it (instead of a generic
+      // message) is what makes the next bug report actionable.
+      const reason = err instanceof Error ? err.name || err.message : String(err);
       console.error("Mifga: mic recording unavailable", err);
-      simulate(targetId);
+      simulate(targetId, reason);
     }
   };
 
