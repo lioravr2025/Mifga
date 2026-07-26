@@ -3,6 +3,24 @@
 -- Run this in the SQL Editor AFTER schema.sql. Safe to re-run (IF NOT EXISTS /
 -- CREATE OR REPLACE / ADD COLUMN IF NOT EXISTS throughout).
 
+-- `alter publication ... add table` has no IF NOT EXISTS - re-running it for a
+-- table that's already a member errors, which (since the whole pasted script
+-- runs as one transaction) rolls back everything else in this same run too,
+-- including any real fixes below it. This makes every use of it idempotent.
+create or replace function public.ensure_realtime(p_schema text, p_table text)
+returns void
+language plpgsql
+as $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = p_schema and tablename = p_table
+  ) then
+    execute format('alter publication supabase_realtime add table %I.%I', p_schema, p_table);
+  end if;
+end;
+$$;
+
 -- ============================================================================
 -- profiles: live presence (position + last-active, used to show "online" /
 -- distance for friends on the map)
@@ -110,8 +128,8 @@ $$;
 grant execute on function public.respond_friend_request(uuid, boolean) to authenticated;
 grant execute on function public.toggle_friend_favorite(uuid) to authenticated;
 
-alter publication supabase_realtime add table public.friendships;
-alter publication supabase_realtime add table public.profiles;
+select public.ensure_realtime('public', 'friendships');
+select public.ensure_realtime('public', 'profiles');
 
 -- ============================================================================
 -- walkie_groups / walkie_group_members - real invite/accept flow (the
@@ -211,8 +229,8 @@ $$;
 
 grant execute on function public.respond_group_invite(uuid, boolean) to authenticated;
 
-alter publication supabase_realtime add table public.walkie_groups;
-alter publication supabase_realtime add table public.walkie_group_members;
+select public.ensure_realtime('public', 'walkie_groups');
+select public.ensure_realtime('public', 'walkie_group_members');
 
 -- ============================================================================
 -- walkie_group_messages - real push-to-talk voice messages (audio_url points
@@ -291,8 +309,8 @@ $$;
 grant execute on function public.send_group_message(uuid, text) to authenticated;
 grant execute on function public.mark_message_delivered(uuid) to authenticated;
 
-alter publication supabase_realtime add table public.walkie_group_messages;
-alter publication supabase_realtime add table public.walkie_group_message_receipts;
+select public.ensure_realtime('public', 'walkie_group_messages');
+select public.ensure_realtime('public', 'walkie_group_message_receipts');
 
 -- ============================================================================
 -- friend_messages - direct (non-group) walkie-talkie voice messages. Simpler
@@ -343,7 +361,7 @@ $$;
 
 grant execute on function public.mark_friend_message_delivered(uuid) to authenticated;
 
-alter publication supabase_realtime add table public.friend_messages;
+select public.ensure_realtime('public', 'friend_messages');
 
 -- ============================================================================
 -- ride_log (WIRED)
