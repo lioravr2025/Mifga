@@ -14,7 +14,14 @@ alter table public.profiles add column if not exists last_active_at timestamptz;
 -- ============================================================================
 -- friendships - request/accept model. One row per pair, direction matters
 -- only for who has to approve; "favorite" is per-viewer since it's subjective.
+--
+-- schema.sql already created a `friendships` table as a RESERVED stub
+-- (user_id/friend_id/favorite only, no id/status) that was never used by any
+-- client code - drop it first so the shape below actually takes effect
+-- instead of silently no-op'ing under CREATE TABLE IF NOT EXISTS.
 -- ============================================================================
+drop table if exists public.friendships cascade;
+
 create table if not exists public.friendships (
   id uuid primary key default gen_random_uuid(),
   requester_id uuid not null references public.profiles(id) on delete cascade,
