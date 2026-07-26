@@ -23,7 +23,7 @@ export default function SettingsSheet({ open, onClose }: { open: boolean; onClos
   const vehicleLine = user.vehicleType
     ? `${user.name} רוכב/ת על ${vehicleLabel(user.vehicleType)}${user.vehicleModel ? " " + user.vehicleModel : ""}. `
     : "";
-  const composedInvite = `${user.name} הזמין/ה אותך להצטרף ל-Mifga! ${vehicleLine}הורידו את האפליקציה כדי לדווח ולהימנע ממפגעים בדרכים: mifga.app/join`;
+  const composedInvite = `${user.name} הזמין/ה אותך להצטרף ל-Mifga! ${vehicleLine}הורידו את האפליקציה כדי לדווח ולהימנע ממפגעים בדרכים: https://israel-ai.org/mifga`;
 
   const sendReferral = () => {
     if (!phoneValid) return;

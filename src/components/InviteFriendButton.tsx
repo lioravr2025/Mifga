@@ -2,7 +2,8 @@ import { useState } from "react";
 import { Copy, Check, MessageCircle, Send, Share2, UserPlus } from "lucide-react";
 import BottomSheet from "./BottomSheet";
 
-const INVITE_URL = "https://mifga.app/join";
+// Points at the landing page during the closed pilot, since there's no app-store listing yet.
+const INVITE_URL = "https://israel-ai.org/mifga";
 const INVITE_TEXT = `מצאתי אפליקציה שמונעת דוחות וקנסות ועוזרת לנסוע בטוח - Mifga! 🛴 תורידו אותה: ${INVITE_URL}`;
 
 /**

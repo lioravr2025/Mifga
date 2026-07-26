@@ -79,8 +79,18 @@ export default function OnboardingScreen() {
         vehicleModel: vehicleType ? vehicleModel.trim() || null : null,
       });
       updateNotifyTypes(notifyTypes);
-    } catch {
-      setSubmitError("ההרשמה נכשלה - בדקו את החיבור לאינטרנט ונסו שוב");
+    } catch (err) {
+      console.error("Mifga: onboarding failed", err);
+      // A real connectivity failure surfaces as a TypeError from fetch() itself (can't reach
+      // the server at all); anything else is a response we DID get back, with a real reason -
+      // showing that reason beats a generic "check your internet" that's misleading and
+      // impossible to debug from a bug report.
+      if (err instanceof TypeError) {
+        setSubmitError("ההרשמה נכשלה - בדקו את החיבור לאינטרנט ונסו שוב");
+      } else {
+        const message = err && typeof err === "object" && "message" in err ? String((err as { message: unknown }).message) : "שגיאה לא צפויה";
+        setSubmitError(`ההרשמה נכשלה: ${message}`);
+      }
       setSubmitting(false);
     }
   };
