@@ -2,7 +2,6 @@ node_modules
 dist
 dist-ssr
 *.local
-android
 ios
 .DS_Store
 *.tsbuildinfo

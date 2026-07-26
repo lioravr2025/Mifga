@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Mifga</string>
+    <string name="title_activity_main">Mifga</string>
+    <string name="package_name">com.mifga.app</string>
+    <string name="custom_url_scheme">com.mifga.app</string>
+</resources>

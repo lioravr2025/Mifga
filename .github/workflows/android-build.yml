@@ -1,0 +1,57 @@
+name: Build Android APK
+
+# Produces an installable debug APK in the cloud - no local Android SDK needed.
+# Download it from the run's "Artifacts" section, then sideload onto a phone.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: # lets you trigger a build manually from the Actions tab
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build web assets
+        run: npm run build
+        env:
+          # Safe to keep here, not a secret: this is the public anon/publishable
+          # key, meant to ship inside client apps - real access control is RLS
+          # in Postgres, not keeping this value hidden.
+          VITE_SUPABASE_URL: https://tmmyimiubfnpkujulqll.supabase.co
+          VITE_SUPABASE_ANON_KEY: sb_publishable_2yytuXb8y5nQGCZqd5bquQ_t-ZEY7j7
+
+      - name: Sync Capacitor
+        run: npx cap sync android
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "21"
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Build debug APK
+        working-directory: android
+        run: |
+          chmod +x ./gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: mifga-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
