@@ -81,7 +81,7 @@ export default function RouteScreen({ position, ride }: { position: LatLng; ride
         {error && <div className="mt-2 text-xs text-red-400">{error}</div>}
       </div>
 
-      <div className="flex-1 min-h-0 relative">
+      <div className="flex-1 min-h-0 relative isolate">
         <MapContainer center={[position.lat, position.lng]} zoom={13} zoomControl={false} attributionControl={false} className="w-full h-full">
           <AttributionControl position="bottomright" prefix={false} />
           <TileLayer url={settings.theme === "dark" ? DARK_TILES : LIGHT_TILES} attribution="&copy; OpenStreetMap &copy; CARTO" />

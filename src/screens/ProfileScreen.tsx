@@ -20,6 +20,7 @@ export default function ProfileScreen({ onOpenSettings }: { onOpenSettings: () =
   const totalHazardsAvoided = rideLog.reduce((sum, r) => sum + r.hazardsAvoided, 0);
 
   const board = [{ id: user.id, name: `${user.name} (את/ה)`, points: user.points, mine: true }, ...friends.map((f) => ({ id: f.id, name: f.name, points: f.points, mine: false }))]
+    .filter((row) => row.points > 0)
     .sort((a, b) => b.points - a.points);
 
   return (
@@ -115,6 +116,9 @@ export default function ProfileScreen({ onOpenSettings }: { onOpenSettings: () =
         <div className="rounded-2xl bg-bg-panel2 border border-bg-border divide-y divide-bg-border overflow-hidden mb-3">
           {rideLog.slice(0, RECENT_RIDES_SHOWN).map((r) => {
             const minutes = Math.max(1, Math.round((r.endedAt - r.startedAt) / 60000));
+            const start = new Date(r.startedAt);
+            const dateLabel = start.toLocaleDateString("he-IL", { day: "2-digit", month: "2-digit" });
+            const timeLabel = start.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
             return (
               <button
                 key={r.id}
@@ -125,8 +129,12 @@ export default function ProfileScreen({ onOpenSettings }: { onOpenSettings: () =
                   <History size={15} className="text-brand-light" />
                 </span>
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-semibold text-neutral-100">נסיעה {timeAgo(r.startedAt)}</div>
-                  <div className="text-[11px] text-neutral-400">{minutes} דק'</div>
+                  <div className="text-sm font-semibold text-neutral-100">
+                    {dateLabel} · {timeLabel}
+                  </div>
+                  <div className="text-[11px] text-neutral-400">
+                    {minutes} דק' · {timeAgo(r.startedAt)}
+                  </div>
                 </div>
                 <span className="flex items-center gap-1 text-xs font-bold text-green-400 shrink-0">
                   <ShieldCheck size={13} />
@@ -155,15 +163,21 @@ export default function ProfileScreen({ onOpenSettings }: { onOpenSettings: () =
         <Award size={16} className="text-brand-light" />
         <h2 className="text-sm font-bold text-neutral-100">המדווחים המובילים</h2>
       </div>
-      <div className="rounded-2xl bg-bg-panel2 border border-bg-border divide-y divide-bg-border overflow-hidden mb-4">
-        {board.map((row, i) => (
-          <div key={row.id} className={`flex items-center gap-3 px-4 py-3 ${row.mine ? "bg-brand/10" : ""}`}>
-            <span className="w-6 text-center text-sm font-bold text-neutral-400">{i + 1}</span>
-            <span className="flex-1 text-sm font-medium text-neutral-100">{row.name}</span>
-            <span className="text-sm font-bold text-brand-light">{row.points}</span>
-          </div>
-        ))}
-      </div>
+      {board.length === 0 ? (
+        <div className="p-4 rounded-2xl bg-bg-panel2 border border-dashed border-bg-border text-center text-xs text-neutral-500 mb-4">
+          עדיין אין מדווחים עם נקודות - היו הראשונים לדווח כדי להופיע כאן
+        </div>
+      ) : (
+        <div className="rounded-2xl bg-bg-panel2 border border-bg-border divide-y divide-bg-border overflow-hidden mb-4">
+          {board.map((row, i) => (
+            <div key={row.id} className={`flex items-center gap-3 px-4 py-3 ${row.mine ? "bg-brand/10" : ""}`}>
+              <span className="w-6 text-center text-sm font-bold text-neutral-400">{i + 1}</span>
+              <span className="flex-1 text-sm font-medium text-neutral-100">{row.name}</span>
+              <span className="text-sm font-bold text-brand-light">{row.points}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       <EditProfileSheet open={editOpen} onClose={() => setEditOpen(false)} />
       <RideHistorySheet open={historyOpen} onClose={() => setHistoryOpen(false)} />

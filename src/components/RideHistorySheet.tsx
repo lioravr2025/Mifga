@@ -26,6 +26,9 @@ export default function RideHistorySheet({ open, onClose }: { open: boolean; onC
       <div className="rounded-2xl bg-bg-panel2 border border-bg-border divide-y divide-bg-border overflow-hidden">
         {rideLog.map((r) => {
           const minutes = Math.max(1, Math.round((r.endedAt - r.startedAt) / 60000));
+          const start = new Date(r.startedAt);
+          const dateLabel = start.toLocaleDateString("he-IL", { day: "2-digit", month: "2-digit" });
+          const timeLabel = start.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
           return (
             <button
               key={r.id}
@@ -36,8 +39,12 @@ export default function RideHistorySheet({ open, onClose }: { open: boolean; onC
                 <History size={15} className="text-brand-light" />
               </span>
               <div className="flex-1 min-w-0">
-                <div className="text-sm font-semibold text-neutral-100">נסיעה {timeAgo(r.startedAt)}</div>
-                <div className="text-[11px] text-neutral-400">{minutes} דק'</div>
+                <div className="text-sm font-semibold text-neutral-100">
+                  {dateLabel} · {timeLabel}
+                </div>
+                <div className="text-[11px] text-neutral-400">
+                  {minutes} דק' · {timeAgo(r.startedAt)}
+                </div>
               </div>
               <span className="flex items-center gap-1 text-xs font-bold text-green-400 shrink-0">
                 <ShieldCheck size={13} />
