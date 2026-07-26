@@ -6,3 +6,5 @@ android
 ios
 .DS_Store
 *.tsbuildinfo
+
+.vercel

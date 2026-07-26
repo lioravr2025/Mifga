@@ -1,12 +1,11 @@
 import { useRef, useState } from "react";
-import { Bell, Camera, Footprints, Gauge, Shield, ShieldCheck, Siren, TriangleAlert, Zap } from "lucide-react";
+import { AlertTriangle, Bell, Camera, Footprints, Gauge, Loader2, Shield, ShieldCheck, Siren, TriangleAlert, Zap } from "lucide-react";
 import { useApp } from "../context/AppContext";
 import { VEHICLE_DEFS } from "../components/VehicleIcons";
 import VehicleModelInput from "../components/VehicleModelInput";
 import UsernameField from "../components/UsernameField";
 import InviteFriendButton from "../components/InviteFriendButton";
 import { HAZARD_COLOR_HEX } from "../lib/colors";
-import { isUsernameTaken, isValidUsernameFormat } from "../lib/username";
 import type { NotifyTypePrefs, VehicleTypeId } from "../types";
 
 function isValidIsraeliPhone(raw: string): boolean {
@@ -22,9 +21,10 @@ const NOTIFY_ROWS: { key: keyof NotifyTypePrefs; label: string; icon: typeof Sir
 ];
 
 export default function OnboardingScreen() {
-  const { updateProfile, updateNotifyTypes, completeOnboarding, settings, hazards, friends } = useApp();
+  const { updateNotifyTypes, completeOnboarding, settings, hazards } = useApp();
   const [name, setName] = useState("");
   const [username, setUsername] = useState("");
+  const [usernameOk, setUsernameOk] = useState(false);
   const [phone, setPhone] = useState("");
   const [phoneTouched, setPhoneTouched] = useState(false);
   const [photo, setPhoto] = useState<string | undefined>(undefined);
@@ -32,11 +32,12 @@ export default function OnboardingScreen() {
   const [vehicleModel, setVehicleModel] = useState("");
   const [noVehicle, setNoVehicle] = useState(false);
   const [notifyTypes, setNotifyTypes] = useState<NotifyTypePrefs>(settings.notifyTypes);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const phoneValid = isValidIsraeliPhone(phone);
-  const usernameValid = isValidUsernameFormat(username) && !isUsernameTaken(username, friends.map((f) => f.username));
-  const canSubmit = name.trim().length > 0 && phoneValid && usernameValid;
+  const canSubmit = name.trim().length > 0 && phoneValid && usernameOk && !submitting;
 
   const activeHazardsCount = hazards.length;
   // "tickets avoided" = distinct encounters with a police/inspector hazard reported in
@@ -64,18 +65,24 @@ export default function OnboardingScreen() {
     setNoVehicle((prev) => !prev);
   };
 
-  const submit = () => {
+  const submit = async () => {
     if (!canSubmit) return;
-    updateProfile({
-      name: name.trim(),
-      username: username.trim(),
-      phone: phone.trim(),
-      avatarPhoto: photo ?? null,
-      vehicleType: vehicleType ?? null,
-      vehicleModel: vehicleType ? vehicleModel.trim() || null : null,
-    });
-    updateNotifyTypes(notifyTypes);
-    completeOnboarding();
+    setSubmitting(true);
+    setSubmitError(null);
+    try {
+      await completeOnboarding({
+        name: name.trim(),
+        username: username.trim(),
+        phone: phone.trim(),
+        avatarPhoto: photo ?? null,
+        vehicleType: vehicleType ?? null,
+        vehicleModel: vehicleType ? vehicleModel.trim() || null : null,
+      });
+      updateNotifyTypes(notifyTypes);
+    } catch {
+      setSubmitError("ההרשמה נכשלה - בדקו את החיבור לאינטרנט ונסו שוב");
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -137,7 +144,7 @@ export default function OnboardingScreen() {
 
         <label className="text-xs text-neutral-400 mb-1.5 block">שם משתמש (ייחודי) *</label>
         <div className="mb-4">
-          <UsernameField value={username} onChange={setUsername} />
+          <UsernameField value={username} onChange={setUsername} onValidityChange={setUsernameOk} />
         </div>
 
         <label className="text-xs text-neutral-400 mb-1.5 block">מספר טלפון *</label>
@@ -233,15 +240,22 @@ export default function OnboardingScreen() {
           <InviteFriendButton label="מכירים עוד רוכבים? הזמינו אותם" />
         </div>
 
+        {submitError && (
+          <div className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-red-500/10 border border-red-500/40 text-red-300 text-xs font-semibold mb-3">
+            <AlertTriangle size={14} className="shrink-0" />
+            {submitError}
+          </div>
+        )}
+
         <button
           onClick={submit}
           disabled={!canSubmit}
           className="w-full py-4 rounded-2xl bg-brand text-white font-bold text-base disabled:opacity-40 active:scale-95 transition flex items-center justify-center gap-2"
         >
-          <Zap size={18} />
-          בואו נתחיל לנסוע בטוח
+          {submitting ? <Loader2 size={18} className="animate-spin" /> : <Zap size={18} />}
+          {submitting ? "נרשמים..." : "בואו נתחיל לנסוע בטוח"}
         </button>
-        {!canSubmit && (
+        {!canSubmit && !submitting && (
           <p className="text-[11px] text-neutral-500 text-center mt-2">כינוי, שם משתמש ייחודי, ומספר טלפון תקין נדרשים כדי להמשיך</p>
         )}
       </div>

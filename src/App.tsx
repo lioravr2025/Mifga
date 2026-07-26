@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Gauge } from "lucide-react";
 import BottomNav from "./components/BottomNav";
 import FeedbackButton from "./components/FeedbackButton";
 import SettingsSheet from "./components/SettingsSheet";
@@ -18,7 +19,7 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [focusFriendId, setFocusFriendId] = useState<string | null>(null);
   const { position } = useGeolocation();
-  const { onboardingComplete } = useApp();
+  const { onboardingComplete, backendReady } = useApp();
   // Lives here (not inside a screen) so a ride keeps beeping regardless of
   // which tab is open - Route isn't kept mounted like Map is.
   const ride = useRideMonitor(position);
@@ -26,7 +27,12 @@ export default function App() {
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-[#05070d] sm:py-4">
       <div className="relative w-full h-[100dvh] sm:h-[92dvh] sm:max-h-[900px] max-w-[430px] bg-bg overflow-hidden flex flex-col sm:rounded-[2.5rem] sm:border-8 sm:border-black sm:shadow-2xl">
-        {!onboardingComplete ? (
+        {!backendReady ? (
+          <div className="flex-1 flex flex-col items-center justify-center gap-3 bg-bg">
+            <Gauge size={32} className="text-brand-light animate-pulse" />
+            <span className="text-sm text-neutral-400">מתחברים ל-Mifga...</span>
+          </div>
+        ) : !onboardingComplete ? (
           <OnboardingScreen />
         ) : (
           <>

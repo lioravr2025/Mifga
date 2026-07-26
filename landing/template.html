@@ -1,0 +1,432 @@
+<title>Mifga | מפגע - יודעים מה מחכה בדרך</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #090e1a;
+    --bg-1: #0e1526;
+    --bg-2: #131c2e;
+    --bg-3: #1a2438;
+    --border: #232e48;
+    --brand: #7c3aed;
+    --brand-light: #a78bfa;
+    --siren: #f43f5e;
+    --shield: #38bdf8;
+    --ink: #f3f1fb;
+    --muted: #9aa3c4;
+    --muted-2: #6b7494;
+    --radius-lg: 28px;
+    --radius-md: 20px;
+    --radius-sm: 14px;
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f3fb;
+    --bg-1: #ffffff;
+    --bg-2: #ffffff;
+    --bg-3: #ede9fb;
+    --border: #e0dcf5;
+    --ink: #17152b;
+    --muted: #57567a;
+    --muted-2: #85839f;
+  }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --bg: #f4f3fb;
+      --bg-1: #ffffff;
+      --bg-2: #ffffff;
+      --bg-3: #ede9fb;
+      --border: #e0dcf5;
+      --ink: #17152b;
+      --muted: #57567a;
+      --muted-2: #85839f;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Rubik', 'Segoe UI', system-ui, -apple-system, sans-serif;
+    direction: rtl;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; scroll-behavior: auto !important; }
+  }
+
+  .wrap { max-width: 520px; margin: 0 auto; padding: 0 20px; }
+  .glow-bg {
+    position: fixed; inset: 0; z-index: -1; pointer-events: none;
+    background:
+      radial-gradient(480px 380px at 78% -6%, rgba(124,58,237,0.30), transparent 60%),
+      radial-gradient(420px 340px at 8% 18%, rgba(244,63,94,0.14), transparent 60%),
+      radial-gradient(420px 340px at 92% 40%, rgba(56,189,248,0.12), transparent 60%),
+      var(--bg);
+  }
+  :root[data-theme="light"] .glow-bg, @media (prefers-color-scheme: light) { }
+
+  /* ---------- top bar ---------- */
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 18px 20px 10px;
+    max-width: 520px; margin: 0 auto;
+  }
+  .wordmark { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 19px; letter-spacing: -0.01em; }
+  .wordmark .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--siren); box-shadow: 0 0 12px 1px var(--siren); }
+  .pill-note {
+    font-size: 11px; font-weight: 600; color: var(--muted); background: var(--bg-2);
+    border: 1px solid var(--border); border-radius: 999px; padding: 5px 12px;
+  }
+
+  /* ---------- hero ---------- */
+  .hero { padding: 18px 0 8px; text-align: center; }
+  .eyebrow {
+    display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700;
+    color: var(--brand-light); background: rgba(124,58,237,0.12); border: 1px solid rgba(124,58,237,0.35);
+    padding: 7px 14px; border-radius: 999px; margin-bottom: 22px;
+    animation: fadeUp 0.7s ease both;
+  }
+  h1 {
+    font-size: 34px; line-height: 1.16; font-weight: 800; letter-spacing: -0.02em;
+    margin: 0 0 16px; text-wrap: balance;
+    animation: fadeUp 0.7s ease 0.08s both;
+  }
+  h1 .accent { color: var(--siren); }
+  .sub {
+    font-size: 16px; line-height: 1.6; color: var(--muted); margin: 0 auto 26px; max-width: 380px;
+    animation: fadeUp 0.7s ease 0.16s both;
+  }
+  .cta-row { animation: fadeUp 0.7s ease 0.24s both; position: relative; z-index: 2; }
+  .btn-primary {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    background: linear-gradient(135deg, var(--brand), #9333ea);
+    color: #fff; font-weight: 700; font-size: 16px; text-decoration: none;
+    padding: 16px 30px; border-radius: 999px; border: none; cursor: pointer;
+    box-shadow: 0 14px 30px -10px rgba(124,58,237,0.65);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    font-family: inherit; position: relative; z-index: 2;
+  }
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 18px 34px -8px rgba(124,58,237,0.75); }
+  .btn-primary:active { transform: translateY(0) scale(0.98); }
+  .trust-line { margin-top: 12px; font-size: 12px; color: var(--muted-2); animation: fadeUp 0.7s ease 0.3s both; }
+
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* ---------- phone mockup ---------- */
+  .phone-stage { position: relative; margin: 34px auto 6px; width: 258px; animation: fadeUp 0.8s ease 0.36s both; z-index: 1; }
+  .radar-ring {
+    position: absolute; inset: -30px; border-radius: 50%;
+    border: 1px solid rgba(124,58,237,0.25);
+    animation: radarPulse 3.2s ease-out infinite;
+    pointer-events: none;
+  }
+  .radar-ring.r2 { animation-delay: 1.1s; }
+  .radar-ring.r3 { animation-delay: 2.2s; }
+  @keyframes radarPulse {
+    0% { transform: scale(0.82); opacity: 0.9; }
+    100% { transform: scale(1.28); opacity: 0; }
+  }
+  .phone {
+    position: relative; width: 258px; height: 542px; border-radius: 38px;
+    background: #04060c; border: 6px solid #1c2236; box-shadow: 0 30px 60px -20px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.03);
+    overflow: hidden;
+  }
+  .phone img { width: 100%; height: 100%; object-fit: cover; object-position: top center; display: block; }
+  .phone-notch { position: absolute; top: 6px; left: 50%; transform: translateX(-50%); width: 84px; height: 18px; background: #04060c; border-radius: 0 0 14px 14px; z-index: 3; }
+  .float-badge {
+    position: absolute; display: flex; align-items: center; gap: 7px;
+    background: var(--bg-2); border: 1px solid var(--border); border-radius: 14px;
+    padding: 9px 13px; font-size: 12px; font-weight: 700; box-shadow: 0 12px 24px -10px rgba(0,0,0,0.5);
+  }
+  .float-badge .ring { width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .float-badge.siren { top: 14%; right: -14px; animation: floatY 5s ease-in-out infinite; }
+  .float-badge.siren .ring { background: rgba(244,63,94,0.15); border: 1.5px solid var(--siren); color: var(--siren); }
+  .float-badge.shield { bottom: 20%; left: -18px; animation: floatY 5.6s ease-in-out 0.4s infinite; }
+  .float-badge.shield .ring { background: rgba(56,189,248,0.15); border: 1.5px solid var(--shield); color: var(--shield); }
+  @keyframes floatY { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-9px); } }
+
+  /* ---------- section shell ---------- */
+  section { padding: 64px 0 8px; }
+  .kicker { font-size: 12px; font-weight: 700; letter-spacing: 0.06em; color: var(--brand-light); text-transform: uppercase; margin-bottom: 10px; }
+  .section-title { font-size: 25px; font-weight: 800; letter-spacing: -0.01em; margin: 0 0 14px; text-wrap: balance; }
+  .section-lead { font-size: 15px; color: var(--muted); line-height: 1.65; margin: 0 0 30px; max-width: 400px; }
+
+  /* ---------- value cards ---------- */
+  .cards { display: grid; grid-template-columns: 1fr; gap: 12px; }
+  .card {
+    display: flex; gap: 14px; align-items: flex-start;
+    background: var(--bg-2); border: 1px solid var(--border); border-radius: var(--radius-md);
+    padding: 18px;
+  }
+  .card .ring {
+    width: 46px; height: 46px; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--bg-3);
+  }
+  .card h3 { margin: 0 0 5px; font-size: 15.5px; font-weight: 700; }
+  .card p { margin: 0; font-size: 13.5px; line-height: 1.6; color: var(--muted); }
+  .ring.c-siren { border: 2px solid var(--siren); box-shadow: 0 0 16px -3px var(--siren); color: var(--siren); }
+  .ring.c-shield { border: 2px solid var(--shield); box-shadow: 0 0 16px -3px var(--shield); color: var(--shield); }
+  .ring.c-brand { border: 2px solid var(--brand-light); box-shadow: 0 0 16px -3px var(--brand-light); color: var(--brand-light); }
+  .ring.c-green { border: 2px solid #22c55e; box-shadow: 0 0 16px -3px #22c55e; color: #22c55e; }
+
+  /* ---------- demo carousel ---------- */
+  .demo-frame { position: relative; width: 220px; height: 464px; margin: 8px auto 18px; border-radius: 34px; background: #04060c; border: 6px solid #1c2236; box-shadow: 0 24px 48px -18px rgba(0,0,0,0.55); overflow: hidden; }
+  .demo-slide { position: absolute; inset: 0; opacity: 0; transition: opacity 0.7s ease; }
+  .demo-slide.active { opacity: 1; }
+  .demo-slide img { width: 100%; height: 100%; object-fit: cover; object-position: top center; display: block; }
+  .demo-dots { display: flex; justify-content: center; gap: 7px; margin-top: 16px; }
+  .demo-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--border); transition: background 0.3s, width 0.3s; }
+  .demo-dot.active { background: var(--brand-light); width: 20px; border-radius: 4px; }
+  .demo-caption { text-align: center; font-size: 13px; color: var(--muted); margin-top: 14px; min-height: 18px; }
+  .demo-note { display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 11.5px; color: var(--muted-2); margin-top: 6px; }
+
+  /* ---------- signup ---------- */
+  .signup-card {
+    background: linear-gradient(165deg, var(--bg-2), var(--bg-1));
+    border: 1px solid var(--border); border-radius: var(--radius-lg);
+    padding: 26px 22px 24px; position: relative; overflow: hidden;
+  }
+  .signup-card::before {
+    content: ""; position: absolute; inset: -40% -40% auto auto; width: 220px; height: 220px;
+    background: radial-gradient(circle, rgba(124,58,237,0.35), transparent 70%); pointer-events: none;
+  }
+  .signup-card h2 { font-size: 22px; margin: 0 0 8px; font-weight: 800; }
+  .signup-card .section-lead { margin-bottom: 20px; }
+  .field-label { font-size: 12.5px; font-weight: 700; color: var(--muted); margin-bottom: 7px; display: block; }
+  .phone-input-row { display: flex; gap: 8px; margin-bottom: 6px; }
+  .phone-input {
+    flex: 1; background: var(--bg-3); border: 1.5px solid var(--border); border-radius: 14px;
+    padding: 14px 16px; font-size: 16px; color: var(--ink); font-family: inherit;
+    outline: none; transition: border-color 0.2s; text-align: right;
+  }
+  .phone-input:focus { border-color: var(--brand-light); }
+  .phone-input.err { border-color: var(--siren); }
+  .field-error { font-size: 11.5px; color: var(--siren); margin: 6px 0 0; min-height: 14px; }
+  .platform-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 18px 0 22px; }
+  .platform-btn {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    background: var(--bg-3); border: 1.5px solid var(--border); border-radius: 14px;
+    padding: 13px 10px; font-size: 14px; font-weight: 700; color: var(--muted); cursor: pointer;
+    transition: all 0.15s ease; font-family: inherit;
+  }
+  .platform-btn.selected { border-color: var(--brand-light); background: rgba(124,58,237,0.14); color: var(--ink); }
+  .btn-submit {
+    width: 100%; background: linear-gradient(135deg, var(--brand), #9333ea); color: #fff;
+    font-weight: 700; font-size: 16px; border: none; border-radius: 14px; padding: 16px;
+    cursor: pointer; font-family: inherit; transition: transform 0.15s, opacity 0.15s;
+    box-shadow: 0 14px 26px -10px rgba(124,58,237,0.6);
+  }
+  .btn-submit:active { transform: scale(0.98); }
+  .btn-submit:disabled { opacity: 0.55; cursor: not-allowed; }
+  .signup-foot { text-align: center; font-size: 11.5px; color: var(--muted-2); margin-top: 12px; }
+  .success-box { display: none; text-align: center; padding: 18px 6px; }
+  .success-box .emoji { font-size: 40px; margin-bottom: 10px; display: block; }
+  .success-box h3 { margin: 0 0 6px; font-size: 18px; }
+  .success-box p { margin: 0; font-size: 13.5px; color: var(--muted); }
+
+  footer { padding: 46px 0 40px; text-align: center; }
+  .footer-word { font-weight: 800; font-size: 15px; margin-bottom: 6px; }
+  footer p { font-size: 12px; color: var(--muted-2); margin: 0; line-height: 1.7; }
+
+  ::selection { background: rgba(124,58,237,0.4); }
+</style>
+
+<div class="glow-bg"></div>
+
+<div class="topbar wrap">
+  <div class="wordmark"><span class="dot"></span>Mifga · מפגע</div>
+  <span class="pill-note">בקרוב</span>
+</div>
+
+<main>
+  <section class="hero wrap" style="padding-top:6px;">
+    <span class="eyebrow">🛴 לרוכבים על קורקינט ואופניים חשמליים</span>
+    <h1>מפחדים שיתפסו אתכם<br><span class="accent">שוטר או פקח?</span></h1>
+    <p class="sub">מפגע מתריעה לכם ברגע שיש שוטר או פקח בסביבה - כדי שלא תקבלו קנס. יש גם בור בדרך? מכשול? גם על זה תדעו לפני שתגיעו אליו.</p>
+    <div class="cta-row">
+      <button type="button" class="btn-primary" id="heroCta">רוצה להצטרף בחינם</button>
+    </div>
+    <div class="trust-line">לא עולה כלום. רק משאירים מספר טלפון.</div>
+
+    <div class="phone-stage">
+      <span class="radar-ring"></span>
+      <span class="radar-ring r2"></span>
+      <span class="radar-ring r3"></span>
+      <div class="phone">
+        <span class="phone-notch"></span>
+        <img src="__IMG_HALO__" alt="הילת הגנה חיה על המפה, מזהירה משוטר ופקח בקרבת מקום" />
+      </div>
+      <div class="float-badge siren"><span class="ring">🚨</span>שוטר · 220 מ'</div>
+      <div class="float-badge shield"><span class="ring">🛡️</span>פקח · 90 מ'</div>
+    </div>
+  </section>
+
+  <section class="wrap">
+    <div class="kicker">למה זה טוב לכם</div>
+    <h2 class="section-title">ככה מפגע שומרת עליכם</h2>
+    <p class="section-lead">כל מי שמדווח עוזר לכולם. וכשגם אתם מדווחים - גם אתם עוזרים לחברים שלכם לא להיתפס.</p>
+    <div class="cards">
+      <div class="card">
+        <span class="ring c-siren">🚨</span>
+        <div><h3>צליל שונה לכל התרעה</h3><p>שוטר, פקח, או מכשול בדרך - לכל אחד צליל אחר. ככה תדעו מה יש מסביב בלי להסתכל על הטלפון.</p></div>
+      </div>
+      <div class="card">
+        <span class="ring c-shield">🛡️</span>
+        <div><h3>רואים כמה זה קרוב</h3><p>במפה רואים בדיוק כמה מטרים יש בינכם לבין שוטר או פקח. עיגול ההגנה זז איתכם כל הזמן שאתם נוסעים.</p></div>
+      </div>
+      <div class="card">
+        <span class="ring c-brand">📍</span>
+        <div><h3>כולם מדווחים אחד לשני</h3><p>ראיתם שוטר או פקח? מדווחים בלחיצה אחת - וכל מי שנוסע אחריכם ידע ויזהר.</p></div>
+      </div>
+      <div class="card">
+        <span class="ring c-green">🏆</span>
+        <div><h3>כל דיווח שווה נקודות</h3><p>עולים ברמות, אוספים נקודות, ורואים מי מהחברים שלכם הכי עוזר לכולם.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="wrap" style="text-align:center;">
+    <div class="kicker">הצצה לאפליקציה</div>
+    <h2 class="section-title">ככה זה נראה באמת</h2>
+    <div class="demo-frame" id="demoFrame">
+      <div class="demo-slide active"><img src="__IMG_MAP__" alt="מפה עם כל המפגעים בסביבה"></div>
+      <div class="demo-slide"><img src="__IMG_HALO__" alt="מצב נסיעה עם עיגול הגנה"></div>
+      <div class="demo-slide"><img src="__IMG_REPORT__" alt="דיווח על מפגע בלחיצה אחת"></div>
+      <div class="demo-slide"><img src="__IMG_PROFILE__" alt="נקודות ורמות בפרופיל"></div>
+    </div>
+    <div class="demo-dots" id="demoDots"></div>
+    <div class="demo-caption" id="demoCaption">מפה עם כל המפגעים בסביבה</div>
+    <div class="demo-note">▶ תמונות אמיתיות מתוך האפליקציה</div>
+  </section>
+
+  <section class="wrap" id="signup">
+    <div class="signup-card">
+      <div id="formState">
+        <h2>רוצים להיות הראשונים?</h2>
+        <p class="section-lead">תשאירו מספר טלפון, ונעדכן אתכם ברגע שאפשר להוריד את מפגע.</p>
+
+        <label class="field-label" for="phoneInput">מספר טלפון</label>
+        <div class="phone-input-row">
+          <input class="phone-input" id="phoneInput" type="tel" inputmode="tel" placeholder="050-1234567" dir="ltr" />
+        </div>
+        <p class="field-error" id="phoneError"></p>
+
+        <span class="field-label">איזה טלפון יש לכם?</span>
+        <div class="platform-row">
+          <button type="button" class="platform-btn" data-platform="android"> Android</button>
+          <button type="button" class="platform-btn" data-platform="ios">iPhone</button>
+        </div>
+
+        <button class="btn-submit" id="submitBtn">רוצה להצטרף בחינם</button>
+        <div class="signup-foot">בחינם. בלי שום התחייבות. אפשר לצאת מהרשימה מתי שרוצים.</div>
+      </div>
+
+      <div class="success-box" id="successBox">
+        <span class="emoji">🎉</span>
+        <h3>מעולה! נרשמת בהצלחה</h3>
+        <p>נשלח לכם הודעה ברגע שאפשר להוריד את האפליקציה.</p>
+      </div>
+    </div>
+  </section>
+
+  <footer class="wrap">
+    <div class="footer-word">Mifga · מפגע</div>
+    <p>רוצים לנסוע בלי לפחד מקנס? מפגע עוזרת לכם לדעת מה יש מסביב.<br>אנחנו לא אומרים לעבור על החוק - רק עוזרים לכם להיות ערניים בדרך.</p>
+  </footer>
+</main>
+
+<script>
+  // ---- demo carousel ----
+  const slides = document.querySelectorAll('.demo-slide');
+  const dotsWrap = document.getElementById('demoDots');
+  const captionEl = document.getElementById('demoCaption');
+  const captions = ['מפה עם כל המפגעים בסביבה', 'במצב נסיעה רואים את עיגול ההגנה', 'מדווחים על מפגע בלחיצה אחת', 'אוספים נקודות ועולים רמות'];
+  slides.forEach((_, i) => {
+    const d = document.createElement('span');
+    d.className = 'demo-dot' + (i === 0 ? ' active' : '');
+    dotsWrap.appendChild(d);
+  });
+  const dots = dotsWrap.querySelectorAll('.demo-dot');
+  let current = 0;
+  function showSlide(i) {
+    slides[current].classList.remove('active');
+    dots[current].classList.remove('active');
+    current = i;
+    slides[current].classList.add('active');
+    dots[current].classList.add('active');
+    captionEl.textContent = captions[current];
+  }
+  let autoplay = setInterval(() => showSlide((current + 1) % slides.length), 3200);
+  dots.forEach((d, i) => d.addEventListener('click', () => { showSlide(i); clearInterval(autoplay); autoplay = setInterval(() => showSlide((current + 1) % slides.length), 3200); }));
+
+  // ---- hero CTA scrolls to the signup form (JS scroll, not href="#", so it
+  // keeps working even in sandboxed/embedded preview contexts) ----
+  document.getElementById('heroCta').addEventListener('click', () => {
+    document.getElementById('signup').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+
+  // ---- signup form ----
+  // Replace with a real endpoint (e.g. a free Formspree form: https://formspree.io)
+  // before deploying - see the note left for you in the project README.
+  const SIGNUP_ENDPOINT = 'https://formspree.io/f/YOUR_FORM_ID';
+
+  const phoneInput = document.getElementById('phoneInput');
+  const phoneError = document.getElementById('phoneError');
+  const platformBtns = document.querySelectorAll('.platform-btn');
+  const submitBtn = document.getElementById('submitBtn');
+  let platform = null;
+
+  platformBtns.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      platformBtns.forEach((b) => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      platform = btn.dataset.platform;
+    });
+  });
+
+  function isValidIsraeliPhone(raw) {
+    const digits = raw.replace(/\D/g, '');
+    const normalized = digits.startsWith('972') ? '0' + digits.slice(3) : digits;
+    return /^05\d{8}$/.test(normalized);
+  }
+
+  submitBtn.addEventListener('click', async () => {
+    const phone = phoneInput.value.trim();
+    if (!isValidIsraeliPhone(phone)) {
+      phoneInput.classList.add('err');
+      phoneError.textContent = 'זה לא נראה כמו מספר טלפון';
+      return;
+    }
+    phoneInput.classList.remove('err');
+    phoneError.textContent = '';
+    if (!platform) {
+      phoneError.textContent = 'תבחרו איזה טלפון יש לכם';
+      return;
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'שולחים...';
+
+    const isPlaceholder = SIGNUP_ENDPOINT.includes('YOUR_FORM_ID');
+    try {
+      if (!isPlaceholder) {
+        await fetch(SIGNUP_ENDPOINT, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify({ phone: phone, platform: platform, source: 'mifga-landing' }),
+        });
+      }
+      document.getElementById('formState').style.display = 'none';
+      document.getElementById('successBox').style.display = 'block';
+    } catch (e) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'רוצה להצטרף בחינם';
+      phoneError.textContent = 'הייתה תקלה, נסו שוב עוד רגע';
+    }
+  });
+</script>

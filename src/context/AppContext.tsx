@@ -16,6 +16,11 @@ import type {
 import { DEMO_FRIENDS, DEMO_USER, seedHazards } from "../data/mockData";
 import { POINTS_PER_REPORT, POINTS_PER_REPORT_WITH_PHOTO, REMOVAL_THRESHOLD } from "../data/hazardTypes";
 import { loadJSON, saveJSON } from "../lib/storage";
+import { isBackendConfigured } from "../lib/supabaseClient";
+import { ensureSession, fetchOwnProfile } from "../lib/backend/auth";
+import { insertProfile, updateProfileRemote } from "../lib/backend/profile";
+import { awardPointsRemote } from "../lib/backend/profile";
+import { confirmHazardRemote, denyHazardRemote, fetchHazards, insertHazard, subscribeHazards } from "../lib/backend/hazards";
 
 interface NewReportInput {
   type: HazardTypeId;
@@ -33,6 +38,15 @@ interface ProfileUpdate {
   username?: string | null;
 }
 
+export interface OnboardingInput {
+  name: string;
+  username: string;
+  phone?: string;
+  vehicleType?: VehicleTypeId | null;
+  vehicleModel?: string | null;
+  avatarPhoto?: string | null;
+}
+
 export const MAX_FAVORITE_FRIENDS = 3;
 
 interface AppContextValue {
@@ -43,6 +57,8 @@ interface AppContextValue {
   settings: AppSettings;
   lastAwardedPoints: number | null;
   onboardingComplete: boolean;
+  /** false only while bootstrapping a real backend session on first load - App.tsx should show a loading state until this flips true */
+  backendReady: boolean;
   rideLog: RideLogEntry[];
   addReport: (input: NewReportInput) => void;
   confirmHazard: (id: string) => void;
@@ -58,7 +74,8 @@ interface AppContextValue {
   removeGroup: (groupId: string) => void;
   sendGroupMessage: (groupId: string) => void;
   clearLastAwarded: () => void;
-  completeOnboarding: () => void;
+  /** Throws on failure (e.g. network/backend error) so the onboarding screen can show it - local mode never throws. */
+  completeOnboarding: (input: OnboardingInput) => Promise<void>;
   addRideLogEntry: (entry: Omit<RideLogEntry, "id">) => void;
   submitFeedback: (liked: boolean, note: string) => void;
 }
@@ -74,16 +91,28 @@ const DEFAULT_SETTINGS: AppSettings = {
   rideAlertRadiusM: 100,
 };
 
+const EMPTY_USER: UserProfile = {
+  id: "",
+  name: "",
+  avatarEmoji: "🧑",
+  points: 0,
+  reportsCount: 0,
+  reportsWithPhoto: 0,
+  createdAt: Date.now(),
+};
+
 // Real member approval / message delivery needs a backend push to the
-// friend's device; this local prototype simulates that round trip with a
-// short delay so the "pending -> accepted" / "sent -> delivered" flows are
-// demoable end to end without a server.
+// friend's device; friends/groups aren't migrated to Supabase yet (see
+// README - "מה עוד נשאר"), so this local prototype simulates that round
+// trip with a short delay so the "pending -> accepted" / "sent -> delivered"
+// flows are demoable end to end without a server, in both modes.
 const SIMULATED_APPROVAL_DELAY_MS = 2200;
 const SIMULATED_DELIVERY_DELAY_MS = 900;
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<UserProfile>(() => loadJSON("user", DEMO_USER));
+  const [user, setUser] = useState<UserProfile>(() => (isBackendConfigured ? EMPTY_USER : loadJSON("user", DEMO_USER)));
   const [friends, setFriends] = useState<Friend[]>(() => {
+    if (isBackendConfigured) return []; // no fake demo people in a real deployment - see README
     // backfill fields added after some users already had friends saved locally
     const stored = loadJSON("friends", DEMO_FRIENDS);
     return stored.map((f, i) => ({
@@ -94,6 +123,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }));
   });
   const [hazards, setHazards] = useState<HazardReport[]>(() => {
+    if (isBackendConfigured) return []; // populated by the bootstrap effect below
     const stored = loadJSON<HazardReport[] | null>("hazards", null);
     return stored ?? seedHazards();
   });
@@ -113,16 +143,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
   });
   const [lastAwardedPoints, setLastAwardedPoints] = useState<number | null>(null);
-  const [onboardingComplete, setOnboardingComplete] = useState<boolean>(() => loadJSON("onboardingComplete", false));
+  const [onboardingComplete, setOnboardingComplete] = useState<boolean>(() =>
+    isBackendConfigured ? false : loadJSON("onboardingComplete", false)
+  );
+  const [backendReady, setBackendReady] = useState<boolean>(!isBackendConfigured);
   const [rideLog, setRideLog] = useState<RideLogEntry[]>(() => loadJSON("rideLog", []));
   const [feedbackEntries, setFeedbackEntries] = useState<FeedbackEntry[]>(() => loadJSON("feedback", []));
 
-  useEffect(() => saveJSON("user", user), [user]);
+  useEffect(() => {
+    if (!isBackendConfigured) saveJSON("user", user);
+  }, [user]);
   useEffect(() => saveJSON("friends", friends), [friends]);
-  useEffect(() => saveJSON("hazards", hazards), [hazards]);
+  useEffect(() => {
+    if (!isBackendConfigured) saveJSON("hazards", hazards);
+  }, [hazards]);
   useEffect(() => saveJSON("groups", groups), [groups]);
   useEffect(() => saveJSON("settings", settings), [settings]);
-  useEffect(() => saveJSON("onboardingComplete", onboardingComplete), [onboardingComplete]);
+  useEffect(() => {
+    if (!isBackendConfigured) saveJSON("onboardingComplete", onboardingComplete);
+  }, [onboardingComplete]);
   useEffect(() => saveJSON("rideLog", rideLog), [rideLog]);
   useEffect(() => saveJSON("feedback", feedbackEntries), [feedbackEntries]);
 
@@ -131,8 +170,87 @@ export function AppProvider({ children }: { children: ReactNode }) {
     root.classList.toggle("dark", settings.theme === "dark");
   }, [settings.theme]);
 
+  // Merge one hazard insert/update from the server into local state -
+  // shared by the initial fetch's realtime subscription and addReport's own write.
+  const mergeHazard = (incoming: HazardReport) => {
+    setHazards((prev) => {
+      const idx = prev.findIndex((h) => h.id === incoming.id);
+      if (incoming.removed) return prev.filter((h) => h.id !== incoming.id);
+      if (idx === -1) return [incoming, ...prev];
+      const next = [...prev];
+      next[idx] = incoming;
+      return next;
+    });
+  };
+
+  // One-time bootstrap when a real backend is configured: sign in (anonymous
+  // session persists across reloads via Supabase's own storage), load the
+  // caller's profile if one already exists, and load current hazards.
+  useEffect(() => {
+    if (!isBackendConfigured) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const uid = await ensureSession();
+        const profile = await fetchOwnProfile(uid);
+        if (cancelled) return;
+        if (profile) {
+          setUser(profile);
+          setOnboardingComplete(true);
+        } else {
+          setUser({ ...EMPTY_USER, id: uid });
+        }
+        const remoteHazards = await fetchHazards();
+        if (cancelled) return;
+        setHazards(remoteHazards);
+      } catch (err) {
+        console.error("Mifga: backend bootstrap failed", err);
+      } finally {
+        if (!cancelled) setBackendReady(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!isBackendConfigured) return;
+    return subscribeHazards(mergeHazard);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const addReport = (input: NewReportInput) => {
     const points = input.photoDataUrl ? POINTS_PER_REPORT_WITH_PHOTO : POINTS_PER_REPORT;
+
+    if (isBackendConfigured) {
+      (async () => {
+        try {
+          const report = await insertHazard({
+            type: input.type,
+            position: input.position,
+            reporterId: user.id,
+            reporterName: user.name,
+            photoDataUrl: input.photoDataUrl,
+            nickname: input.nickname,
+          });
+          mergeHazard(report);
+          await awardPointsRemote(user.id, points, !!input.photoDataUrl);
+          setUser((prev) => ({
+            ...prev,
+            points: prev.points + points,
+            reportsCount: prev.reportsCount + 1,
+            reportsWithPhoto: prev.reportsWithPhoto + (input.photoDataUrl ? 1 : 0),
+          }));
+          setLastAwardedPoints(points);
+        } catch (err) {
+          console.error("Mifga: addReport failed", err);
+        }
+      })();
+      return;
+    }
+
     const report: HazardReport = {
       id: `r-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       type: input.type,
@@ -157,10 +275,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const confirmHazard = (id: string) => {
+    if (isBackendConfigured) {
+      confirmHazardRemote(id).catch((err) => console.error("Mifga: confirmHazard failed", err));
+      return;
+    }
     setHazards((prev) => prev.map((h) => (h.id === id ? { ...h, confirmations: h.confirmations + 1, lastVoteAt: Date.now() } : h)));
   };
 
   const denyHazard = (id: string) => {
+    if (isBackendConfigured) {
+      denyHazardRemote(id).catch((err) => console.error("Mifga: denyHazard failed", err));
+      return;
+    }
     setHazards((prev) =>
       prev.map((h) => {
         if (h.id !== id) return h;
@@ -175,7 +301,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const updateNotifyTypes = (patch: Partial<NotifyTypePrefs>) =>
     setSettings((s) => ({ ...s, notifyTypes: { ...s.notifyTypes, ...patch } }));
 
-  const updateProfile = (patch: ProfileUpdate) =>
+  const updateProfile = (patch: ProfileUpdate) => {
+    if (isBackendConfigured && user.id) {
+      updateProfileRemote(user.id, patch).catch((err) => console.error("Mifga: updateProfile failed", err));
+    }
     setUser((prev) => ({
       ...prev,
       ...(patch.name !== undefined ? { name: patch.name } : {}),
@@ -185,8 +314,35 @@ export function AppProvider({ children }: { children: ReactNode }) {
       ...(patch.phone !== undefined ? { phone: patch.phone ?? undefined } : {}),
       ...(patch.username !== undefined ? { username: patch.username ?? undefined } : {}),
     }));
+  };
 
-  const completeOnboarding = () => setOnboardingComplete(true);
+  const completeOnboarding = async (input: OnboardingInput) => {
+    if (isBackendConfigured) {
+      const uid = await ensureSession();
+      const profile = await insertProfile({
+        id: uid,
+        name: input.name,
+        username: input.username,
+        phone: input.phone,
+        vehicleType: input.vehicleType,
+        vehicleModel: input.vehicleModel,
+        avatarPhoto: input.avatarPhoto,
+      });
+      setUser(profile);
+      setOnboardingComplete(true);
+      return;
+    }
+    setUser((prev) => ({
+      ...prev,
+      name: input.name,
+      username: input.username,
+      phone: input.phone,
+      vehicleType: input.vehicleType ?? undefined,
+      vehicleModel: input.vehicleModel ?? undefined,
+      avatarPhoto: input.avatarPhoto ?? undefined,
+    }));
+    setOnboardingComplete(true);
+  };
 
   const addRideLogEntry = (entry: Omit<RideLogEntry, "id">) => {
     const logEntry: RideLogEntry = { id: `ride-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, ...entry };
@@ -294,6 +450,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     settings,
     lastAwardedPoints,
     onboardingComplete,
+    backendReady,
     rideLog,
     addReport,
     confirmHazard,

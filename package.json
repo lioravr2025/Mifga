@@ -11,6 +11,7 @@
     "cap:sync": "npx cap sync"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.110.8",
     "clsx": "^2.1.1",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.474.0",

@@ -5,13 +5,13 @@ import VehicleModelInput from "./VehicleModelInput";
 import UsernameField from "./UsernameField";
 import { VEHICLE_DEFS } from "./VehicleIcons";
 import { useApp } from "../context/AppContext";
-import { isUsernameTaken, isValidUsernameFormat } from "../lib/username";
 import type { VehicleTypeId } from "../types";
 
 export default function EditProfileSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { user, friends, updateProfile } = useApp();
+  const { user, updateProfile } = useApp();
   const [name, setName] = useState(user.name);
   const [username, setUsername] = useState(user.username ?? "");
+  const [usernameFieldOk, setUsernameFieldOk] = useState(true);
   const [photo, setPhoto] = useState<string | undefined>(user.avatarPhoto);
   const [vehicleType, setVehicleType] = useState<VehicleTypeId | undefined>(user.vehicleType);
   const [vehicleModel, setVehicleModel] = useState(user.vehicleModel ?? "");
@@ -27,7 +27,8 @@ export default function EditProfileSheet({ open, onClose }: { open: boolean; onC
     }
   }, [open, user.name, user.username, user.avatarPhoto, user.vehicleType, user.vehicleModel]);
 
-  const usernameOk = !username.trim() || (isValidUsernameFormat(username) && !isUsernameTaken(username, friends.map((f) => f.username), user.username));
+  // an empty field is fine here (username is optional post-onboarding in local mode); a non-empty one must pass UsernameField's live check
+  const usernameOk = !username.trim() || usernameFieldOk;
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -91,7 +92,7 @@ export default function EditProfileSheet({ open, onClose }: { open: boolean; onC
 
       <label className="text-xs text-neutral-400 mb-1.5 block">שם משתמש (ייחודי)</label>
       <div className="mb-5">
-        <UsernameField value={username} onChange={setUsername} excludeUsername={user.username} />
+        <UsernameField value={username} onChange={setUsername} excludeUsername={user.username} onValidityChange={setUsernameFieldOk} />
       </div>
 
       <label className="text-xs text-neutral-400 mb-1.5 block">הכלי שלי</label>
