@@ -121,16 +121,32 @@ create policy "owner can delete their group"
 
 alter table public.walkie_group_members enable row level security;
 
+-- A policy on walkie_group_members that queries walkie_group_members itself
+-- (to let accepted members see their fellow members) causes Postgres to
+-- re-apply that same policy to filter the subquery's own rows, recursively,
+-- forever ("infinite recursion detected in policy"). A security-definer
+-- function breaks the loop: it runs as its owner, which bypasses RLS, so the
+-- query inside it doesn't re-trigger the policy that's calling it.
+create or replace function public.is_accepted_group_member(p_group_id uuid, p_uid uuid)
+returns boolean
+language sql
+security definer
+stable
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.walkie_group_members
+    where group_id = p_group_id and member_id = p_uid and status = 'accepted'
+  );
+$$;
+
 drop policy if exists "see members of my groups" on public.walkie_group_members;
 create policy "see members of my groups"
   on public.walkie_group_members for select
   using (
     member_id = auth.uid()
     or exists (select 1 from public.walkie_groups g where g.id = group_id and g.owner_id = auth.uid())
-    or exists (
-      select 1 from public.walkie_group_members me
-      where me.group_id = group_id and me.member_id = auth.uid() and me.status = 'accepted'
-    )
+    or public.is_accepted_group_member(group_id, auth.uid())
   );
 
 drop policy if exists "owner invites members" on public.walkie_group_members;
