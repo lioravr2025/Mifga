@@ -25,6 +25,7 @@ import {
   REMOVAL_THRESHOLD,
 } from "../data/hazardTypes";
 import { loadJSON, saveJSON } from "../lib/storage";
+import { playAudioUrl } from "../lib/nativeMic";
 import { isBackendConfigured } from "../lib/supabaseClient";
 import { ensureSession, fetchOwnProfile } from "../lib/backend/auth";
 import { insertProfile, updateProfileRemote } from "../lib/backend/profile";
@@ -359,7 +360,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         )
       );
       if (row.sender_id === uid) return;
-      new Audio(row.audio_url).play().catch(() => {});
+      playAudioUrl(row.audio_url).catch((err) => console.error("Mifga: group voice message playback failed", err));
       const group = groupsRef.current.find((g) => g.id === row.group_id);
       showVoiceToast(group?.name ?? "קבוצה");
       markMessageDeliveredRemote(row.id).catch((err) => console.error("Mifga: markMessageDelivered failed", err));
@@ -387,7 +388,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     const handleIncomingFriendMessage = (row: FriendMessageRow) => {
       if (row.sender_id === uid) return;
-      new Audio(row.audio_url).play().catch(() => {});
+      playAudioUrl(row.audio_url).catch((err) => console.error("Mifga: friend voice message playback failed", err));
       const friend = friendsRef.current.find((f) => f.id === row.sender_id);
       showVoiceToast(friend?.name ?? "חבר");
       markFriendMessageDeliveredRemote(row.id).catch((err) => console.error("Mifga: markFriendMessageDelivered failed", err));

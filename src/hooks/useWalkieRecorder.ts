@@ -1,17 +1,23 @@
 import { useRef, useState } from "react";
+import { base64ToBlob, isNative, MicRecorder } from "../lib/nativeMic";
 
 const SIMULATED_RECORDING_MS = 900;
 const MAX_RECORDING_MS = 15_000;
 
 /**
- * Press-and-hold voice message recorder. Uses the real mic (MediaRecorder)
- * when available and permitted, and hands the recorded clip back via
- * `onSent(targetId, blob)` so the caller can upload+send it. Falls back to a
- * short simulated recording (blob = null) whenever recording isn't possible
- * - no mic hardware, API missing, or the permission prompt gets denied - so
- * the press-and-hold interaction is still demoable everywhere instead of
- * silently doing nothing on press; the caller should treat blob === null as
- * "couldn't actually record" and tell the user, not as a successful send.
+ * Press-and-hold voice message recorder. On native Android builds, records
+ * through MicRecorderPlugin (native MediaRecorder) instead of the browser's
+ * getUserMedia() - the WebView's permission bridge for that kept failing
+ * with NotAllowedError even with RECORD_AUDIO already granted at the OS
+ * level, so recording is done natively instead of patching that bridge
+ * further. On web (local dev/testing), falls back to getUserMedia().
+ *
+ * Either way, hands the recorded clip back via `onSent(targetId, blob)` so
+ * the caller can upload+send it. Falls back to a short simulated recording
+ * (blob = null) whenever recording isn't possible at all, so the
+ * press-and-hold interaction is still demoable instead of silently doing
+ * nothing on press; the caller should treat blob === null as "couldn't
+ * actually record" and tell the user, not as a successful send.
  *
  * Auto-stops and sends after MAX_RECORDING_MS so a held-too-long press can't
  * produce an endless clip.
@@ -45,6 +51,19 @@ export function useWalkieRecorder(onSent: (targetId: string, blob: Blob | null, 
     if (activeTargetRef.current) return;
     activeTargetRef.current = targetId;
 
+    if (isNative()) {
+      try {
+        await MicRecorder.start();
+        setRecordingFor(targetId);
+        maxTimerRef.current = setTimeout(() => stop(targetId), MAX_RECORDING_MS);
+      } catch (err) {
+        const reason = err instanceof Error ? err.message : String(err);
+        console.error("Mifga: native mic recording unavailable", err);
+        simulate(targetId, reason);
+      }
+      return;
+    }
+
     if (!("mediaDevices" in navigator) || !navigator.mediaDevices?.getUserMedia) {
       simulate(targetId, "getUserMedia-unsupported");
       return;
@@ -73,6 +92,26 @@ export function useWalkieRecorder(onSent: (targetId: string, blob: Blob | null, 
 
   const stop = (targetId: string) => {
     clearMaxTimer();
+
+    if (isNative()) {
+      if (activeTargetRef.current !== targetId) return; // simulate()/a prior stop already owns finishing this press
+      MicRecorder.stop()
+        .then(async ({ base64, mimeType }) => {
+          const blob = await base64ToBlob(base64, mimeType);
+          activeTargetRef.current = null;
+          setRecordingFor(null);
+          onSent(targetId, blob);
+        })
+        .catch((err) => {
+          activeTargetRef.current = null;
+          setRecordingFor(null);
+          const reason = err instanceof Error ? err.message : String(err);
+          console.error("Mifga: native mic stop failed", err);
+          onSent(targetId, null, reason);
+        });
+      return;
+    }
+
     const recorder = mediaRef.current;
     if (recorder && recorder.state !== "inactive") {
       const mimeType = recorder.mimeType;

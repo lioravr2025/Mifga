@@ -41,6 +41,9 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        // Must be registered before super.onCreate() - that's what builds the
+        // Bridge from the plugin list.
+        registerPlugin(MicRecorderPlugin.class);
         super.onCreate(savedInstanceState);
 
         // Capacitor's default WebChromeClient grants getUserMedia() (mic/camera)

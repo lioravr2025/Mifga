@@ -4,6 +4,7 @@ import BottomSheet from "./BottomSheet";
 import Avatar from "./Avatar";
 import { useApp } from "../context/AppContext";
 import { timeAgo } from "../lib/geo";
+import { playAudioUrl } from "../lib/nativeMic";
 import type { WalkieGroup } from "../types";
 
 export default function GroupManageSheet({ group, onClose }: { group: WalkieGroup | null; onClose: () => void }) {
@@ -119,7 +120,7 @@ export default function GroupManageSheet({ group, onClose }: { group: WalkieGrou
             <div className="text-[11px] text-neutral-400">נשלחה {timeAgo(lastMessage.sentAt)}</div>
             {lastMessage.audioUrl && (
               <button
-                onClick={() => new Audio(lastMessage.audioUrl).play().catch(() => {})}
+                onClick={() => lastMessage.audioUrl && playAudioUrl(lastMessage.audioUrl).catch(() => {})}
                 className="flex items-center gap-1 text-[11px] font-semibold text-brand-light active:scale-95 transition"
               >
                 <Play size={12} className="fill-current" />
