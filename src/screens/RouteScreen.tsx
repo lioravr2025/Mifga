@@ -1,10 +1,11 @@
-import { useState } from "react";
-import { Circle, MapContainer, Marker, Polyline, TileLayer } from "react-leaflet";
-import { AlertTriangle, Loader2, MapPin, Navigation, Search, ShieldCheck, Square } from "lucide-react";
+import { useEffect, useState } from "react";
+import { AttributionControl, Circle, MapContainer, Marker, Polyline, TileLayer } from "react-leaflet";
+import { AlertTriangle, Loader2, MapPin, ShieldCheck, Square } from "lucide-react";
 import { useApp } from "../context/AppContext";
 import ScooterIcon from "../components/ScooterIcon";
 import PulseRing from "../components/PulseRing";
-import { fetchRoute, geocode, minDistanceToPath } from "../lib/routing";
+import AddressAutocomplete from "../components/AddressAutocomplete";
+import { fetchRoute, minDistanceToPath, remainingDistanceAlongPath } from "../lib/routing";
 import { formatDistance } from "../lib/geo";
 import { getHazardType } from "../data/hazardTypes";
 import { destinationDivIcon, hazardDivIcon, selfDivIcon } from "../lib/mapIcons";
@@ -17,26 +18,34 @@ const HAZARD_ALERT_RADIUS_M = 120;
 
 export default function RouteScreen({ position, ride }: { position: LatLng; ride: RideMonitor }) {
   const { hazards, settings, user } = useApp();
-  const [destination, setDestination] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [route, setRoute] = useState<{ points: LatLng[]; distanceM: number; durationS: number } | null>(null);
   const [destPoint, setDestPoint] = useState<LatLng | null>(null);
+  const [destLabel, setDestLabel] = useState("");
+  const [remainingM, setRemainingM] = useState<number | null>(null);
 
   const hazardsOnRoute = route ? hazards.filter((h) => minDistanceToPath(h.position, route.points) <= HAZARD_ALERT_RADIUS_M) : [];
 
-  const planRoute = async () => {
-    if (!destination.trim()) return;
+  // Live "how much is left" while riding this specific route - the shared ride
+  // monitor already handles hazard-proximity audio alerts and path logging
+  // (same instance as the home tab, so alerts fire no matter which tab is
+  // open) - this just adds the route-progress figure on top of it.
+  useEffect(() => {
+    if (!ride.rideActive || !route) {
+      setRemainingM(null);
+      return;
+    }
+    setRemainingM(remainingDistanceAlongPath(position, route.points));
+  }, [position, ride.rideActive, route]);
+
+  const planRouteTo = async (dest: LatLng, label: string) => {
     setLoading(true);
     setError(null);
     setRoute(null);
+    setDestPoint(dest);
+    setDestLabel(label);
     try {
-      const dest = await geocode(destination, position);
-      if (!dest) {
-        setError("לא הצלחנו למצוא את הכתובת. נסו לנסח אחרת.");
-        return;
-      }
-      setDestPoint(dest);
       const r = await fetchRoute(position, dest);
       if (!r) {
         setError("לא נמצא מסלול נסיעה בין הנקודות.");
@@ -58,29 +67,23 @@ export default function RouteScreen({ position, ride }: { position: LatLng; ride
           <MapPin size={16} className="text-brand-light shrink-0" />
           <span className="text-sm text-neutral-300">המיקום הנוכחי שלי</span>
         </div>
-        <div className="flex items-center gap-2 px-4 py-3 rounded-2xl bg-bg-panel2 border border-bg-border">
-          <Search size={16} className="text-neutral-400 shrink-0" />
-          <input
-            value={destination}
-            onChange={(e) => setDestination(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && planRoute()}
-            placeholder="לאן נוסעים? (כתובת או מקום)"
-            className="flex-1 bg-transparent outline-none text-sm text-neutral-100 placeholder:text-neutral-500"
-          />
-        </div>
-        <button
-          onClick={planRoute}
-          disabled={loading || !destination.trim()}
-          className="w-full mt-3 py-3 rounded-2xl bg-brand text-white font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-40 active:scale-95 transition"
-        >
-          {loading ? <Loader2 size={18} className="animate-spin" /> : <Navigation size={18} />}
-          {loading ? "מחשב מסלול..." : "מצא מסלול"}
-        </button>
+        <AddressAutocomplete
+          biasNear={position}
+          placeholder="לאן נוסעים? הקלידו כתובת או יישוב"
+          onSelect={(s) => planRouteTo(s.position, s.label)}
+        />
+        {loading && (
+          <div className="mt-2 flex items-center gap-1.5 text-xs text-neutral-400">
+            <Loader2 size={13} className="animate-spin" />
+            מחשב מסלול ל{destLabel}...
+          </div>
+        )}
         {error && <div className="mt-2 text-xs text-red-400">{error}</div>}
       </div>
 
       <div className="flex-1 min-h-0 relative">
-        <MapContainer center={[position.lat, position.lng]} zoom={13} zoomControl={false} className="w-full h-full">
+        <MapContainer center={[position.lat, position.lng]} zoom={13} zoomControl={false} attributionControl={false} className="w-full h-full">
+          <AttributionControl position="bottomright" prefix={false} />
           <TileLayer url={settings.theme === "dark" ? DARK_TILES : LIGHT_TILES} attribution="&copy; OpenStreetMap &copy; CARTO" />
           {ride.rideActive && (
             <Circle
@@ -93,7 +96,8 @@ export default function RouteScreen({ position, ride }: { position: LatLng; ride
           <Marker position={[position.lat, position.lng]} icon={selfDivIcon(user.vehicleType)} />
           {destPoint && <Marker position={[destPoint.lat, destPoint.lng]} icon={destinationDivIcon()} />}
           {route && <Polyline positions={route.points.map((p) => [p.lat, p.lng])} pathOptions={{ color: "#7c3aed", weight: 5, opacity: 0.85 }} />}
-          {hazardsOnRoute.map((h) => (
+          {/* every nearby hazard, same as the home map - not just ones near the planned route */}
+          {hazards.map((h) => (
             <Marker key={h.id} position={[h.position.lat, h.position.lng]} icon={hazardDivIcon(getHazardType(h.type))} />
           ))}
         </MapContainer>
@@ -108,7 +112,9 @@ export default function RouteScreen({ position, ride }: { position: LatLng; ride
               }`}
             >
               {ride.rideActive ? <Square size={18} className="text-white fill-white" /> : <ScooterIcon size={20} color="white" />}
-              <span className="text-white text-base font-bold">{ride.rideActive ? "הפסקת נסיעה" : "תחילת נסיעה"}</span>
+              <span className="text-white text-base font-bold">
+                {ride.rideActive ? "הפסקת נסיעה" : route ? "תחילת נסיעה במסלול" : "תחילת נסיעה"}
+              </span>
             </button>
           </div>
 
@@ -116,8 +122,19 @@ export default function RouteScreen({ position, ride }: { position: LatLng; ride
             <div className="bg-bg-panel/95 backdrop-blur border border-bg-border rounded-2xl p-4 shadow-2xl max-h-[40%] overflow-y-auto no-scrollbar">
               <div className="flex items-center justify-between mb-3">
                 <div>
-                  <div className="text-lg font-bold text-neutral-50">{Math.round(route.durationS / 60)} דק'</div>
-                  <div className="text-xs text-neutral-400">{formatDistance(route.distanceM)}</div>
+                  {ride.rideActive && remainingM !== null ? (
+                    <>
+                      <div className="text-lg font-bold text-neutral-50">{formatDistance(remainingM)} נותרו</div>
+                      <div className="text-xs text-neutral-400">
+                        מתוך {formatDistance(route.distanceM)} · {Math.round(route.durationS / 60)} דק' משוער
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="text-lg font-bold text-neutral-50">{Math.round(route.durationS / 60)} דק'</div>
+                      <div className="text-xs text-neutral-400">{formatDistance(route.distanceM)}</div>
+                    </>
+                  )}
                 </div>
                 {hazardsOnRoute.length === 0 ? (
                   <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-green-500/15 border border-green-500/40 text-green-300 text-xs font-semibold">
@@ -143,7 +160,7 @@ export default function RouteScreen({ position, ride }: { position: LatLng; ride
                     );
                   })}
                   <p className="text-[10px] text-neutral-500 pt-1">
-                    עקיפה אוטומטית של מפגעים בתכנון המסלול תתווסף בגרסה הבאה - כרגע אנו רק מתריעים על מפגעים שדווחו לאורך הדרך.
+                    ברגע שתלחצו "תחילת נסיעה" תקבלו צפצוף כשתתקרבו לכל מפגע לאורך הדרך - כמו בעמוד הראשי.
                   </p>
                 </div>
               )}

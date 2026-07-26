@@ -9,6 +9,7 @@ import CreateGroupSheet from "../components/CreateGroupSheet";
 import GroupManageSheet from "../components/GroupManageSheet";
 import AddFriendSheet from "../components/AddFriendSheet";
 import InviteFriendButton from "../components/InviteFriendButton";
+import Avatar from "../components/Avatar";
 import type { WalkieGroup } from "../types";
 
 export default function FriendsScreen({ onLocateFriend }: { onLocateFriend: (friendId: string) => void }) {
@@ -119,9 +120,7 @@ export default function FriendsScreen({ onLocateFriend }: { onLocateFriend: (fri
         <div className="space-y-2 mb-6">
           {incomingFriendRequests.map((r) => (
             <div key={r.friendshipId} className="flex items-center gap-3 p-3.5 rounded-2xl bg-brand/10 border border-brand/40">
-              <span className="w-9 h-9 rounded-full bg-bg-panel border border-bg-border flex items-center justify-center text-lg shrink-0">
-                {r.fromAvatarEmoji}
-              </span>
+              <Avatar emoji={r.fromAvatarEmoji} photoUrl={r.fromAvatarPhoto} size={36} className="border border-bg-border" />
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-semibold text-neutral-50">{r.fromName}</div>
                 <div className="text-[11px] text-neutral-400">רוצה להתחבר אליך</div>
@@ -213,12 +212,13 @@ export default function FriendsScreen({ onLocateFriend }: { onLocateFriend: (fri
               <div className="flex items-center gap-3">
                 <div className="flex -space-x-2 rtl:space-x-reverse shrink-0">
                   {g.members.slice(0, 4).map((m) => (
-                    <span
+                    <Avatar
                       key={m.friendId}
-                      className="w-9 h-9 rounded-full bg-bg-panel border-2 border-bg-panel2 flex items-center justify-center text-base"
-                    >
-                      {friendById(m.friendId)?.avatarEmoji ?? "🙂"}
-                    </span>
+                      emoji={friendById(m.friendId)?.avatarEmoji ?? "🙂"}
+                      photoUrl={friendById(m.friendId)?.avatarPhoto}
+                      size={36}
+                      className="border-2 border-bg-panel2"
+                    />
                   ))}
                 </div>
                 <div className="flex-1 min-w-0">
@@ -289,7 +289,7 @@ export default function FriendsScreen({ onLocateFriend }: { onLocateFriend: (fri
           return (
             <div key={f.id} className="flex items-center gap-2.5 p-3.5 rounded-2xl bg-bg-panel2 border border-bg-border">
               <div className="relative shrink-0">
-                <div className="w-12 h-12 rounded-full bg-bg-panel border border-bg-border flex items-center justify-center text-2xl">{f.avatarEmoji}</div>
+                <Avatar emoji={f.avatarEmoji} photoUrl={f.avatarPhoto} size={48} className="border border-bg-border" />
                 <span
                   className={`absolute bottom-0 left-0 w-3.5 h-3.5 rounded-full border-2 border-bg-panel2 ${f.online ? "bg-green-500" : "bg-neutral-600"}`}
                 />

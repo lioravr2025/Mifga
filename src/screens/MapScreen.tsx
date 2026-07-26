@@ -10,6 +10,7 @@ import Confetti from "../components/Confetti";
 import ScooterIcon from "../components/ScooterIcon";
 import PulseRing from "../components/PulseRing";
 import InviteFriendButton from "../components/InviteFriendButton";
+import Avatar from "../components/Avatar";
 import { HazardIcon } from "../components/HazardIcon";
 import { PRIMARY_HAZARD_TYPES } from "../data/hazardTypes";
 import { HAZARD_COLOR_HEX } from "../lib/colors";
@@ -213,9 +214,7 @@ export default function MapScreen({
                       className="flex-1 min-w-0 flex items-center gap-2 active:scale-95 transition"
                     >
                       <span className="relative shrink-0">
-                        <span className="w-8 h-8 rounded-full bg-bg-panel border border-bg-border flex items-center justify-center text-base">
-                          {f.avatarEmoji}
-                        </span>
+                        <Avatar emoji={f.avatarEmoji} photoUrl={f.avatarPhoto} size={32} className="border border-bg-border" />
                         <span
                           className={`absolute -bottom-0.5 -left-0.5 w-2.5 h-2.5 rounded-full border-2 border-bg-panel2 ${
                             f.online ? "bg-green-500" : "bg-neutral-600"

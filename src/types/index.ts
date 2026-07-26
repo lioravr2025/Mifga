@@ -75,6 +75,8 @@ export interface Friend {
   name: string;
   username: string;
   avatarEmoji: string;
+  /** uploaded profile photo URL - only set in backend mode; falls back to avatarEmoji everywhere when absent */
+  avatarPhoto?: string;
   online: boolean;
   points: number;
   position: LatLng;
@@ -95,6 +97,7 @@ export interface IncomingFriendRequest {
   fromName: string;
   fromUsername: string;
   fromAvatarEmoji: string;
+  fromAvatarPhoto?: string;
   createdAt: number;
 }
 

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Check, Clock, Mail, Play, Plus, UserMinus, X } from "lucide-react";
 import BottomSheet from "./BottomSheet";
+import Avatar from "./Avatar";
 import { useApp } from "../context/AppContext";
 import { timeAgo } from "../lib/geo";
 import type { WalkieGroup } from "../types";
@@ -55,9 +56,7 @@ export default function GroupManageSheet({ group, onClose }: { group: WalkieGrou
           if (!f) return null;
           return (
             <div key={m.friendId} className="flex items-center gap-3 p-3 rounded-2xl bg-bg-panel2 border border-bg-border">
-              <span className="w-9 h-9 rounded-full bg-bg-panel border border-bg-border flex items-center justify-center text-lg shrink-0">
-                {f.avatarEmoji}
-              </span>
+              <Avatar emoji={f.avatarEmoji} photoUrl={f.avatarPhoto} size={36} className="border border-bg-border" />
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-semibold text-neutral-100">{f.name}</div>
                 <div className="text-[11px] text-neutral-400">{lastSeenLabel(m.friendId)}</div>
@@ -99,9 +98,7 @@ export default function GroupManageSheet({ group, onClose }: { group: WalkieGrou
                 }}
                 className="w-full flex items-center gap-3 p-3 rounded-2xl bg-bg-panel2 border border-bg-border active:scale-95 transition"
               >
-                <span className="w-9 h-9 rounded-full bg-bg-panel border border-bg-border flex items-center justify-center text-lg">
-                  {f.avatarEmoji}
-                </span>
+                <Avatar emoji={f.avatarEmoji} photoUrl={f.avatarPhoto} size={36} className="border border-bg-border" />
                 <span className="flex-1 text-right text-sm font-medium text-neutral-100">{f.name}</span>
                 <Plus size={16} className="text-brand-light" />
               </button>

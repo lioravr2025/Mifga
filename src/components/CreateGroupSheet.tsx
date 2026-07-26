@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Check, Search, Users, X } from "lucide-react";
 import BottomSheet from "./BottomSheet";
+import Avatar from "./Avatar";
 import { useApp } from "../context/AppContext";
 import type { Friend } from "../types";
 
@@ -77,9 +78,7 @@ export default function CreateGroupSheet({ open, onClose }: { open: boolean; onC
                 checked ? "bg-brand/15 border-brand/50" : "bg-bg-panel2 border-bg-border"
               }`}
             >
-              <span className="w-9 h-9 rounded-full bg-bg-panel border border-bg-border flex items-center justify-center text-lg">
-                {f.avatarEmoji}
-              </span>
+              <Avatar emoji={f.avatarEmoji} photoUrl={f.avatarPhoto} size={36} className="border border-bg-border" />
               <span className="flex-1 text-right text-sm font-medium text-neutral-100">{f.name}</span>
               <span
                 className={`w-5 h-5 rounded-md flex items-center justify-center border ${

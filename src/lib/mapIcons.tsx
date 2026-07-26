@@ -120,7 +120,7 @@ export function destinationDivIcon(): L.DivIcon {
   return L.divIcon({ html, className: "mifga-dest-marker", iconSize: [30, 40], iconAnchor: [15, 40] });
 }
 
-export function friendDivIcon(emoji: string, online: boolean): L.DivIcon {
+export function friendDivIcon(emoji: string, online: boolean, photoUrl?: string): L.DivIcon {
   const html = renderToStaticMarkup(
     <div
       style={{
@@ -134,9 +134,14 @@ export function friendDivIcon(emoji: string, online: boolean): L.DivIcon {
         justifyContent: "center",
         fontSize: 18,
         boxShadow: online ? "0 0 10px -1px #22c55e" : "none",
+        overflow: "hidden",
       }}
     >
-      {emoji}
+      {photoUrl ? (
+        <img src={photoUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+      ) : (
+        emoji
+      )}
     </div>
   );
   return L.divIcon({ html, className: "mifga-friend-marker", iconSize: [34, 34], iconAnchor: [17, 17] });

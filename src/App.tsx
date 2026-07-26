@@ -19,7 +19,8 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [focusFriendId, setFocusFriendId] = useState<string | null>(null);
   const { position } = useGeolocation();
-  const { onboardingComplete, backendReady, lastIncomingVoiceLabel } = useApp();
+  const { onboardingComplete, backendReady, lastIncomingVoiceLabel, incomingFriendRequests, incomingGroupInvites } = useApp();
+  const pendingFriendsCount = incomingFriendRequests.length + incomingGroupInvites.length;
   // Lives here (not inside a screen) so a ride keeps beeping regardless of
   // which tab is open - Route isn't kept mounted like Map is.
   const ride = useRideMonitor(position);
@@ -72,7 +73,7 @@ export default function App() {
               </div>
             )}
 
-            <BottomNav tab={tab} onChange={setTab} />
+            <BottomNav tab={tab} onChange={setTab} friendsBadgeCount={pendingFriendsCount} />
             <FeedbackButton />
 
             {lastIncomingVoiceLabel && (

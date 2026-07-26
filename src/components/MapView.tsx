@@ -115,10 +115,15 @@ export default function MapView({
           friends
             .filter((f) => f.shareLocation)
             .map((f) => (
-              <Marker key={f.id} position={[f.position.lat, f.position.lng]} icon={friendDivIcon(f.avatarEmoji, f.online)}>
+              <Marker key={f.id} position={[f.position.lat, f.position.lng]} icon={friendDivIcon(f.avatarEmoji, f.online, f.avatarPhoto)}>
                 <Popup>
-                  <div className="text-sm font-semibold">
-                    {f.avatarEmoji} {f.name}
+                  <div className="flex items-center gap-2 text-sm font-semibold">
+                    {f.avatarPhoto ? (
+                      <img src={f.avatarPhoto} alt="" style={{ width: 22, height: 22, borderRadius: "9999px", objectFit: "cover" }} />
+                    ) : (
+                      <span>{f.avatarEmoji}</span>
+                    )}
+                    {f.name}
                   </div>
                 </Popup>
               </Marker>

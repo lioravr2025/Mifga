@@ -50,6 +50,23 @@ export function minDistanceToPath(point: LatLng, path: LatLng[]): number {
   return min;
 }
 
+/** Distance in meters from the route point nearest the rider's current position to the end of the route - a live "how much is left" figure while a ride along this route is active. */
+export function remainingDistanceAlongPath(point: LatLng, path: LatLng[]): number {
+  if (path.length === 0) return 0;
+  let nearestIdx = 0;
+  let nearestDist = Infinity;
+  path.forEach((p, i) => {
+    const d = haversine(point, p);
+    if (d < nearestDist) {
+      nearestDist = d;
+      nearestIdx = i;
+    }
+  });
+  let remaining = 0;
+  for (let i = nearestIdx; i < path.length - 1; i++) remaining += haversine(path[i], path[i + 1]);
+  return remaining;
+}
+
 function haversine(a: LatLng, b: LatLng): number {
   const R = 6371000;
   const dLat = ((b.lat - a.lat) * Math.PI) / 180;

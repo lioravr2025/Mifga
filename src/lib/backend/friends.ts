@@ -9,6 +9,7 @@ export interface ProfileSearchResult {
   name: string;
   username: string;
   avatarEmoji: string;
+  avatarPhoto?: string;
   points: number;
 }
 
@@ -18,16 +19,17 @@ export async function searchProfiles(query: string, excludeUid: string): Promise
   if (!trimmed) return [];
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, name, username, avatar_emoji, points")
+    .select("id, name, username, avatar_emoji, avatar_photo_url, points")
     .ilike("username", `%${trimmed}%`)
     .neq("id", excludeUid)
     .limit(20);
   if (error) throw error;
-  return (data as Pick<ProfileRow, "id" | "name" | "username" | "avatar_emoji" | "points">[]).map((r) => ({
+  return (data as Pick<ProfileRow, "id" | "name" | "username" | "avatar_emoji" | "avatar_photo_url" | "points">[]).map((r) => ({
     id: r.id,
     name: r.name,
     username: r.username,
     avatarEmoji: r.avatar_emoji,
+    avatarPhoto: r.avatar_photo_url ?? undefined,
     points: r.points,
   }));
 }
@@ -96,6 +98,7 @@ export async function fetchFriends(uid: string): Promise<Friend[]> {
       name: p?.name ?? "",
       username: p?.username ?? "",
       avatarEmoji: p?.avatar_emoji ?? "🙂",
+      avatarPhoto: p?.avatar_photo_url ?? undefined,
       online: now - lastActive < ONLINE_WINDOW_MS,
       points: p?.points ?? 0,
       position: hasLivePosition ? { lat: p!.live_lat as number, lng: p!.live_lng as number } : { lat: 0, lng: 0 },
@@ -116,9 +119,14 @@ export async function fetchIncomingFriendRequests(uid: string): Promise<Incoming
   if (friendships.length === 0) return [];
 
   const ids = friendships.map((f) => f.requester_id);
-  const { data: profiles, error: pErr } = await supabase.from("profiles").select("id, name, username, avatar_emoji").in("id", ids);
+  const { data: profiles, error: pErr } = await supabase
+    .from("profiles")
+    .select("id, name, username, avatar_emoji, avatar_photo_url")
+    .in("id", ids);
   if (pErr) throw pErr;
-  const byId = new Map((profiles as Pick<ProfileRow, "id" | "name" | "username" | "avatar_emoji">[]).map((p) => [p.id, p]));
+  const byId = new Map(
+    (profiles as Pick<ProfileRow, "id" | "name" | "username" | "avatar_emoji" | "avatar_photo_url">[]).map((p) => [p.id, p])
+  );
 
   return friendships.map((f) => {
     const p = byId.get(f.requester_id);
@@ -128,6 +136,7 @@ export async function fetchIncomingFriendRequests(uid: string): Promise<Incoming
       fromName: p?.name ?? "",
       fromUsername: p?.username ?? "",
       fromAvatarEmoji: p?.avatar_emoji ?? "🙂",
+      fromAvatarPhoto: p?.avatar_photo_url ?? undefined,
       createdAt: new Date(f.created_at).getTime(),
     };
   });

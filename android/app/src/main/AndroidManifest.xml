@@ -13,6 +13,7 @@
             android:label="@string/title_activity_main"
             android:theme="@style/AppTheme.NoActionBarLaunch"
             android:launchMode="singleTask"
+            android:screenOrientation="portrait"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -36,6 +37,10 @@
     <!-- Map, ride-mode hazard alerts, and live presence for friends -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- Requested as a second, separate step after foreground location is granted
+         (Android requires this staging) - see MainActivity for why this alone
+         isn't full Waze-style background tracking. -->
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
 
     <!-- Recording and sending walkie-talkie voice messages -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />

@@ -48,19 +48,25 @@ html:not(.dark) body {
   filter: invert(1) hue-rotate(180deg) brightness(0.95) contrast(0.9) saturate(0.6);
 }
 
+/* OSM/CARTO's free tiles require attribution as a condition of use - fully
+   removing it risks losing map access, so this makes it as unobtrusive as
+   the terms allow (tiny, translucent) instead of removing it outright. */
 .leaflet-control-attribution {
-  font-size: 9px !important;
-  background: rgba(11, 18, 32, 0.6) !important;
-  color: #8892a6 !important;
+  font-size: 7px !important;
+  line-height: 1.4 !important;
+  padding: 1px 4px !important;
+  background: rgba(11, 18, 32, 0.35) !important;
+  color: rgba(136, 146, 166, 0.7) !important;
+  opacity: 0.6;
   /* the floating ride-start button pulls up ~52px into the map's bottom edge -
      lift attribution clear of it instead of sitting half-hidden behind it */
   margin-bottom: 64px !important;
 }
 .leaflet-control-attribution a {
-  color: #a78bfa !important;
+  color: rgba(167, 139, 250, 0.7) !important;
 }
 html:not(.dark) .leaflet-control-attribution {
-  background: rgba(255, 255, 255, 0.7) !important;
+  background: rgba(255, 255, 255, 0.5) !important;
   color: #555 !important;
 }
 

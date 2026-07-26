@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Check, Search, UserPlus, X } from "lucide-react";
 import BottomSheet from "./BottomSheet";
+import Avatar from "./Avatar";
 import { useApp } from "../context/AppContext";
 import type { ProfileSearchResult } from "../lib/backend/friends";
 
@@ -81,9 +82,7 @@ export default function AddFriendSheet({ open, onClose }: { open: boolean; onClo
           const sent = sentTo.has(r.id);
           return (
             <div key={r.id} className="flex items-center gap-3 p-3 rounded-2xl bg-bg-panel2 border border-bg-border">
-              <span className="w-9 h-9 rounded-full bg-bg-panel border border-bg-border flex items-center justify-center text-lg shrink-0">
-                {r.avatarEmoji}
-              </span>
+              <Avatar emoji={r.avatarEmoji} photoUrl={r.avatarPhoto} size={36} className="border border-bg-border" />
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-semibold text-neutral-100">{r.name}</div>
                 <div className="text-[11px] text-neutral-500" dir="ltr">

@@ -11,18 +11,35 @@ const TABS: { id: TabId; label: string; icon: typeof User }[] = [
   { id: "profile", label: "פרופיל", icon: User },
 ];
 
-export default function BottomNav({ tab, onChange }: { tab: TabId; onChange: (t: TabId) => void }) {
+export default function BottomNav({
+  tab,
+  onChange,
+  friendsBadgeCount = 0,
+}: {
+  tab: TabId;
+  onChange: (t: TabId) => void;
+  /** pending friend requests + group invites - shown as a "+N" badge on the חברים tab */
+  friendsBadgeCount?: number;
+}) {
   return (
     <nav className="flex items-stretch justify-around bg-bg-panel border-t border-bg-border px-1 pt-1.5 safe-bottom">
       {TABS.map(({ id, label, icon: Icon }) => {
         const active = tab === id;
+        const badge = id === "friends" ? friendsBadgeCount : 0;
         return (
           <button
             key={id}
             onClick={() => onChange(id)}
             className="flex flex-col items-center gap-1 flex-1 py-1.5 relative"
           >
-            <Icon size={22} strokeWidth={2.2} className={active ? "text-brand-light" : "text-neutral-500"} />
+            <span className="relative">
+              <Icon size={22} strokeWidth={2.2} className={active ? "text-brand-light" : "text-neutral-500"} />
+              {badge > 0 && (
+                <span className="absolute -top-1.5 -left-2 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center border-2 border-bg-panel">
+                  {badge > 9 ? "9+" : `+${badge}`}
+                </span>
+              )}
+            </span>
             <span className={clsx("text-[11px] font-medium", active ? "text-brand-light" : "text-neutral-500")}>
               {label}
             </span>
