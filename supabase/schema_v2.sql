@@ -171,12 +171,29 @@ as $$
   );
 $$;
 
+-- A pending invitee needs to read the group's name to see what they're being
+-- invited to (before they've accepted) - is_accepted_group_member alone hid
+-- it from them, so fetchIncomingGroupInvites always came back empty even
+-- though their pending walkie_group_members row was really there.
+create or replace function public.is_group_member(p_group_id uuid, p_uid uuid)
+returns boolean
+language sql
+security definer
+stable
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.walkie_group_members
+    where group_id = p_group_id and member_id = p_uid
+  );
+$$;
+
 drop policy if exists "members and owner can see the group" on public.walkie_groups;
 create policy "members and owner can see the group"
   on public.walkie_groups for select
   using (
     owner_id = auth.uid()
-    or public.is_accepted_group_member(id, auth.uid())
+    or public.is_group_member(id, auth.uid())
   );
 
 drop policy if exists "create a group as its owner" on public.walkie_groups;
