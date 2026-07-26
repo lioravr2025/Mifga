@@ -6,18 +6,18 @@
 -- `alter publication ... add table` has no IF NOT EXISTS - re-running it for a
 -- table that's already a member errors, which (since the whole pasted script
 -- runs as one transaction) rolls back everything else in this same run too,
--- including any real fixes below it. This makes every use of it idempotent.
+-- including any real fixes below it. This makes every use of it idempotent -
+-- catching the exact expected error directly instead of pre-checking system
+-- catalogs, so it can't be thrown off by how the SQL editor's role sees them.
 create or replace function public.ensure_realtime(p_schema text, p_table text)
 returns void
 language plpgsql
 as $$
 begin
-  if not exists (
-    select 1 from pg_publication_tables
-    where pubname = 'supabase_realtime' and schemaname = p_schema and tablename = p_table
-  ) then
-    execute format('alter publication supabase_realtime add table %I.%I', p_schema, p_table);
-  end if;
+  execute format('alter publication supabase_realtime add table %I.%I', p_schema, p_table);
+exception
+  when duplicate_object then
+    null; -- already a member - nothing to do
 end;
 $$;
 
