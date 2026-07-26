@@ -15,6 +15,7 @@ import { PRIMARY_HAZARD_TYPES } from "../data/hazardTypes";
 import { HAZARD_COLOR_HEX } from "../lib/colors";
 import { useWalkieRecorder } from "../hooks/useWalkieRecorder";
 import { useApp } from "../context/AppContext";
+import { isBackendConfigured } from "../lib/supabaseClient";
 import type { RideMonitor } from "../hooks/useRideMonitor";
 import type { HazardTypeId, LatLng } from "../types";
 
@@ -74,7 +75,12 @@ export default function MapScreen({
     if (lastAwardedPoints !== null) setConfettiTrigger((t) => t + 1);
   }, [lastAwardedPoints]);
 
-  const { recordingFor, start: startWalkie, stop: stopWalkie } = useWalkieRecorder((friendId, blob) => {
+  const { recordingFor, start: startWalkie, stop: stopWalkie, cancel: cancelWalkie } = useWalkieRecorder((friendId, blob) => {
+    if (isBackendConfigured && !blob) {
+      setWalkieSentLabel("לא הצלחנו להקליט - בדקו הרשאת מיקרופון");
+      setTimeout(() => setWalkieSentLabel(null), 3000);
+      return;
+    }
     const friend = friends.find((f) => f.id === friendId);
     sendFriendMessage(friendId, blob);
     setWalkieSentLabel(friend?.name ?? "");
@@ -133,7 +139,7 @@ export default function MapScreen({
       {!isPicking && (
         <div className="shrink-0 bg-bg-panel border-t border-bg-border px-4 pt-3 pb-2">
           <div className="flex flex-col items-center mb-2">
-            <div className="relative z-[1400] w-20 h-20 -mt-[52px]">
+            <div className="relative z-[600] w-20 h-20 -mt-[52px]">
               {ride.rideActive && <PulseRing color="#ef4444" />}
               <button
                 onClick={() => (ride.rideActive ? ride.stopRide() : ride.startRide())}
@@ -222,9 +228,19 @@ export default function MapScreen({
                       <button
                         onMouseDown={() => startWalkie(f.id)}
                         onMouseUp={() => recording && stopWalkie(f.id)}
-                        onTouchStart={() => startWalkie(f.id)}
-                        onTouchEnd={() => recording && stopWalkie(f.id)}
-                        className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center border active:scale-95 transition ${
+                        onMouseLeave={() => recording && stopWalkie(f.id)}
+                        onTouchStart={(e) => {
+                          e.preventDefault();
+                          startWalkie(f.id);
+                        }}
+                        onTouchEnd={(e) => {
+                          e.preventDefault();
+                          if (recording) stopWalkie(f.id);
+                        }}
+                        onTouchCancel={() => cancelWalkie(f.id)}
+                        onContextMenu={(e) => e.preventDefault()}
+                        style={{ touchAction: "none" }}
+                        className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center border active:scale-95 transition select-none ${
                           recording ? "bg-red-500 border-red-400 animate-pulseRing" : "bg-brand/15 border-brand/50"
                         }`}
                         title="החזיקו לשליחת הודעה קולית"

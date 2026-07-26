@@ -158,6 +158,8 @@ export interface RideLogEntry {
   endedAt: number;
   /** count of distinct hazards that triggered a beep alert during this ride */
   hazardsAvoided: number;
+  /** sparse breadcrumb trail sampled during the ride, for redrawing the route afterward - may be empty for very short rides */
+  path?: LatLng[];
 }
 
 export interface FeedbackEntry {

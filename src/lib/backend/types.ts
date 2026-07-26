@@ -117,6 +117,7 @@ export interface RideLogRow {
   started_at: string;
   ended_at: string;
   hazards_avoided: number;
+  path: { lat: number; lng: number }[] | null;
 }
 
 export function rideLogFromRow(row: RideLogRow): RideLogEntry {
@@ -125,5 +126,6 @@ export function rideLogFromRow(row: RideLogRow): RideLogEntry {
     startedAt: new Date(row.started_at).getTime(),
     endedAt: new Date(row.ended_at).getTime(),
     hazardsAvoided: row.hazards_avoided,
+    path: row.path ?? undefined,
   };
 }

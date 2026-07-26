@@ -16,12 +16,12 @@ import type {
   WalkieGroup,
 } from "../types";
 import { DEMO_FRIENDS, DEMO_USER, seedHazards } from "../data/mockData";
-import { POINTS_PER_REPORT, POINTS_PER_REPORT_WITH_PHOTO, REMOVAL_THRESHOLD } from "../data/hazardTypes";
+import { POINTS_PER_REPORT, POINTS_PER_REPORT_WITH_PHOTO, POINTS_PER_VOTE, REMOVAL_THRESHOLD } from "../data/hazardTypes";
 import { loadJSON, saveJSON } from "../lib/storage";
 import { isBackendConfigured } from "../lib/supabaseClient";
 import { ensureSession, fetchOwnProfile } from "../lib/backend/auth";
 import { insertProfile, updateProfileRemote } from "../lib/backend/profile";
-import { awardPointsRemote } from "../lib/backend/profile";
+import { awardPointsRemote, awardVotePointsRemote } from "../lib/backend/profile";
 import { confirmHazardRemote, denyHazardRemote, fetchHazards, insertHazard, subscribeHazards } from "../lib/backend/hazards";
 import { uploadBlob } from "../lib/backend/storage";
 import {
@@ -471,17 +471,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setLastAwardedPoints(points);
   };
 
+  const awardVotePoints = () => {
+    if (isBackendConfigured && user.id) {
+      awardVotePointsRemote(user.id, POINTS_PER_VOTE).catch((err) => console.error("Mifga: awardVotePoints failed", err));
+    }
+    setUser((prev) => ({ ...prev, points: prev.points + POINTS_PER_VOTE }));
+    setLastAwardedPoints(POINTS_PER_VOTE);
+  };
+
   const confirmHazard = (id: string) => {
     if (isBackendConfigured) {
       confirmHazardRemote(id).catch((err) => console.error("Mifga: confirmHazard failed", err));
+      awardVotePoints();
       return;
     }
     setHazards((prev) => prev.map((h) => (h.id === id ? { ...h, confirmations: h.confirmations + 1, lastVoteAt: Date.now() } : h)));
+    awardVotePoints();
   };
 
   const denyHazard = (id: string) => {
     if (isBackendConfigured) {
       denyHazardRemote(id).catch((err) => console.error("Mifga: denyHazard failed", err));
+      awardVotePoints();
       return;
     }
     setHazards((prev) =>
@@ -491,6 +502,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         return { ...h, denials, lastVoteAt: Date.now(), removed: denials >= REMOVAL_THRESHOLD };
       })
     );
+    awardVotePoints();
   };
 
   const updateSettings = (patch: Partial<AppSettings>) => setSettings((s) => ({ ...s, ...patch }));

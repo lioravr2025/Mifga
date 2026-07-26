@@ -32,6 +32,8 @@ export function getHazardType(id: HazardTypeId): HazardTypeDef {
 export const REMOVAL_THRESHOLD = 5; // denial votes needed to auto-remove a hazard
 export const POINTS_PER_REPORT = 1;
 export const POINTS_PER_REPORT_WITH_PHOTO = 5;
+/** Awarded for confirming/denying whether a hazard is still there - verifying info is worth rewarding too. */
+export const POINTS_PER_VOTE = 1;
 
 /** Which of the 3 distinct ride-alert beep sounds a hazard type should play. */
 export type RideAlertKind = "police" | "inspector" | "other";

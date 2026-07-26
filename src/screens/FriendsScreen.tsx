@@ -31,12 +31,23 @@ export default function FriendsScreen({ onLocateFriend }: { onLocateFriend: (fri
   const [manageGroup, setManageGroup] = useState<WalkieGroup | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
+  const [recError, setRecError] = useState<string | null>(null);
+
   const notify = (label: string) => {
     setLastSentLabel(label);
     setTimeout(() => setLastSentLabel(null), 2200);
   };
 
-  const { recordingFor, start, stop } = useWalkieRecorder((targetId, blob) => {
+  const notifyError = () => {
+    setRecError("לא הצלחנו להקליט - בדקו הרשאת מיקרופון בהגדרות המכשיר");
+    setTimeout(() => setRecError(null), 3000);
+  };
+
+  const { recordingFor, start, stop, cancel } = useWalkieRecorder((targetId, blob) => {
+    if (isBackendConfigured && !blob) {
+      notifyError();
+      return;
+    }
     if (targetId.startsWith("g-")) {
       const group = groups.find((g) => g.id === targetId);
       sendGroupMessage(targetId, blob);
@@ -161,6 +172,11 @@ export default function FriendsScreen({ onLocateFriend }: { onLocateFriend: (fri
           ההודעה הקולית נשלחה {lastSentLabel} 🎙️
         </div>
       )}
+      {recError && (
+        <div className="mb-4 px-4 py-2.5 rounded-2xl bg-red-500/15 border border-red-500/40 text-red-300 text-sm font-semibold text-center">
+          {recError}
+        </div>
+      )}
       {favoriteNotice && (
         <div className="mb-4 px-4 py-2.5 rounded-2xl bg-amber-500/15 border border-amber-500/40 text-amber-300 text-sm font-semibold text-center">
           {favoriteNotice}
@@ -226,10 +242,20 @@ export default function FriendsScreen({ onLocateFriend }: { onLocateFriend: (fri
                 <button
                   onMouseDown={() => canSend && start(g.id)}
                   onMouseUp={() => recording && stop(g.id)}
-                  onTouchStart={() => canSend && start(g.id)}
-                  onTouchEnd={() => recording && stop(g.id)}
+                  onMouseLeave={() => recording && stop(g.id)}
+                  onTouchStart={(e) => {
+                    e.preventDefault();
+                    if (canSend) start(g.id);
+                  }}
+                  onTouchEnd={(e) => {
+                    e.preventDefault();
+                    if (recording) stop(g.id);
+                  }}
+                  onTouchCancel={() => cancel(g.id)}
+                  onContextMenu={(e) => e.preventDefault()}
                   disabled={!canSend}
-                  className={`shrink-0 w-11 h-11 rounded-full flex items-center justify-center border active:scale-95 transition disabled:opacity-30 ${
+                  style={{ touchAction: "none" }}
+                  className={`shrink-0 w-11 h-11 rounded-full flex items-center justify-center border active:scale-95 transition disabled:opacity-30 select-none ${
                     recording ? "bg-red-500 border-red-400 animate-pulseRing" : "bg-brand/15 border-brand/50"
                   }`}
                   title="החזיקו כדי לשלוח הודעה קולית לכל הקבוצה"
@@ -305,9 +331,19 @@ export default function FriendsScreen({ onLocateFriend }: { onLocateFriend: (fri
                 <button
                   onMouseDown={() => start(f.id)}
                   onMouseUp={() => recording && stop(f.id)}
-                  onTouchStart={() => start(f.id)}
-                  onTouchEnd={() => recording && stop(f.id)}
-                  className={`shrink-0 w-11 h-11 rounded-full flex items-center justify-center border active:scale-95 transition ${
+                  onMouseLeave={() => recording && stop(f.id)}
+                  onTouchStart={(e) => {
+                    e.preventDefault();
+                    start(f.id);
+                  }}
+                  onTouchEnd={(e) => {
+                    e.preventDefault();
+                    if (recording) stop(f.id);
+                  }}
+                  onTouchCancel={() => cancel(f.id)}
+                  onContextMenu={(e) => e.preventDefault()}
+                  style={{ touchAction: "none" }}
+                  className={`shrink-0 w-11 h-11 rounded-full flex items-center justify-center border active:scale-95 transition select-none ${
                     recording ? "bg-red-500 border-red-400 animate-pulseRing" : "bg-brand/15 border-brand/50"
                   }`}
                   title="החזיקו כדי לשלוח הודעה קולית מתפרצת"

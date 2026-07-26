@@ -43,6 +43,29 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
+      # Every CI run is a fresh machine, so Gradle's auto-generated debug
+      # keystore would be different each build - Android then refuses to
+      # install the new APK over the old one ("signatures don't match"),
+      # forcing an uninstall every time. Caching one fixed keystore across
+      # runs (with the exact alias/passwords Gradle's default debug config
+      # already expects, so build.gradle needs no changes) means every
+      # future build is signed identically and installs as a normal update.
+      - name: Restore stable debug keystore
+        id: keystore-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: mifga-debug-keystore-v1
+
+      - name: Generate debug keystore (first run only)
+        if: steps.keystore-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/.android
+          keytool -genkeypair -v -keystore ~/.android/debug.keystore \
+            -storepass android -alias androiddebugkey -keypass android \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -dname "CN=Android Debug,O=Android,C=US"
+
       - name: Build debug APK
         working-directory: android
         run: |

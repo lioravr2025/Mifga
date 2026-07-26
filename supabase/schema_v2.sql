@@ -11,6 +11,25 @@ alter table public.profiles add column if not exists live_lat double precision;
 alter table public.profiles add column if not exists live_lng double precision;
 alter table public.profiles add column if not exists last_active_at timestamptz;
 
+-- Awarded for confirming/denying a hazard ("still there?") - unlike
+-- award_report_points, this never touches reports_count/reports_with_photo,
+-- since voting isn't reporting.
+create or replace function public.award_vote_points(p_uid uuid, p_points integer)
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+  if auth.uid() <> p_uid then
+    raise exception 'cannot award points to another user';
+  end if;
+
+  update public.profiles set points = points + p_points where id = p_uid;
+end;
+$$;
+
+grant execute on function public.award_vote_points(uuid, integer) to authenticated;
+
 -- ============================================================================
 -- friendships - request/accept model. One row per pair, direction matters
 -- only for who has to approve; "favorite" is per-viewer since it's subjective.
@@ -317,6 +336,9 @@ alter publication supabase_realtime add table public.friend_messages;
 -- ============================================================================
 -- ride_log (WIRED)
 -- ============================================================================
+-- sparse breadcrumb trail of the ride, so the log can redraw a route (start -> end)
+alter table public.ride_log add column if not exists path jsonb not null default '[]'::jsonb;
+
 alter table public.ride_log enable row level security;
 
 drop policy if exists "read own ride log" on public.ride_log;

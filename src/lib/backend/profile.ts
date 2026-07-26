@@ -67,3 +67,9 @@ export async function awardPointsRemote(uid: string, pointsDelta: number, withPh
   const { error } = await supabase.rpc("award_report_points", { p_uid: uid, p_points: pointsDelta, p_with_photo: withPhoto });
   if (error) throw error;
 }
+
+export async function awardVotePointsRemote(uid: string, pointsDelta: number): Promise<void> {
+  if (!supabase) throw new Error("Supabase not configured");
+  const { error } = await supabase.rpc("award_vote_points", { p_uid: uid, p_points: pointsDelta });
+  if (error) throw error;
+}

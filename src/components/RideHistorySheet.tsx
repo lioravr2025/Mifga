@@ -1,11 +1,15 @@
-import { History, ShieldCheck, X } from "lucide-react";
+import { useState } from "react";
+import { ChevronLeft, History, ShieldCheck, X } from "lucide-react";
 import BottomSheet from "./BottomSheet";
+import RideRouteSheet from "./RideRouteSheet";
 import { useApp } from "../context/AppContext";
 import { timeAgo } from "../lib/geo";
+import type { RideLogEntry } from "../types";
 
 export default function RideHistorySheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { rideLog } = useApp();
   const totalHazardsAvoided = rideLog.reduce((sum, r) => sum + r.hazardsAvoided, 0);
+  const [selectedRide, setSelectedRide] = useState<RideLogEntry | null>(null);
 
   return (
     <BottomSheet open={open} onClose={onClose} maxHeight="80%">
@@ -23,7 +27,11 @@ export default function RideHistorySheet({ open, onClose }: { open: boolean; onC
         {rideLog.map((r) => {
           const minutes = Math.max(1, Math.round((r.endedAt - r.startedAt) / 60000));
           return (
-            <div key={r.id} className="flex items-center gap-3 px-4 py-3">
+            <button
+              key={r.id}
+              onClick={() => setSelectedRide(r)}
+              className="w-full flex items-center gap-3 px-4 py-3 active:bg-bg-panel transition text-right"
+            >
               <span className="w-9 h-9 rounded-full bg-brand/15 flex items-center justify-center shrink-0">
                 <History size={15} className="text-brand-light" />
               </span>
@@ -35,10 +43,13 @@ export default function RideHistorySheet({ open, onClose }: { open: boolean; onC
                 <ShieldCheck size={13} />
                 {r.hazardsAvoided}
               </span>
-            </div>
+              <ChevronLeft size={16} className="text-neutral-500 shrink-0" />
+            </button>
           );
         })}
       </div>
+
+      <RideRouteSheet ride={selectedRide} onClose={() => setSelectedRide(null)} />
     </BottomSheet>
   );
 }

@@ -21,6 +21,7 @@ export async function insertRideLogEntry(uid: string, entry: Omit<RideLogEntry, 
     started_at: new Date(entry.startedAt).toISOString(),
     ended_at: new Date(entry.endedAt).toISOString(),
     hazards_avoided: entry.hazardsAvoided,
+    path: entry.path ?? [],
   });
   if (error) throw error;
 }
