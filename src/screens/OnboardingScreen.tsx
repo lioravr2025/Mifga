@@ -5,6 +5,7 @@ import { VEHICLE_DEFS } from "../components/VehicleIcons";
 import VehicleModelInput from "../components/VehicleModelInput";
 import UsernameField from "../components/UsernameField";
 import InviteFriendButton from "../components/InviteFriendButton";
+import TermsSheet from "../components/TermsSheet";
 import { HAZARD_COLOR_HEX } from "../lib/colors";
 import type { NotifyTypePrefs, VehicleTypeId } from "../types";
 
@@ -34,6 +35,7 @@ export default function OnboardingScreen() {
   const [notifyTypes, setNotifyTypes] = useState<NotifyTypePrefs>(settings.notifyTypes);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [termsOpen, setTermsOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const phoneValid = isValidIsraeliPhone(phone);
@@ -268,7 +270,15 @@ export default function OnboardingScreen() {
         {!canSubmit && !submitting && (
           <p className="text-[11px] text-neutral-500 text-center mt-2">כינוי, שם משתמש ייחודי, ומספר טלפון תקין נדרשים כדי להמשיך</p>
         )}
+        <p className="text-[10px] text-neutral-500 text-center mt-3">
+          שימוש באפליקציה מהווה הסכמה ל
+          <button onClick={() => setTermsOpen(true)} className="text-brand-light underline decoration-dotted underline-offset-2">
+            תנאי השימוש
+          </button>
+        </p>
       </div>
+
+      <TermsSheet open={termsOpen} onClose={() => setTermsOpen(false)} />
     </div>
   );
 }

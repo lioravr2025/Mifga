@@ -4,8 +4,14 @@ import type { Map as LeafletMap, LatLngBoundsExpression } from "leaflet";
 import { Flag, MapPin, X } from "lucide-react";
 import BottomSheet from "./BottomSheet";
 import { useApp } from "../context/AppContext";
-import { timeAgo } from "../lib/geo";
+import { distanceMeters, formatDistance, timeAgo } from "../lib/geo";
 import type { RideLogEntry } from "../types";
+
+function totalPathDistance(path: { lat: number; lng: number }[]): number {
+  let total = 0;
+  for (let i = 1; i < path.length; i++) total += distanceMeters(path[i - 1], path[i]);
+  return total;
+}
 
 const DARK_TILES = "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
 const LIGHT_TILES = "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png";
@@ -27,6 +33,7 @@ export default function RideRouteSheet({ ride, onClose }: { ride: RideLogEntry |
   const path = ride.path ?? [];
   const positions: [number, number][] = path.map((p) => [p.lat, p.lng]);
   const minutes = Math.max(1, Math.round((ride.endedAt - ride.startedAt) / 60000));
+  const distance = totalPathDistance(path);
   const start = positions[0];
   const end = positions[positions.length - 1];
 
@@ -36,7 +43,7 @@ export default function RideRouteSheet({ ride, onClose }: { ride: RideLogEntry |
         <div>
           <h2 className="text-lg font-bold text-neutral-50">נסיעה {timeAgo(ride.startedAt)}</h2>
           <p className="text-xs text-neutral-400">
-            {minutes} דק' · {ride.hazardsAvoided} מפגעים נחסכו
+            {minutes} דק' · {formatDistance(distance)} · {ride.hazardsAvoided} מפגעים נחסכו
           </p>
         </div>
         <button onClick={onClose} className="text-neutral-400">

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { Circle, MapContainer, Marker, Popup, TileLayer, useMap, useMapEvents } from "react-leaflet";
+import { AttributionControl, Circle, MapContainer, Marker, Popup, TileLayer, useMap, useMapEvents } from "react-leaflet";
 import type { Map as LeafletMap } from "leaflet";
 import type { Friend, HazardReport, LatLng } from "../types";
 import { getHazardType } from "../data/hazardTypes";
@@ -86,10 +86,12 @@ export default function MapView({
         center={[userPosition.lat, userPosition.lng]}
         zoom={DEFAULT_ZOOM}
         zoomControl={false}
-        attributionControl={true}
+        attributionControl={false}
         className="w-full h-full"
         ref={mapRef}
       >
+        {/* Default position, but lifted clear of the floating ride button via CSS (see index.css) - every other corner already has a control (menu/bell/locate). */}
+        <AttributionControl position="bottomright" prefix={false} />
         <TileLayer url={theme === "dark" ? DARK_TILES : LIGHT_TILES} attribution="&copy; OpenStreetMap &copy; CARTO" />
         <RecenterController target={cameraTarget ?? userPosition} signal={recenterSignal} />
         {pickingLocation && onPickedCenterChange && <CenterTracker onChange={onPickedCenterChange} />}

@@ -119,33 +119,15 @@ alter publication supabase_realtime add table public.profiles;
 -- simulated auto-accept).
 -- ============================================================================
 alter table public.walkie_groups enable row level security;
-
-drop policy if exists "members and owner can see the group" on public.walkie_groups;
-create policy "members and owner can see the group"
-  on public.walkie_groups for select
-  using (
-    owner_id = auth.uid()
-    or exists (select 1 from public.walkie_group_members m where m.group_id = id and m.member_id = auth.uid())
-  );
-
-drop policy if exists "create a group as its owner" on public.walkie_groups;
-create policy "create a group as its owner"
-  on public.walkie_groups for insert
-  with check (owner_id = auth.uid());
-
-drop policy if exists "owner can delete their group" on public.walkie_groups;
-create policy "owner can delete their group"
-  on public.walkie_groups for delete
-  using (owner_id = auth.uid());
-
 alter table public.walkie_group_members enable row level security;
 
--- A policy on walkie_group_members that queries walkie_group_members itself
--- (to let accepted members see their fellow members) causes Postgres to
--- re-apply that same policy to filter the subquery's own rows, recursively,
--- forever ("infinite recursion detected in policy"). A security-definer
--- function breaks the loop: it runs as its owner, which bypasses RLS, so the
--- query inside it doesn't re-trigger the policy that's calling it.
+-- walkie_groups' policy needs to check walkie_group_members, and
+-- walkie_group_members' policy needs to check walkie_groups - a plain
+-- subquery in either direction makes Postgres re-evaluate the other table's
+-- policy, which re-triggers the first one, forever ("infinite recursion
+-- detected in policy"). Security-definer functions break both directions of
+-- the cycle: each runs as its owner, which bypasses RLS, so the query inside
+-- it never re-triggers the policy that's calling it.
 create or replace function public.is_accepted_group_member(p_group_id uuid, p_uid uuid)
 returns boolean
 language sql
@@ -159,26 +141,56 @@ as $$
   );
 $$;
 
+create or replace function public.is_group_owner(p_group_id uuid, p_uid uuid)
+returns boolean
+language sql
+security definer
+stable
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.walkie_groups where id = p_group_id and owner_id = p_uid
+  );
+$$;
+
+drop policy if exists "members and owner can see the group" on public.walkie_groups;
+create policy "members and owner can see the group"
+  on public.walkie_groups for select
+  using (
+    owner_id = auth.uid()
+    or public.is_accepted_group_member(id, auth.uid())
+  );
+
+drop policy if exists "create a group as its owner" on public.walkie_groups;
+create policy "create a group as its owner"
+  on public.walkie_groups for insert
+  with check (owner_id = auth.uid());
+
+drop policy if exists "owner can delete their group" on public.walkie_groups;
+create policy "owner can delete their group"
+  on public.walkie_groups for delete
+  using (owner_id = auth.uid());
+
 drop policy if exists "see members of my groups" on public.walkie_group_members;
 create policy "see members of my groups"
   on public.walkie_group_members for select
   using (
     member_id = auth.uid()
-    or exists (select 1 from public.walkie_groups g where g.id = group_id and g.owner_id = auth.uid())
+    or public.is_group_owner(group_id, auth.uid())
     or public.is_accepted_group_member(group_id, auth.uid())
   );
 
 drop policy if exists "owner invites members" on public.walkie_group_members;
 create policy "owner invites members"
   on public.walkie_group_members for insert
-  with check (exists (select 1 from public.walkie_groups g where g.id = group_id and g.owner_id = auth.uid()));
+  with check (public.is_group_owner(group_id, auth.uid()));
 
 drop policy if exists "owner or the member themself can remove a membership" on public.walkie_group_members;
 create policy "owner or the member themself can remove a membership"
   on public.walkie_group_members for delete
   using (
     member_id = auth.uid()
-    or exists (select 1 from public.walkie_groups g where g.id = group_id and g.owner_id = auth.uid())
+    or public.is_group_owner(group_id, auth.uid())
   );
 
 create or replace function public.respond_group_invite(p_group_id uuid, p_accept boolean)

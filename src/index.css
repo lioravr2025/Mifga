@@ -52,6 +52,9 @@ html:not(.dark) body {
   font-size: 9px !important;
   background: rgba(11, 18, 32, 0.6) !important;
   color: #8892a6 !important;
+  /* the floating ride-start button pulls up ~52px into the map's bottom edge -
+     lift attribution clear of it instead of sitting half-hidden behind it */
+  margin-bottom: 64px !important;
 }
 .leaflet-control-attribution a {
   color: #a78bfa !important;

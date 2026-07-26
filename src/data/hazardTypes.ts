@@ -30,6 +30,9 @@ export function getHazardType(id: HazardTypeId): HazardTypeDef {
 }
 
 export const REMOVAL_THRESHOLD = 5; // denial votes needed to auto-remove a hazard
+/** Police/inspector hazards vanish from the map if nobody confirms/denies them for this long - resets on every vote. */
+export const HAZARD_EXPIRY_MS = 20 * 60_000;
+export const HAZARD_EXPIRY_TYPES: HazardTypeId[] = ["police", "inspector"];
 export const POINTS_PER_REPORT = 1;
 export const POINTS_PER_REPORT_WITH_PHOTO = 5;
 /** Awarded for confirming/denying whether a hazard is still there - verifying info is worth rewarding too. */

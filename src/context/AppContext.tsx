@@ -16,7 +16,14 @@ import type {
   WalkieGroup,
 } from "../types";
 import { DEMO_FRIENDS, DEMO_USER, seedHazards } from "../data/mockData";
-import { POINTS_PER_REPORT, POINTS_PER_REPORT_WITH_PHOTO, POINTS_PER_VOTE, REMOVAL_THRESHOLD } from "../data/hazardTypes";
+import {
+  HAZARD_EXPIRY_MS,
+  HAZARD_EXPIRY_TYPES,
+  POINTS_PER_REPORT,
+  POINTS_PER_REPORT_WITH_PHOTO,
+  POINTS_PER_VOTE,
+  REMOVAL_THRESHOLD,
+} from "../data/hazardTypes";
 import { loadJSON, saveJSON } from "../lib/storage";
 import { isBackendConfigured } from "../lib/supabaseClient";
 import { ensureSession, fetchOwnProfile } from "../lib/backend/auth";
@@ -735,7 +742,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
     await reloadGroups(user.id);
   };
 
-  const visibleHazards = useMemo(() => hazards.filter((h) => !h.removed), [hazards]);
+  // Re-check every 30s so a hazard actually disappears from the map as its
+  // 20-minute silence window elapses, not only after the next unrelated re-render.
+  const [expiryTick, setExpiryTick] = useState(0);
+  useEffect(() => {
+    const interval = setInterval(() => setExpiryTick((t) => t + 1), 30_000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const visibleHazards = useMemo(() => {
+    const now = Date.now();
+    return hazards.filter((h) => {
+      if (h.removed) return false;
+      if (!HAZARD_EXPIRY_TYPES.includes(h.type)) return true;
+      const lastInteraction = h.lastVoteAt ?? h.createdAt;
+      return now - lastInteraction < HAZARD_EXPIRY_MS;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hazards, expiryTick]);
 
   const value: AppContextValue = {
     user,

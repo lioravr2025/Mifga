@@ -34,6 +34,7 @@ export function useWalkieRecorder(onSent: (targetId: string, blob: Blob | null) 
     setRecordingFor(targetId);
     setTimeout(() => {
       setRecordingFor(null);
+      activeTargetRef.current = null; // otherwise every future press is silently ignored - see start()'s guard
       onSent(targetId, null);
     }, SIMULATED_RECORDING_MS);
   };
