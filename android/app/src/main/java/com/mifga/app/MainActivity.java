@@ -4,9 +4,11 @@ import android.Manifest;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.webkit.PermissionRequest;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import com.getcapacitor.BridgeActivity;
+import com.getcapacitor.BridgeWebChromeClient;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -40,6 +42,15 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        // Capacitor's default WebChromeClient grants getUserMedia() (mic/camera)
+        // via an async ActivityResultLauncher, and Android invokes
+        // onPermissionRequest() off the UI thread - in practice that grant
+        // sometimes never resolves, so JS sees a NotAllowedError even though the
+        // OS-level permission (requested below) is already held. Replacing it
+        // with a synchronous, UI-thread grant based on the OS permission we
+        // already have removes that failure mode for the walkie-talkie recorder.
+        getBridge().getWebView().setWebChromeClient(new MicSafeWebChromeClient(getBridge()));
 
         String[] needed = {
             Manifest.permission.RECORD_AUDIO,
@@ -83,6 +94,46 @@ public class MainActivity extends BridgeActivity {
                 new String[] { Manifest.permission.ACCESS_BACKGROUND_LOCATION },
                 BACKGROUND_LOCATION_REQUEST_CODE
             );
+        }
+    }
+
+    /**
+     * Same as Capacitor's BridgeWebChromeClient (file chooser, alerts, geolocation
+     * prompts all still work via the parent class) except for mic/camera capture:
+     * grants immediately on the UI thread if the OS permission is already held,
+     * instead of relying on Capacitor's async permission-launcher path.
+     */
+    private static class MicSafeWebChromeClient extends BridgeWebChromeClient {
+        private final MainActivity activity;
+
+        MicSafeWebChromeClient(com.getcapacitor.Bridge bridge) {
+            super(bridge);
+            this.activity = (MainActivity) bridge.getActivity();
+        }
+
+        @Override
+        public void onPermissionRequest(final PermissionRequest request) {
+            activity.runOnUiThread(() -> {
+                List<String> toGrant = new ArrayList<>();
+                for (String resource : request.getResources()) {
+                    if (
+                        resource.equals(PermissionRequest.RESOURCE_AUDIO_CAPTURE) &&
+                        ContextCompat.checkSelfPermission(activity, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+                    ) {
+                        toGrant.add(resource);
+                    } else if (
+                        resource.equals(PermissionRequest.RESOURCE_VIDEO_CAPTURE) &&
+                        ContextCompat.checkSelfPermission(activity, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+                    ) {
+                        toGrant.add(resource);
+                    }
+                }
+                if (!toGrant.isEmpty()) {
+                    request.grant(toGrant.toArray(new String[0]));
+                } else {
+                    request.deny();
+                }
+            });
         }
     }
 }
