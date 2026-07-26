@@ -1,5 +1,6 @@
 import { supabase } from "../supabaseClient";
 import { hazardFromRow, type HazardRow } from "./types";
+import { uploadDataUrl } from "./storage";
 import type { HazardReport, HazardTypeId, LatLng } from "../../types";
 
 export async function fetchHazards(): Promise<HazardReport[]> {
@@ -20,6 +21,7 @@ interface NewHazardInput {
 
 export async function insertHazard(input: NewHazardInput): Promise<HazardReport> {
   if (!supabase) throw new Error("Supabase not configured");
+  const photoUrl = input.photoDataUrl ? await uploadDataUrl("hazard-photos", input.reporterId, input.photoDataUrl) : null;
   const { data, error } = await supabase
     .from("hazards")
     .insert({
@@ -29,7 +31,7 @@ export async function insertHazard(input: NewHazardInput): Promise<HazardReport>
       reporter_id: input.reporterId,
       reporter_name: input.reporterName,
       has_photo: !!input.photoDataUrl,
-      photo_url: input.photoDataUrl ?? null,
+      photo_url: photoUrl,
       nickname: input.nickname?.trim() || null,
     })
     .select("*")

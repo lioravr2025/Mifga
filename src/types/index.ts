@@ -84,6 +84,25 @@ export interface Friend {
   lastSeenAt: number;
   /** starred for the home-screen quick row - capped at MAX_FAVORITE_FRIENDS */
   favorite?: boolean;
+  /** id of the underlying `friendships` row - only set in backend mode, needed to call the favorite/respond RPCs */
+  friendshipId?: string;
+}
+
+/** A pending friend request someone else sent me - backend mode only. */
+export interface IncomingFriendRequest {
+  friendshipId: string;
+  fromUid: string;
+  fromName: string;
+  fromUsername: string;
+  fromAvatarEmoji: string;
+  createdAt: number;
+}
+
+/** A pending invite to join a WalkieGroup - backend mode only. */
+export interface IncomingGroupInvite {
+  groupId: string;
+  groupName: string;
+  invitedAt: number;
 }
 
 /** Membership status of a friend inside a WalkieGroup - joining requires their approval. */
@@ -98,6 +117,10 @@ export interface GroupMessage {
   id: string;
   sentAt: number;
   receipts: GroupMessageReceipt[];
+  /** URL of the recorded voice clip - only set in backend mode (local mode never persists audio) */
+  audioUrl?: string;
+  /** profile id of whoever sent it - backend mode only, used to skip auto-play/receipt-marking on your own outgoing message */
+  senderId?: string;
 }
 
 export interface WalkieGroup {

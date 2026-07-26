@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Gauge } from "lucide-react";
+import { Gauge, Mic } from "lucide-react";
 import BottomNav from "./components/BottomNav";
 import FeedbackButton from "./components/FeedbackButton";
 import SettingsSheet from "./components/SettingsSheet";
@@ -19,7 +19,7 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [focusFriendId, setFocusFriendId] = useState<string | null>(null);
   const { position } = useGeolocation();
-  const { onboardingComplete, backendReady } = useApp();
+  const { onboardingComplete, backendReady, lastIncomingVoiceLabel } = useApp();
   // Lives here (not inside a screen) so a ride keeps beeping regardless of
   // which tab is open - Route isn't kept mounted like Map is.
   const ride = useRideMonitor(position);
@@ -74,6 +74,13 @@ export default function App() {
 
             <BottomNav tab={tab} onChange={setTab} />
             <FeedbackButton />
+
+            {lastIncomingVoiceLabel && (
+              <div className="absolute top-4 inset-x-4 z-[2000] flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-brand/90 backdrop-blur border border-brand-light/50 shadow-2xl safe-top animate-slideUp">
+                <Mic size={16} className="text-white shrink-0" />
+                <span className="text-sm font-semibold text-white">הודעה קולית מ{lastIncomingVoiceLabel} 🎙️</span>
+              </div>
+            )}
 
             <SettingsSheet open={settingsOpen} onClose={() => setSettingsOpen(false)} />
           </>

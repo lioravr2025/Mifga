@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type {
   AppSettings,
   FeedbackEntry,
@@ -6,6 +6,8 @@ import type {
   GroupMessage,
   HazardReport,
   HazardTypeId,
+  IncomingFriendRequest,
+  IncomingGroupInvite,
   LatLng,
   NotifyTypePrefs,
   RideLogEntry,
@@ -21,6 +23,41 @@ import { ensureSession, fetchOwnProfile } from "../lib/backend/auth";
 import { insertProfile, updateProfileRemote } from "../lib/backend/profile";
 import { awardPointsRemote } from "../lib/backend/profile";
 import { confirmHazardRemote, denyHazardRemote, fetchHazards, insertHazard, subscribeHazards } from "../lib/backend/hazards";
+import { uploadBlob } from "../lib/backend/storage";
+import {
+  fetchFriends,
+  fetchIncomingFriendRequests,
+  respondFriendRequestRemote,
+  searchProfiles,
+  sendFriendRequest,
+  subscribeFriendships,
+  toggleFriendFavoriteRemote,
+  updatePresence,
+  type ProfileSearchResult,
+} from "../lib/backend/friends";
+import {
+  createGroupRemote,
+  fetchGroups,
+  fetchIncomingGroupInvites,
+  inviteMembersRemote,
+  markMessageDeliveredRemote,
+  removeGroupRemote,
+  removeMemberRemote,
+  respondGroupInviteRemote,
+  sendGroupMessageRemote,
+  subscribeGroupMessages,
+  subscribeGroups,
+  subscribeMessageReceipts,
+} from "../lib/backend/groups";
+import {
+  markFriendMessageDeliveredRemote,
+  sendFriendMessageRemote,
+  subscribeFriendMessages,
+  type FriendMessageRow,
+} from "../lib/backend/directMessages";
+import type { WalkieGroupMessageReceiptRow, WalkieGroupMessageRow } from "../lib/backend/types";
+import { fetchRideLog, insertRideLogEntry } from "../lib/backend/rideLog";
+import { insertFeedbackRemote } from "../lib/backend/feedback";
 
 interface NewReportInput {
   type: HazardTypeId;
@@ -60,6 +97,12 @@ interface AppContextValue {
   /** false only while bootstrapping a real backend session on first load - App.tsx should show a loading state until this flips true */
   backendReady: boolean;
   rideLog: RideLogEntry[];
+  /** backend mode only: friend requests other people sent me, awaiting my accept/decline */
+  incomingFriendRequests: IncomingFriendRequest[];
+  /** backend mode only: group invites awaiting my accept/decline */
+  incomingGroupInvites: IncomingGroupInvite[];
+  /** backend mode only: name of whoever a just-received voice message is from, shown as a toast then auto-cleared */
+  lastIncomingVoiceLabel: string | null;
   addReport: (input: NewReportInput) => void;
   confirmHazard: (id: string) => void;
   denyHazard: (id: string) => void;
@@ -72,12 +115,19 @@ interface AppContextValue {
   addMembersToGroup: (groupId: string, memberFriendIds: string[]) => void;
   removeMemberFromGroup: (groupId: string, friendId: string) => void;
   removeGroup: (groupId: string) => void;
-  sendGroupMessage: (groupId: string) => void;
+  sendGroupMessage: (groupId: string, audioBlob?: Blob | null) => void;
+  /** backend mode only: a direct (non-group) walkie-talkie voice message straight to a friend */
+  sendFriendMessage: (friendId: string, audioBlob?: Blob | null) => void;
   clearLastAwarded: () => void;
   /** Throws on failure (e.g. network/backend error) so the onboarding screen can show it - local mode never throws. */
   completeOnboarding: (input: OnboardingInput) => Promise<void>;
   addRideLogEntry: (entry: Omit<RideLogEntry, "id">) => void;
   submitFeedback: (liked: boolean, note: string) => void;
+  /** backend mode only: search all registered users by username to add as a friend */
+  searchFriendCandidates: (query: string) => Promise<ProfileSearchResult[]>;
+  addFriendByUid: (targetUid: string) => Promise<void>;
+  respondFriendRequest: (friendshipId: string, accept: boolean) => Promise<void>;
+  respondGroupInvite: (groupId: string, accept: boolean) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -102,17 +152,18 @@ const EMPTY_USER: UserProfile = {
 };
 
 // Real member approval / message delivery needs a backend push to the
-// friend's device; friends/groups aren't migrated to Supabase yet (see
-// README - "מה עוד נשאר"), so this local prototype simulates that round
+// friend's device; in local (no-backend) mode this simulates that round
 // trip with a short delay so the "pending -> accepted" / "sent -> delivered"
-// flows are demoable end to end without a server, in both modes.
+// flows are demoable end to end without a server.
 const SIMULATED_APPROVAL_DELAY_MS = 2200;
 const SIMULATED_DELIVERY_DELAY_MS = 900;
+const PRESENCE_PUSH_INTERVAL_MS = 25_000;
+const VOICE_TOAST_MS = 3000;
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserProfile>(() => (isBackendConfigured ? EMPTY_USER : loadJSON("user", DEMO_USER)));
   const [friends, setFriends] = useState<Friend[]>(() => {
-    if (isBackendConfigured) return []; // no fake demo people in a real deployment - see README
+    if (isBackendConfigured) return []; // populated by the bootstrap effect below
     // backfill fields added after some users already had friends saved locally
     const stored = loadJSON("friends", DEMO_FRIENDS);
     return stored.map((f, i) => ({
@@ -128,6 +179,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return stored ?? seedHazards();
   });
   const [groups, setGroups] = useState<WalkieGroup[]>(() => {
+    if (isBackendConfigured) return []; // populated by the bootstrap effect below
     // backfill `messages` for groups created before that field existed - otherwise
     // GroupManageSheet crashes reading .length off an undefined array
     const stored = loadJSON<WalkieGroup[]>("groups", []);
@@ -147,28 +199,53 @@ export function AppProvider({ children }: { children: ReactNode }) {
     isBackendConfigured ? false : loadJSON("onboardingComplete", false)
   );
   const [backendReady, setBackendReady] = useState<boolean>(!isBackendConfigured);
-  const [rideLog, setRideLog] = useState<RideLogEntry[]>(() => loadJSON("rideLog", []));
+  const [rideLog, setRideLog] = useState<RideLogEntry[]>(() => (isBackendConfigured ? [] : loadJSON("rideLog", [])));
   const [feedbackEntries, setFeedbackEntries] = useState<FeedbackEntry[]>(() => loadJSON("feedback", []));
+  const [incomingFriendRequests, setIncomingFriendRequests] = useState<IncomingFriendRequest[]>([]);
+  const [incomingGroupInvites, setIncomingGroupInvites] = useState<IncomingGroupInvite[]>([]);
+  const [lastIncomingVoiceLabel, setLastIncomingVoiceLabel] = useState<string | null>(null);
+
+  // Refs so realtime callbacks (set up once) can read current state without
+  // re-subscribing on every friends/groups change.
+  const friendsRef = useRef(friends);
+  useEffect(() => {
+    friendsRef.current = friends;
+  }, [friends]);
+  const groupsRef = useRef(groups);
+  useEffect(() => {
+    groupsRef.current = groups;
+  }, [groups]);
 
   useEffect(() => {
     if (!isBackendConfigured) saveJSON("user", user);
   }, [user]);
-  useEffect(() => saveJSON("friends", friends), [friends]);
+  useEffect(() => {
+    if (!isBackendConfigured) saveJSON("friends", friends);
+  }, [friends]);
   useEffect(() => {
     if (!isBackendConfigured) saveJSON("hazards", hazards);
   }, [hazards]);
-  useEffect(() => saveJSON("groups", groups), [groups]);
+  useEffect(() => {
+    if (!isBackendConfigured) saveJSON("groups", groups);
+  }, [groups]);
   useEffect(() => saveJSON("settings", settings), [settings]);
   useEffect(() => {
     if (!isBackendConfigured) saveJSON("onboardingComplete", onboardingComplete);
   }, [onboardingComplete]);
-  useEffect(() => saveJSON("rideLog", rideLog), [rideLog]);
+  useEffect(() => {
+    if (!isBackendConfigured) saveJSON("rideLog", rideLog);
+  }, [rideLog]);
   useEffect(() => saveJSON("feedback", feedbackEntries), [feedbackEntries]);
 
   useEffect(() => {
     const root = document.documentElement;
     root.classList.toggle("dark", settings.theme === "dark");
   }, [settings.theme]);
+
+  const showVoiceToast = (label: string) => {
+    setLastIncomingVoiceLabel(label);
+    setTimeout(() => setLastIncomingVoiceLabel((cur) => (cur === label ? null : cur)), VOICE_TOAST_MS);
+  };
 
   // Merge one hazard insert/update from the server into local state -
   // shared by the initial fetch's realtime subscription and addReport's own write.
@@ -183,9 +260,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
   };
 
+  const reloadFriendsAndRequests = async (uid: string) => {
+    try {
+      const [friendsList, requests] = await Promise.all([fetchFriends(uid), fetchIncomingFriendRequests(uid)]);
+      setFriends(friendsList);
+      setIncomingFriendRequests(requests);
+    } catch (err) {
+      console.error("Mifga: reload friends failed", err);
+    }
+  };
+
+  const reloadGroups = async (uid: string) => {
+    try {
+      const [groupList, invites] = await Promise.all([fetchGroups(uid), fetchIncomingGroupInvites(uid)]);
+      setGroups(groupList);
+      setIncomingGroupInvites(invites);
+    } catch (err) {
+      console.error("Mifga: reload groups failed", err);
+    }
+  };
+
   // One-time bootstrap when a real backend is configured: sign in (anonymous
   // session persists across reloads via Supabase's own storage), load the
-  // caller's profile if one already exists, and load current hazards.
+  // caller's profile/friends/groups/ride-log if they already exist, and load
+  // current hazards.
   useEffect(() => {
     if (!isBackendConfigured) return;
     let cancelled = false;
@@ -200,9 +298,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
         } else {
           setUser({ ...EMPTY_USER, id: uid });
         }
-        const remoteHazards = await fetchHazards();
+
+        const [remoteHazards, rideLogEntries] = await Promise.all([fetchHazards(), fetchRideLog(uid)]);
         if (cancelled) return;
         setHazards(remoteHazards);
+        setRideLog(rideLogEntries);
+        await Promise.all([reloadFriendsAndRequests(uid), reloadGroups(uid)]);
       } catch (err) {
         console.error("Mifga: backend bootstrap failed", err);
       } finally {
@@ -220,6 +321,102 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return subscribeHazards(mergeHazard);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Realtime: friends, groups, and incoming voice messages. Gated on having
+  // a signed-in uid (set by the bootstrap effect above, for both new and
+  // returning users) so callbacks below always have a valid `uid` to close over.
+  useEffect(() => {
+    if (!isBackendConfigured || !user.id) return;
+    const uid = user.id;
+
+    const handleIncomingGroupMessage = (row: WalkieGroupMessageRow) => {
+      setGroups((prev) =>
+        prev.map((g) =>
+          g.id !== row.group_id
+            ? g
+            : {
+                ...g,
+                messages: g.messages.some((m) => m.id === row.id)
+                  ? g.messages
+                  : [
+                      ...g.messages,
+                      {
+                        id: row.id,
+                        sentAt: new Date(row.sent_at).getTime(),
+                        audioUrl: row.audio_url,
+                        senderId: row.sender_id,
+                        receipts: [],
+                      } as GroupMessage,
+                    ],
+              }
+        )
+      );
+      if (row.sender_id === uid) return;
+      new Audio(row.audio_url).play().catch(() => {});
+      const group = groupsRef.current.find((g) => g.id === row.group_id);
+      showVoiceToast(group?.name ?? "קבוצה");
+      markMessageDeliveredRemote(row.id).catch((err) => console.error("Mifga: markMessageDelivered failed", err));
+    };
+
+    const handleReceiptUpdate = (row: WalkieGroupMessageReceiptRow) => {
+      setGroups((prev) =>
+        prev.map((g) => ({
+          ...g,
+          messages: g.messages.map((m) =>
+            m.id !== row.message_id
+              ? m
+              : {
+                  ...m,
+                  receipts: m.receipts.map((r) =>
+                    r.friendId === row.member_id
+                      ? { ...r, deliveredAt: row.delivered_at ? new Date(row.delivered_at).getTime() : null }
+                      : r
+                  ),
+                }
+          ),
+        }))
+      );
+    };
+
+    const handleIncomingFriendMessage = (row: FriendMessageRow) => {
+      if (row.sender_id === uid) return;
+      new Audio(row.audio_url).play().catch(() => {});
+      const friend = friendsRef.current.find((f) => f.id === row.sender_id);
+      showVoiceToast(friend?.name ?? "חבר");
+      markFriendMessageDeliveredRemote(row.id).catch((err) => console.error("Mifga: markFriendMessageDelivered failed", err));
+    };
+
+    const unsubFriendships = subscribeFriendships(uid, () => reloadFriendsAndRequests(uid));
+    const unsubGroups = subscribeGroups(() => reloadGroups(uid));
+    const unsubMessages = subscribeGroupMessages(handleIncomingGroupMessage);
+    const unsubReceipts = subscribeMessageReceipts(handleReceiptUpdate);
+    const unsubFriendMsgs = subscribeFriendMessages(uid, handleIncomingFriendMessage);
+    return () => {
+      unsubFriendships();
+      unsubGroups();
+      unsubMessages();
+      unsubReceipts();
+      unsubFriendMsgs();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user.id]);
+
+  // Live presence: push my position + activity timestamp periodically so
+  // friends see "online" / distance, once I'm a real onboarded user.
+  useEffect(() => {
+    if (!isBackendConfigured || !user.id || !onboardingComplete) return;
+    const push = () => {
+      if (!("geolocation" in navigator)) return;
+      navigator.geolocation.getCurrentPosition(
+        (pos) => updatePresence(user.id, pos.coords.latitude, pos.coords.longitude).catch(() => {}),
+        () => {},
+        { maximumAge: 20_000, timeout: 8000 }
+      );
+    };
+    push();
+    const interval = setInterval(push, PRESENCE_PUSH_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, [user.id, onboardingComplete]);
 
   const addReport = (input: NewReportInput) => {
     const points = input.photoDataUrl ? POINTS_PER_REPORT_WITH_PHOTO : POINTS_PER_REPORT;
@@ -345,11 +542,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const addRideLogEntry = (entry: Omit<RideLogEntry, "id">) => {
+    if (isBackendConfigured && user.id) {
+      insertRideLogEntry(user.id, entry).catch((err) => console.error("Mifga: addRideLogEntry failed", err));
+    }
     const logEntry: RideLogEntry = { id: `ride-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, ...entry };
     setRideLog((prev) => [logEntry, ...prev].slice(0, 200));
   };
 
   const submitFeedback = (liked: boolean, note: string) => {
+    if (isBackendConfigured && user.id) {
+      insertFeedbackRemote(user.id, liked, note).catch((err) => console.error("Mifga: submitFeedback failed", err));
+    }
     const entry: FeedbackEntry = {
       id: `fb-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       liked,
@@ -361,7 +564,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const toggleFriendShare = (_id: string) => {
     // Friend location sharing is mutual/consent-based in the real product;
-    // stubbed as a no-op toggle target for the UI in this local prototype.
+    // stubbed as a no-op toggle target for the UI. In backend mode, sharing
+    // is simplified to "on for every accepted friend" (see friends.ts) - true
+    // per-friend consent is a documented follow-up, not built in this pass.
   };
 
   const toggleFavorite = (id: string): boolean => {
@@ -369,6 +574,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (!target) return false;
     if (!target.favorite && friends.filter((f) => f.favorite).length >= MAX_FAVORITE_FRIENDS) return false;
     setFriends((prev) => prev.map((f) => (f.id === id ? { ...f, favorite: !f.favorite } : f)));
+    if (isBackendConfigured && target.friendshipId) {
+      toggleFriendFavoriteRemote(target.friendshipId).catch((err) => console.error("Mifga: toggleFavorite failed", err));
+    }
     return true;
   };
 
@@ -383,6 +591,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const addMembersToGroup = (groupId: string, memberFriendIds: string[]) => {
+    if (isBackendConfigured) {
+      inviteMembersRemote(groupId, memberFriendIds)
+        .then(() => reloadGroups(user.id))
+        .catch((err) => console.error("Mifga: addMembersToGroup failed", err));
+      return;
+    }
     setGroups((prev) =>
       prev.map((g) => {
         if (g.id !== groupId) return g;
@@ -397,10 +611,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const removeMemberFromGroup = (groupId: string, friendId: string) => {
+    if (isBackendConfigured) {
+      removeMemberRemote(groupId, friendId)
+        .then(() => reloadGroups(user.id))
+        .catch((err) => console.error("Mifga: removeMemberFromGroup failed", err));
+      return;
+    }
     setGroups((prev) => prev.map((g) => (g.id !== groupId ? g : { ...g, members: g.members.filter((m) => m.friendId !== friendId) })));
   };
 
   const createGroup = (name: string, memberFriendIds: string[]): string => {
+    if (isBackendConfigured) {
+      createGroupRemote(user.id, name, memberFriendIds)
+        .then(() => reloadGroups(user.id))
+        .catch((err) => console.error("Mifga: createGroup failed", err));
+      return "";
+    }
     const id = `g-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const group: WalkieGroup = { id, name, createdAt: Date.now(), members: [], messages: [] };
     setGroups((prev) => [...prev, group]);
@@ -408,9 +634,31 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return id;
   };
 
-  const removeGroup = (groupId: string) => setGroups((prev) => prev.filter((g) => g.id !== groupId));
+  const removeGroup = (groupId: string) => {
+    if (isBackendConfigured) {
+      removeGroupRemote(groupId)
+        .then(() => reloadGroups(user.id))
+        .catch((err) => console.error("Mifga: removeGroup failed", err));
+      return;
+    }
+    setGroups((prev) => prev.filter((g) => g.id !== groupId));
+  };
 
-  const sendGroupMessage = (groupId: string) => {
+  const sendGroupMessage = (groupId: string, audioBlob?: Blob | null) => {
+    if (isBackendConfigured) {
+      if (!audioBlob) return; // no real audio captured (mic unavailable/denied) - nothing to persist in backend mode
+      (async () => {
+        try {
+          const audioUrl = await uploadBlob("walkie-audio", user.id, audioBlob);
+          await sendGroupMessageRemote(groupId, audioUrl);
+          // the realtime subscription appends the message (for every member, sender included) - no local append needed here.
+        } catch (err) {
+          console.error("Mifga: sendGroupMessage failed", err);
+        }
+      })();
+      return;
+    }
+
     const group = groups.find((g) => g.id === groupId);
     if (!group) return;
     const acceptedIds = group.members.filter((m) => m.status === "accepted").map((m) => m.friendId);
@@ -440,6 +688,41 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
   };
 
+  const sendFriendMessage = (friendId: string, audioBlob?: Blob | null) => {
+    if (!isBackendConfigured || !audioBlob) return; // local mode has never persisted direct messages - the screen shows its own "sent" toast
+    (async () => {
+      try {
+        const audioUrl = await uploadBlob("walkie-audio", user.id, audioBlob);
+        await sendFriendMessageRemote(user.id, friendId, audioUrl);
+      } catch (err) {
+        console.error("Mifga: sendFriendMessage failed", err);
+      }
+    })();
+  };
+
+  const searchFriendCandidates = async (query: string): Promise<ProfileSearchResult[]> => {
+    if (!isBackendConfigured || !user.id) return [];
+    return searchProfiles(query, user.id);
+  };
+
+  const addFriendByUid = async (targetUid: string): Promise<void> => {
+    if (!isBackendConfigured || !user.id) return;
+    await sendFriendRequest(user.id, targetUid);
+    await reloadFriendsAndRequests(user.id);
+  };
+
+  const respondFriendRequest = async (friendshipId: string, accept: boolean): Promise<void> => {
+    if (!isBackendConfigured || !user.id) return;
+    await respondFriendRequestRemote(friendshipId, accept);
+    await reloadFriendsAndRequests(user.id);
+  };
+
+  const respondGroupInvite = async (groupId: string, accept: boolean): Promise<void> => {
+    if (!isBackendConfigured || !user.id) return;
+    await respondGroupInviteRemote(groupId, accept);
+    await reloadGroups(user.id);
+  };
+
   const visibleHazards = useMemo(() => hazards.filter((h) => !h.removed), [hazards]);
 
   const value: AppContextValue = {
@@ -452,6 +735,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     onboardingComplete,
     backendReady,
     rideLog,
+    incomingFriendRequests,
+    incomingGroupInvites,
+    lastIncomingVoiceLabel,
     addReport,
     confirmHazard,
     denyHazard,
@@ -465,10 +751,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     removeMemberFromGroup,
     removeGroup,
     sendGroupMessage,
+    sendFriendMessage,
     clearLastAwarded: () => setLastAwardedPoints(null),
     completeOnboarding,
     addRideLogEntry,
     submitFeedback,
+    searchFriendCandidates,
+    addFriendByUid,
+    respondFriendRequest,
+    respondGroupInvite,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

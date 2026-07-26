@@ -1,20 +1,33 @@
 import { useState } from "react";
-import { Clock, MapPin, Mic, Navigation, Plus, Radio, Search, Settings2, Square, Star, Users } from "lucide-react";
+import { Check, Clock, MapPin, Mic, Navigation, Plus, Radio, Search, Settings2, Square, Star, UserPlus, Users, X } from "lucide-react";
 import { useApp, MAX_FAVORITE_FRIENDS } from "../context/AppContext";
+import { isBackendConfigured } from "../lib/supabaseClient";
 import { formatDistance, distanceMeters } from "../lib/geo";
 import { useGeolocation } from "../hooks/useGeolocation";
 import { useWalkieRecorder } from "../hooks/useWalkieRecorder";
 import CreateGroupSheet from "../components/CreateGroupSheet";
 import GroupManageSheet from "../components/GroupManageSheet";
+import AddFriendSheet from "../components/AddFriendSheet";
 import InviteFriendButton from "../components/InviteFriendButton";
 import type { WalkieGroup } from "../types";
 
 export default function FriendsScreen({ onLocateFriend }: { onLocateFriend: (friendId: string) => void }) {
-  const { friends, groups, toggleFavorite, sendGroupMessage } = useApp();
+  const {
+    friends,
+    groups,
+    toggleFavorite,
+    sendGroupMessage,
+    sendFriendMessage,
+    incomingFriendRequests,
+    incomingGroupInvites,
+    respondFriendRequest,
+    respondGroupInvite,
+  } = useApp();
   const { position } = useGeolocation();
   const [lastSentLabel, setLastSentLabel] = useState<string | null>(null);
   const [favoriteNotice, setFavoriteNotice] = useState<string | null>(null);
   const [createGroupOpen, setCreateGroupOpen] = useState(false);
+  const [addFriendOpen, setAddFriendOpen] = useState(false);
   const [manageGroup, setManageGroup] = useState<WalkieGroup | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -23,13 +36,14 @@ export default function FriendsScreen({ onLocateFriend }: { onLocateFriend: (fri
     setTimeout(() => setLastSentLabel(null), 2200);
   };
 
-  const { recordingFor, start, stop } = useWalkieRecorder((targetId) => {
+  const { recordingFor, start, stop } = useWalkieRecorder((targetId, blob) => {
     if (targetId.startsWith("g-")) {
       const group = groups.find((g) => g.id === targetId);
-      sendGroupMessage(targetId);
+      sendGroupMessage(targetId, blob);
       notify(`לקבוצה "${group?.name ?? ""}"`);
     } else {
       const friend = friends.find((f) => f.id === targetId);
+      sendFriendMessage(targetId, blob);
       notify(friend?.name ?? "");
     }
   });
@@ -61,20 +75,86 @@ export default function FriendsScreen({ onLocateFriend }: { onLocateFriend: (fri
       </div>
       <p className="text-xs text-neutral-400 mb-4">ראו איפה החברים שלכם נמצאים על המפה, ושלחו הודעת ווקי-טוקי מיידית</p>
 
-      <div className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-bg-panel2 border border-bg-border mb-4">
-        <Search size={15} className="text-neutral-400 shrink-0" />
-        <input
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="חיפוש חבר לפי שם משתמש"
-          dir="ltr"
-          className="flex-1 bg-transparent outline-none text-sm text-neutral-100 placeholder:text-neutral-500 text-right"
-        />
+      <div className="flex items-center gap-2 mb-4">
+        <div className="flex-1 flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-bg-panel2 border border-bg-border">
+          <Search size={15} className="text-neutral-400 shrink-0" />
+          <input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="חיפוש בין החברים שלי"
+            dir="ltr"
+            className="flex-1 bg-transparent outline-none text-sm text-neutral-100 placeholder:text-neutral-500 text-right"
+          />
+        </div>
+        {isBackendConfigured && (
+          <button
+            onClick={() => setAddFriendOpen(true)}
+            className="shrink-0 w-11 h-11 rounded-2xl bg-brand/15 border border-brand/50 flex items-center justify-center active:scale-95 transition"
+            title="הוספת חבר"
+          >
+            <UserPlus size={18} className="text-brand-light" />
+          </button>
+        )}
       </div>
 
       <div className="mb-5">
         <InviteFriendButton />
       </div>
+
+      {isBackendConfigured && (incomingFriendRequests.length > 0 || incomingGroupInvites.length > 0) && (
+        <div className="space-y-2 mb-6">
+          {incomingFriendRequests.map((r) => (
+            <div key={r.friendshipId} className="flex items-center gap-3 p-3.5 rounded-2xl bg-brand/10 border border-brand/40">
+              <span className="w-9 h-9 rounded-full bg-bg-panel border border-bg-border flex items-center justify-center text-lg shrink-0">
+                {r.fromAvatarEmoji}
+              </span>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-semibold text-neutral-50">{r.fromName}</div>
+                <div className="text-[11px] text-neutral-400">רוצה להתחבר אליך</div>
+              </div>
+              <button
+                onClick={() => respondFriendRequest(r.friendshipId, true)}
+                className="w-9 h-9 rounded-full bg-green-500/15 border border-green-500/40 flex items-center justify-center active:scale-95 transition"
+                title="אישור"
+              >
+                <Check size={15} className="text-green-400" />
+              </button>
+              <button
+                onClick={() => respondFriendRequest(r.friendshipId, false)}
+                className="w-9 h-9 rounded-full bg-red-500/10 border border-red-500/30 flex items-center justify-center active:scale-95 transition"
+                title="דחייה"
+              >
+                <X size={15} className="text-red-400" />
+              </button>
+            </div>
+          ))}
+          {incomingGroupInvites.map((inv) => (
+            <div key={inv.groupId} className="flex items-center gap-3 p-3.5 rounded-2xl bg-brand/10 border border-brand/40">
+              <span className="w-9 h-9 rounded-full bg-bg-panel border border-bg-border flex items-center justify-center shrink-0">
+                <Users size={16} className="text-brand-light" />
+              </span>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-semibold text-neutral-50">{inv.groupName}</div>
+                <div className="text-[11px] text-neutral-400">הוזמנת להצטרף לקבוצת ווקי-טוקי</div>
+              </div>
+              <button
+                onClick={() => respondGroupInvite(inv.groupId, true)}
+                className="w-9 h-9 rounded-full bg-green-500/15 border border-green-500/40 flex items-center justify-center active:scale-95 transition"
+                title="הצטרפות"
+              >
+                <Check size={15} className="text-green-400" />
+              </button>
+              <button
+                onClick={() => respondGroupInvite(inv.groupId, false)}
+                className="w-9 h-9 rounded-full bg-red-500/10 border border-red-500/30 flex items-center justify-center active:scale-95 transition"
+                title="דחייה"
+              >
+                <X size={15} className="text-red-400" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       {lastSentLabel && (
         <div className="mb-4 px-4 py-2.5 rounded-2xl bg-green-500/15 border border-green-500/40 text-green-300 text-sm font-semibold text-center">
@@ -254,6 +334,7 @@ export default function FriendsScreen({ onLocateFriend }: { onLocateFriend: (fri
 
       <CreateGroupSheet open={createGroupOpen} onClose={() => setCreateGroupOpen(false)} />
       <GroupManageSheet group={liveManageGroup} onClose={() => setManageGroup(null)} />
+      <AddFriendSheet open={addFriendOpen} onClose={() => setAddFriendOpen(false)} />
     </div>
   );
 }

@@ -2,7 +2,7 @@
 // mappers to/from the camelCase app types in src/types/index.ts. Keeping the
 // mapping in one place means AppContext never has to think about column
 // naming - it only ever sees HazardReport/UserProfile.
-import type { HazardReport, HazardTypeId, UserProfile, VehicleTypeId } from "../../types";
+import type { HazardReport, HazardTypeId, RideLogEntry, UserProfile, VehicleTypeId } from "../../types";
 
 export interface HazardRow {
   id: string;
@@ -52,6 +52,9 @@ export interface ProfileRow {
   vehicle_model: string | null;
   phone: string | null;
   created_at: string;
+  live_lat?: number | null;
+  live_lng?: number | null;
+  last_active_at?: string | null;
 }
 
 export function profileFromRow(row: ProfileRow): UserProfile {
@@ -68,5 +71,59 @@ export function profileFromRow(row: ProfileRow): UserProfile {
     vehicleType: (row.vehicle_type as VehicleTypeId | null) ?? undefined,
     vehicleModel: row.vehicle_model ?? undefined,
     phone: row.phone ?? undefined,
+  };
+}
+
+export interface FriendshipRow {
+  id: string;
+  requester_id: string;
+  addressee_id: string;
+  status: "pending" | "accepted";
+  favorite_by_requester: boolean;
+  favorite_by_addressee: boolean;
+  created_at: string;
+}
+
+export interface WalkieGroupRow {
+  id: string;
+  name: string;
+  owner_id: string;
+  created_at: string;
+}
+
+export interface WalkieGroupMemberRow {
+  group_id: string;
+  member_id: string;
+  status: "pending" | "accepted";
+}
+
+export interface WalkieGroupMessageRow {
+  id: string;
+  group_id: string;
+  sender_id: string;
+  sent_at: string;
+  audio_url: string;
+}
+
+export interface WalkieGroupMessageReceiptRow {
+  message_id: string;
+  member_id: string;
+  delivered_at: string | null;
+}
+
+export interface RideLogRow {
+  id: string;
+  user_id: string;
+  started_at: string;
+  ended_at: string;
+  hazards_avoided: number;
+}
+
+export function rideLogFromRow(row: RideLogRow): RideLogEntry {
+  return {
+    id: row.id,
+    startedAt: new Date(row.started_at).getTime(),
+    endedAt: new Date(row.ended_at).getTime(),
+    hazardsAvoided: row.hazards_avoided,
   };
 }

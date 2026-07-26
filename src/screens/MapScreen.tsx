@@ -37,7 +37,7 @@ export default function MapScreen({
   focusFriendId: string | null;
   onConsumeFocusFriend: () => void;
 }) {
-  const { hazards, friends, settings, lastAwardedPoints, clearLastAwarded } = useApp();
+  const { hazards, friends, settings, lastAwardedPoints, clearLastAwarded, sendFriendMessage } = useApp();
   const friendsInMotionCount = friends.filter((f) => f.online && f.shareLocation).length;
   const favoriteFriends = friends.filter((f) => f.favorite);
 
@@ -74,8 +74,9 @@ export default function MapScreen({
     if (lastAwardedPoints !== null) setConfettiTrigger((t) => t + 1);
   }, [lastAwardedPoints]);
 
-  const { recordingFor, start: startWalkie, stop: stopWalkie } = useWalkieRecorder((friendId) => {
+  const { recordingFor, start: startWalkie, stop: stopWalkie } = useWalkieRecorder((friendId, blob) => {
     const friend = friends.find((f) => f.id === friendId);
+    sendFriendMessage(friendId, blob);
     setWalkieSentLabel(friend?.name ?? "");
     setTimeout(() => setWalkieSentLabel(null), 2200);
   });

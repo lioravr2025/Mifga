@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, Clock, Mail, Plus, UserMinus, X } from "lucide-react";
+import { Check, Clock, Mail, Play, Plus, UserMinus, X } from "lucide-react";
 import BottomSheet from "./BottomSheet";
 import { useApp } from "../context/AppContext";
 import { timeAgo } from "../lib/geo";
@@ -118,7 +118,18 @@ export default function GroupManageSheet({ group, onClose }: { group: WalkieGrou
         <div className="text-xs text-neutral-500 text-center py-3">עדיין לא נשלחה הודעת ווקי-טוקי לקבוצה</div>
       ) : (
         <div className="rounded-2xl bg-bg-panel2 border border-bg-border p-3">
-          <div className="text-[11px] text-neutral-400 mb-2">נשלחה {timeAgo(lastMessage.sentAt)}</div>
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-[11px] text-neutral-400">נשלחה {timeAgo(lastMessage.sentAt)}</div>
+            {lastMessage.audioUrl && (
+              <button
+                onClick={() => new Audio(lastMessage.audioUrl).play().catch(() => {})}
+                className="flex items-center gap-1 text-[11px] font-semibold text-brand-light active:scale-95 transition"
+              >
+                <Play size={12} className="fill-current" />
+                השמעה
+              </button>
+            )}
+          </div>
           <div className="space-y-1.5">
             {lastMessage.receipts.map((r) => {
               const f = friendById(r.friendId);

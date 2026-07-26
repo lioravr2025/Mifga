@@ -1,6 +1,13 @@
 import { supabase } from "../supabaseClient";
 import { profileFromRow, type ProfileRow } from "./types";
+import { uploadDataUrl } from "./storage";
 import type { UserProfile } from "../../types";
+
+/** Uploads a freshly-picked photo (a data: URL) to Storage; passes an existing https URL straight through unchanged. */
+async function resolveAvatarUrl(uid: string, avatarPhoto: string | null | undefined): Promise<string | null | undefined> {
+  if (!avatarPhoto || !avatarPhoto.startsWith("data:")) return avatarPhoto;
+  return uploadDataUrl("avatars", uid, avatarPhoto);
+}
 
 interface NewProfileInput {
   id: string;
@@ -14,6 +21,7 @@ interface NewProfileInput {
 
 export async function insertProfile(input: NewProfileInput): Promise<UserProfile> {
   if (!supabase) throw new Error("Supabase not configured");
+  const avatarUrl = await resolveAvatarUrl(input.id, input.avatarPhoto);
   const { data, error } = await supabase
     .from("profiles")
     .insert({
@@ -23,7 +31,7 @@ export async function insertProfile(input: NewProfileInput): Promise<UserProfile
       phone: input.phone ?? null,
       vehicle_type: input.vehicleType ?? null,
       vehicle_model: input.vehicleModel ?? null,
-      avatar_photo_url: input.avatarPhoto ?? null,
+      avatar_photo_url: avatarUrl ?? null,
     })
     .select("*")
     .single();
@@ -44,7 +52,7 @@ export async function updateProfileRemote(uid: string, patch: ProfilePatch): Pro
   if (!supabase) throw new Error("Supabase not configured");
   const row: Record<string, unknown> = {};
   if (patch.name !== undefined) row.name = patch.name;
-  if (patch.avatarPhoto !== undefined) row.avatar_photo_url = patch.avatarPhoto;
+  if (patch.avatarPhoto !== undefined) row.avatar_photo_url = await resolveAvatarUrl(uid, patch.avatarPhoto);
   if (patch.vehicleType !== undefined) row.vehicle_type = patch.vehicleType;
   if (patch.vehicleModel !== undefined) row.vehicle_model = patch.vehicleModel;
   if (patch.phone !== undefined) row.phone = patch.phone;
