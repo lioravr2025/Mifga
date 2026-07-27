@@ -28,6 +28,13 @@
             android:grantUriPermissions="true">
             <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" />
         </provider>
+
+        <!-- Keeps ride tracking (location + hazard alerts + walkie messages) running
+             while the app is backgrounded, same as Waze - see BackgroundRideService. -->
+        <service
+            android:name=".BackgroundRideService"
+            android:exported="false"
+            android:foregroundServiceType="location" />
     </application>
 
     <!-- Permissions -->
@@ -49,4 +56,10 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
+
+    <!-- BackgroundRideService: keeps tracking/alerting while the app is backgrounded -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
 </manifest>

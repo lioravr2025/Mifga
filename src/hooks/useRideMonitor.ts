@@ -5,6 +5,7 @@ import { distanceMeters } from "../lib/geo";
 import { playRideAlert, primeRideAudio } from "../lib/sound";
 import { isBackendConfigured } from "../lib/supabaseClient";
 import { setRidingStatus } from "../lib/backend/friends";
+import { startBackgroundRide, stopBackgroundRide } from "../lib/backgroundRide";
 import type { LatLng } from "../types";
 
 // Sample the route sparsely (not on every position update) so a long ride
@@ -65,7 +66,10 @@ export function useRideMonitor(position: LatLng): RideMonitor {
     lastSampleRef.current = { pos: position, at: Date.now() };
     startedAtRef.current = Date.now();
     setRideActive(true);
-    if (isBackendConfigured && user.id) setRidingStatus(user.id, true).catch(() => {});
+    if (isBackendConfigured && user.id) {
+      setRidingStatus(user.id, true).catch(() => {});
+      startBackgroundRide(user.id, settings.rideAlertRadiusM);
+    }
   };
 
   const stopRide = () => {
@@ -76,6 +80,7 @@ export function useRideMonitor(position: LatLng): RideMonitor {
     if (pathRef.current[pathRef.current.length - 1] !== position) pathRef.current.push(position);
     addRideLogEntry({ startedAt, endedAt: Date.now(), hazardsAvoided: alertedRef.current.size, path: pathRef.current });
     if (isBackendConfigured && user.id) setRidingStatus(user.id, false).catch(() => {});
+    stopBackgroundRide();
   };
 
   return { rideActive, startRide, stopRide };

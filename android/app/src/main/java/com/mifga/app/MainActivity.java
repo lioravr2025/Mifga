@@ -44,6 +44,7 @@ public class MainActivity extends BridgeActivity {
         // Must be registered before super.onCreate() - that's what builds the
         // Bridge from the plugin list.
         registerPlugin(MicRecorderPlugin.class);
+        registerPlugin(BackgroundRidePlugin.class);
         super.onCreate(savedInstanceState);
 
         // Capacitor's default WebChromeClient grants getUserMedia() (mic/camera)
@@ -55,12 +56,19 @@ public class MainActivity extends BridgeActivity {
         // already have removes that failure mode for the walkie-talkie recorder.
         getBridge().getWebView().setWebChromeClient(new MicSafeWebChromeClient(getBridge()));
 
-        String[] needed = {
-            Manifest.permission.RECORD_AUDIO,
-            Manifest.permission.CAMERA,
-            Manifest.permission.ACCESS_FINE_LOCATION,
-            Manifest.permission.ACCESS_COARSE_LOCATION
-        };
+        List<String> needed = new ArrayList<>(
+            java.util.Arrays.asList(
+                Manifest.permission.RECORD_AUDIO,
+                Manifest.permission.CAMERA,
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            )
+        );
+        // Without this, BackgroundRideService's persistent notification silently
+        // doesn't show on Android 13+ (the service can still run, just invisibly).
+        if (Build.VERSION.SDK_INT >= 33) {
+            needed.add(Manifest.permission.POST_NOTIFICATIONS);
+        }
 
         List<String> toRequest = new ArrayList<>();
         for (String permission : needed) {
