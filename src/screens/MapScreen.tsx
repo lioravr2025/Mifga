@@ -114,6 +114,7 @@ export default function MapScreen({
           onSelectHazard={(h) => setSelectedHazardId(h.id)}
           onSelectSelf={() => setSelfCardOpen(true)}
           rideActive={ride.rideActive}
+          autoFollow={ride.rideActive}
           pickingLocation={isPicking}
           onPickedCenterChange={setPickedCenter}
           onMapClick={!reportOpen && !isPicking ? openReportAtPosition : undefined}
@@ -146,27 +147,74 @@ export default function MapScreen({
           <Locate size={20} className="text-brand-light" />
         </button>
 
+        {/* Ride mode: map takes over the screen, so quick-report stays reachable as a
+            vertical strip on the map itself instead of living in the (now hidden) bottom panel. */}
+        {ride.rideActive && (
+          <div className="absolute top-24 right-4 z-[500] flex flex-col gap-3">
+            {PRIMARY_HAZARD_TYPES.map((h) => (
+              <button
+                key={h.id}
+                onClick={() => openReport(h.id)}
+                className="w-12 h-12 rounded-full flex items-center justify-center active:scale-95 transition shadow-lg"
+                style={{ background: "#0f1830", border: `2px solid ${HAZARD_COLOR_HEX[h.color]}`, boxShadow: `0 0 12px -2px ${HAZARD_COLOR_HEX[h.color]}` }}
+                title={h.label}
+              >
+                <HazardIcon name={h.icon} color={HAZARD_COLOR_HEX[h.color]} size={22} />
+              </button>
+            ))}
+            <button
+              onClick={() => openReport(undefined, "more")}
+              className="w-12 h-12 rounded-full flex items-center justify-center bg-bg-panel/90 backdrop-blur border border-bg-border active:scale-95 transition shadow-lg"
+              title="עוד"
+            >
+              <span className="text-lg leading-none text-neutral-300">···</span>
+            </button>
+          </div>
+        )}
+
+        {/* Ride mode: the ride button floats over the enlarged map instead of living
+            in the (now hidden) bottom panel - same spot/shape as usual, just lower,
+            since there's no panel underneath it to overlap anymore. */}
+        {ride.rideActive && (
+          <div className="absolute bottom-5 inset-x-0 z-[600] flex flex-col items-center">
+            <div className="relative w-20 h-20">
+              <PulseRing color="#ef4444" />
+              <button
+                onClick={() => ride.stopRide()}
+                aria-label="הפסקת נסיעה"
+                className="absolute inset-0 rounded-full flex items-center justify-center shadow-glow border-4 border-bg-panel active:scale-95 transition bg-gradient-to-br from-red-600 to-red-500 shadow-red-500"
+              >
+                <Square size={30} className="text-white fill-white" />
+              </button>
+            </div>
+            <span className="text-[11px] text-neutral-200 mt-1 drop-shadow">נסיעה פעילה - נתריע על מפגעים בדרך</span>
+            <span className="text-sm font-bold text-white drop-shadow">הפסקת נסיעה</span>
+          </div>
+        )}
+
         <PointsToast points={lastAwardedPoints} onDone={clearLastAwarded} />
         <Confetti trigger={confettiTrigger} />
       </div>
 
-      {!isPicking && (
-        <div className="shrink-0 bg-bg-panel border-t border-bg-border px-4 pt-3 pb-2">
-          <div className="flex flex-col items-center mb-2">
-            <div className="relative z-[600] w-20 h-20 -mt-[52px]">
-              {ride.rideActive && <PulseRing color="#ef4444" />}
-              <button
-                onClick={() => (ride.rideActive ? ride.stopRide() : ride.startRide())}
-                className={`absolute inset-0 rounded-full flex items-center justify-center shadow-glow border-4 border-bg-panel active:scale-95 transition ${
-                  ride.rideActive ? "bg-gradient-to-br from-red-600 to-red-500 shadow-red-500" : "bg-gradient-to-br from-green-600 to-green-500 shadow-green-500"
-                }`}
-              >
-                {ride.rideActive ? <Square size={30} className="text-white fill-white" /> : <ScooterIcon size={34} color="white" />}
-              </button>
-            </div>
-            <span className="text-[11px] text-neutral-400 mt-1">{ride.rideActive ? "נסיעה פעילה - נתריע על מפגעים בדרך" : "מוכנים לזוז?"}</span>
-            <span className="text-sm font-bold text-neutral-50">{ride.rideActive ? "הפסקת נסיעה" : "תחילת נסיעה"}</span>
+      {/* Slides down and fades out on ride start instead of just vanishing, and back in on ride end. */}
+      <div
+        className={`shrink-0 bg-bg-panel border-t border-bg-border px-4 pt-3 pb-2 overflow-hidden transition-all duration-300 ease-in-out ${
+          !isPicking && !ride.rideActive ? "max-h-[600px] opacity-100 translate-y-0" : "max-h-0 opacity-0 translate-y-6 pointer-events-none"
+        }`}
+      >
+        <div className="flex flex-col items-center mb-2">
+          <div className="relative z-[600] w-20 h-20 -mt-[52px]">
+            <button
+              onClick={() => ride.startRide()}
+              aria-label="תחילת נסיעה"
+              className="absolute inset-0 rounded-full flex items-center justify-center shadow-glow border-4 border-bg-panel active:scale-95 transition bg-gradient-to-br from-green-600 to-green-500 shadow-green-500"
+            >
+              <ScooterIcon size={34} color="white" />
+            </button>
           </div>
+          <span className="text-[11px] text-neutral-400 mt-1">מוכנים לזוז?</span>
+          <span className="text-sm font-bold text-neutral-50">תחילת נסיעה</span>
+        </div>
 
           <div className="flex justify-center gap-5 mb-3">
             {PRIMARY_HAZARD_TYPES.map((h) => (
@@ -266,7 +314,6 @@ export default function MapScreen({
             </div>
           )}
         </div>
-      )}
 
       <ReportFlow
         open={reportOpen}

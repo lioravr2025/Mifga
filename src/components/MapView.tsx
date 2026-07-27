@@ -54,6 +54,16 @@ export function MapResizeHandler() {
   return null;
 }
 
+/** Waze-style following: keeps the map re-centered on the live position instead of leaving the rider to drift off the edge of a static map. Panning (not jumping) so it doesn't fight the rider trying to glance elsewhere. */
+export function AutoFollow({ position }: { position: LatLng }) {
+  const map = useMap();
+  useEffect(() => {
+    map.panTo([position.lat, position.lng], { animate: true, duration: 0.5 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [position.lat, position.lng]);
+  return null;
+}
+
 function CenterTracker({ onChange }: { onChange: (c: LatLng) => void }) {
   const map = useMapEvents({
     move: () => {
@@ -86,6 +96,8 @@ interface MapViewProps {
   rideActive?: boolean;
   /** tapping a bare point on the map (not a marker/popup) - used to report a hazard right at that spot */
   onMapClick?: (pos: LatLng) => void;
+  /** keeps the map centered on userPosition as it updates, Waze-style - used while a ride is active */
+  autoFollow?: boolean;
 }
 
 function ClickHandler({ onClick }: { onClick: (pos: LatLng) => void }) {
@@ -109,6 +121,7 @@ export default function MapView({
   onPickedCenterChange,
   rideActive = false,
   onMapClick,
+  autoFollow = false,
 }: MapViewProps) {
   const mapRef = useRef<LeafletMap | null>(null);
   const { user, settings } = useApp();
@@ -128,6 +141,7 @@ export default function MapView({
         <TileLayer url={theme === "dark" ? DARK_TILES : LIGHT_TILES} attribution="&copy; OpenStreetMap &copy; CARTO" />
         <MapResizeHandler />
         <RecenterController target={cameraTarget ?? userPosition} signal={recenterSignal} />
+        {autoFollow && <AutoFollow position={userPosition} />}
         {pickingLocation && onPickedCenterChange && <CenterTracker onChange={onPickedCenterChange} />}
         {!pickingLocation && onMapClick && <ClickHandler onClick={onMapClick} />}
 

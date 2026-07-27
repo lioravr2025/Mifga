@@ -10,6 +10,14 @@ export async function fetchHazards(): Promise<HazardReport[]> {
   return (data as HazardRow[]).map(hazardFromRow);
 }
 
+/** Full report history for one reporter, including removed/expired ones - for the profile screen's own "my reports" view (fetchHazards() above deliberately excludes those, since it's for the live map). */
+export async function fetchMyReports(uid: string): Promise<HazardReport[]> {
+  if (!supabase) throw new Error("Supabase not configured");
+  const { data, error } = await supabase.from("hazards").select("*").eq("reporter_id", uid).order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data as HazardRow[]).map(hazardFromRow);
+}
+
 interface NewHazardInput {
   type: HazardTypeId;
   position: LatLng;

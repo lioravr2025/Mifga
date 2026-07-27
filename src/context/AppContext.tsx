@@ -26,6 +26,7 @@ import {
 } from "../data/hazardTypes";
 import { loadJSON, saveJSON } from "../lib/storage";
 import { playAudioUrl } from "../lib/nativeMic";
+import { setErrorLogUser } from "../lib/errorLogger";
 import { isBackendConfigured } from "../lib/supabaseClient";
 import { ensureSession, fetchOwnProfile } from "../lib/backend/auth";
 import { insertProfile, updateProfileRemote } from "../lib/backend/profile";
@@ -64,7 +65,7 @@ import {
   type FriendMessageRow,
 } from "../lib/backend/directMessages";
 import type { WalkieGroupMessageReceiptRow, WalkieGroupMessageRow } from "../lib/backend/types";
-import { fetchRideLog, insertRideLogEntry } from "../lib/backend/rideLog";
+import { fetchRideLog, hideRideLogEntryRemote, insertRideLogEntry } from "../lib/backend/rideLog";
 import { insertFeedbackRemote } from "../lib/backend/feedback";
 
 interface NewReportInput {
@@ -130,6 +131,7 @@ interface AppContextValue {
   /** Throws on failure (e.g. network/backend error) so the onboarding screen can show it - local mode never throws. */
   completeOnboarding: (input: OnboardingInput) => Promise<void>;
   addRideLogEntry: (entry: Omit<RideLogEntry, "id">) => void;
+  deleteRideLogEntry: (id: string) => void;
   submitFeedback: (liked: boolean, note: string) => void;
   /** backend mode only: search all registered users by username to add as a friend */
   searchFriendCandidates: (query: string) => Promise<ProfileSearchResult[]>;
@@ -410,6 +412,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user.id]);
 
+  // Ties future crash/error reports to an account, once known
+  useEffect(() => {
+    setErrorLogUser(user.id || null);
+  }, [user.id]);
+
   // Live presence: push my position + activity timestamp periodically so
   // friends see "online" / distance, once I'm a real onboarded user.
   useEffect(() => {
@@ -568,6 +575,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
     const logEntry: RideLogEntry = { id: `ride-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, ...entry };
     setRideLog((prev) => [logEntry, ...prev].slice(0, 200));
+  };
+
+  /** Removes a ride from the rider's own history only - the underlying record (and its data for analytics) is kept, just hidden from this user's view. */
+  const deleteRideLogEntry = (id: string) => {
+    if (isBackendConfigured && user.id) {
+      hideRideLogEntryRemote(user.id, id).catch((err) => console.error("Mifga: deleteRideLogEntry failed", err));
+    }
+    setRideLog((prev) => prev.filter((r) => r.id !== id));
   };
 
   const submitFeedback = (liked: boolean, note: string) => {
@@ -793,6 +808,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     clearLastAwarded: () => setLastAwardedPoints(null),
     completeOnboarding,
     addRideLogEntry,
+    deleteRideLogEntry,
     submitFeedback,
     searchFriendCandidates,
     addFriendByUid,

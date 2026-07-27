@@ -410,6 +410,13 @@ create policy "insert own ride log"
   on public.ride_log for insert
   with check (user_id = auth.uid());
 
+-- lets a rider hide (not delete) their own ride log entries - see hidden_from_user below
+drop policy if exists "update own ride log" on public.ride_log;
+create policy "update own ride log"
+  on public.ride_log for update
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());
+
 -- ============================================================================
 -- feedback (WIRED) - write-only from the client, nobody reads it back in-app
 -- ============================================================================
@@ -419,6 +426,36 @@ drop policy if exists "insert own feedback" on public.feedback;
 create policy "insert own feedback"
   on public.feedback for insert
   with check (user_id = auth.uid() or user_id is null);
+
+-- ============================================================================
+-- client_error_logs (NEW) - crash/error reporting from the app itself, so
+-- issues can be found without needing a bug report. Write-only from the
+-- client (no SELECT policy for regular users) - reading these is an admin
+-- task, done via direct DB access until the admin dashboard exists.
+-- ============================================================================
+create table if not exists public.client_error_logs (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id) on delete set null,
+  message text not null,
+  stack text,
+  context jsonb,
+  app_version text,
+  platform text,
+  created_at timestamptz not null default now()
+);
+
+alter table public.client_error_logs enable row level security;
+
+drop policy if exists "log errors as self or anonymously" on public.client_error_logs;
+create policy "log errors as self or anonymously"
+  on public.client_error_logs for insert
+  with check (user_id = auth.uid() or user_id is null);
+
+-- ============================================================================
+-- ride_log soft-delete (NEW) - "delete" from the rider's own history hides
+-- it from their view only; the row (and its data for analytics) stays intact.
+-- ============================================================================
+alter table public.ride_log add column if not exists hidden_from_user boolean not null default false;
 
 -- ============================================================================
 -- storage - a bucket for walkie-talkie audio (hazard-photos/avatars already

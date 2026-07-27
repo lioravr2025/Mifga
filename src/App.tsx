@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { Gauge, Mic } from "lucide-react";
+import { Mic } from "lucide-react";
 import BottomNav from "./components/BottomNav";
+import LoadingScreen from "./components/LoadingScreen";
 import FeedbackButton from "./components/FeedbackButton";
 import SettingsSheet from "./components/SettingsSheet";
 import MapScreen from "./screens/MapScreen";
@@ -29,10 +30,7 @@ export default function App() {
     <div className="min-h-screen w-full flex items-center justify-center bg-[#05070d] sm:py-4">
       <div className="relative w-full h-[100dvh] sm:h-[92dvh] sm:max-h-[900px] max-w-[430px] bg-bg overflow-hidden flex flex-col sm:rounded-[2.5rem] sm:border-8 sm:border-black sm:shadow-2xl">
         {!backendReady ? (
-          <div className="flex-1 flex flex-col items-center justify-center gap-3 bg-bg">
-            <Gauge size={32} className="text-brand-light animate-pulse" />
-            <span className="text-sm text-neutral-400">מתחברים ל-Mifga...</span>
-          </div>
+          <LoadingScreen />
         ) : !onboardingComplete ? (
           <OnboardingScreen />
         ) : (

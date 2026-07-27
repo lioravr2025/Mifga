@@ -5,7 +5,7 @@ import { useApp } from "../context/AppContext";
 import ScooterIcon from "../components/ScooterIcon";
 import PulseRing from "../components/PulseRing";
 import AddressAutocomplete from "../components/AddressAutocomplete";
-import { MapResizeHandler } from "../components/MapView";
+import { AutoFollow, MapResizeHandler } from "../components/MapView";
 import { fetchRoute, minDistanceToPath, remainingDistanceAlongPath } from "../lib/routing";
 import { formatDistance } from "../lib/geo";
 import { getHazardType } from "../data/hazardTypes";
@@ -62,7 +62,12 @@ export default function RouteScreen({ position, ride }: { position: LatLng; ride
 
   return (
     <div className="flex-1 min-h-0 flex flex-col safe-top">
-      <div className="px-5 pt-6 pb-4 shrink-0">
+      {/* Slides up and fades out on ride start, like the home tab's bottom panel, so the map gets most of the screen. */}
+      <div
+        className={`shrink-0 overflow-hidden transition-all duration-300 ease-in-out ${
+          ride.rideActive ? "max-h-0 opacity-0 -translate-y-4 pointer-events-none" : "max-h-[320px] opacity-100 translate-y-0 px-5 pt-6 pb-4"
+        }`}
+      >
         <h1 className="text-xl font-bold text-neutral-50 mb-4">תכנון מסלול בטוח ממפגעים</h1>
         <div className="flex items-center gap-2 mb-2 px-4 py-3 rounded-2xl bg-bg-panel2 border border-bg-border">
           <MapPin size={16} className="text-brand-light shrink-0" />
@@ -85,6 +90,7 @@ export default function RouteScreen({ position, ride }: { position: LatLng; ride
       <div className="flex-1 min-h-0 relative isolate">
         <MapContainer center={[position.lat, position.lng]} zoom={13} zoomControl={false} attributionControl={false} className="w-full h-full">
           <MapResizeHandler />
+          {ride.rideActive && <AutoFollow position={position} />}
           <AttributionControl position="bottomright" prefix={false} />
           <TileLayer url={settings.theme === "dark" ? DARK_TILES : LIGHT_TILES} attribution="&copy; OpenStreetMap &copy; CARTO" />
           {ride.rideActive && (
@@ -138,19 +144,21 @@ export default function RouteScreen({ position, ride }: { position: LatLng; ride
                     </>
                   )}
                 </div>
-                {hazardsOnRoute.length === 0 ? (
-                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-green-500/15 border border-green-500/40 text-green-300 text-xs font-semibold">
-                    <ShieldCheck size={14} />
-                    אין מפגעים ידועים בדרך
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-500/15 border border-amber-500/40 text-amber-300 text-xs font-semibold">
-                    <AlertTriangle size={14} />
-                    {hazardsOnRoute.length} מפגעים בדרך
-                  </div>
-                )}
+                {/* Once riding, hazards are already visible as markers on the (now much bigger) map - no need to also list them here. */}
+                {!ride.rideActive &&
+                  (hazardsOnRoute.length === 0 ? (
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-green-500/15 border border-green-500/40 text-green-300 text-xs font-semibold">
+                      <ShieldCheck size={14} />
+                      אין מפגעים ידועים בדרך
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-500/15 border border-amber-500/40 text-amber-300 text-xs font-semibold">
+                      <AlertTriangle size={14} />
+                      {hazardsOnRoute.length} מפגעים בדרך
+                    </div>
+                  ))}
               </div>
-              {hazardsOnRoute.length > 0 && (
+              {!ride.rideActive && hazardsOnRoute.length > 0 && (
                 <div className="space-y-2">
                   {hazardsOnRoute.map((h) => {
                     const def = getHazardType(h.type);

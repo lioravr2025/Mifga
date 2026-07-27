@@ -8,10 +8,18 @@ export async function fetchRideLog(uid: string): Promise<RideLogEntry[]> {
     .from("ride_log")
     .select("*")
     .eq("user_id", uid)
+    .eq("hidden_from_user", false)
     .order("started_at", { ascending: false })
     .limit(200);
   if (error) throw error;
   return (data as RideLogRow[]).map(rideLogFromRow);
+}
+
+/** "Deletes" a ride from the rider's own view only - the row (and its data for analytics) stays in the database, just flagged hidden. */
+export async function hideRideLogEntryRemote(uid: string, entryId: string): Promise<void> {
+  if (!supabase) throw new Error("Supabase not configured");
+  const { error } = await supabase.from("ride_log").update({ hidden_from_user: true }).eq("id", entryId).eq("user_id", uid);
+  if (error) throw error;
 }
 
 export async function insertRideLogEntry(uid: string, entry: Omit<RideLogEntry, "id">): Promise<void> {

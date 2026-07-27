@@ -1,7 +1,7 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { MapContainer, Polyline, TileLayer, CircleMarker, useMap } from "react-leaflet";
 import type { Map as LeafletMap, LatLngBoundsExpression } from "leaflet";
-import { Flag, MapPin, X } from "lucide-react";
+import { Flag, MapPin, Trash2, X } from "lucide-react";
 import BottomSheet from "./BottomSheet";
 import { useApp } from "../context/AppContext";
 import { distanceMeters, formatDistance, timeAgo } from "../lib/geo";
@@ -26,9 +26,21 @@ function FitToPath({ positions }: { positions: [number, number][] }) {
 }
 
 export default function RideRouteSheet({ ride, onClose }: { ride: RideLogEntry | null; onClose: () => void }) {
-  const { settings } = useApp();
+  const { settings, deleteRideLogEntry } = useApp();
   const mapRef = useRef<LeafletMap | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   if (!ride) return null;
+
+  const handleDeleteClick = () => {
+    if (!confirmDelete) {
+      setConfirmDelete(true);
+      setTimeout(() => setConfirmDelete(false), 3000);
+      return;
+    }
+    deleteRideLogEntry(ride.id);
+    setConfirmDelete(false);
+    onClose();
+  };
 
   const path = ride.path ?? [];
   const positions: [number, number][] = path.map((p) => [p.lat, p.lng]);
@@ -77,6 +89,16 @@ export default function RideRouteSheet({ ride, onClose }: { ride: RideLogEntry |
           סיום
         </span>
       </div>
+
+      <button
+        onClick={handleDeleteClick}
+        className={`w-full flex items-center justify-center gap-2 mt-4 py-2.5 rounded-2xl border text-xs font-semibold active:scale-95 transition ${
+          confirmDelete ? "bg-red-500/20 border-red-500/50 text-red-300" : "bg-bg-panel2 border-bg-border text-neutral-400"
+        }`}
+      >
+        <Trash2 size={14} />
+        {confirmDelete ? "לחצו שוב לאישור המחיקה" : "מחיקת נסיעה מהיומן שלי"}
+      </button>
     </BottomSheet>
   );
 }

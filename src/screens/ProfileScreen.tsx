@@ -7,6 +7,7 @@ import EditProfileSheet from "../components/EditProfileSheet";
 import InviteFriendButton from "../components/InviteFriendButton";
 import RideHistorySheet from "../components/RideHistorySheet";
 import RideRouteSheet from "../components/RideRouteSheet";
+import MyReportsSheet from "../components/MyReportsSheet";
 import type { RideLogEntry } from "../types";
 
 const RECENT_RIDES_SHOWN = 3;
@@ -17,6 +18,8 @@ export default function ProfileScreen({ onOpenSettings }: { onOpenSettings: () =
   const [editOpen, setEditOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [selectedRide, setSelectedRide] = useState<RideLogEntry | null>(null);
+  const [reportsOpen, setReportsOpen] = useState(false);
+  const [photosOpen, setPhotosOpen] = useState(false);
   const totalHazardsAvoided = rideLog.reduce((sum, r) => sum + r.hazardsAvoided, 0);
 
   const board = [{ id: user.id, name: `${user.name} (את/ה)`, points: user.points, mine: true }, ...friends.map((f) => ({ id: f.id, name: f.name, points: f.points, mine: false }))]
@@ -76,24 +79,30 @@ export default function ProfileScreen({ onOpenSettings }: { onOpenSettings: () =
       </div>
 
       <div className="grid grid-cols-2 gap-3 mb-6">
-        <div className="rounded-2xl bg-bg-panel2 border border-bg-border p-4 flex items-center gap-3">
-          <span className="w-10 h-10 rounded-full bg-brand/15 flex items-center justify-center">
+        <button
+          onClick={() => setReportsOpen(true)}
+          className="rounded-2xl bg-bg-panel2 border border-bg-border p-4 flex items-center gap-3 active:scale-[0.98] transition text-right"
+        >
+          <span className="w-10 h-10 rounded-full bg-brand/15 flex items-center justify-center shrink-0">
             <FileText size={18} className="text-brand-light" />
           </span>
           <div>
             <div className="text-lg font-bold text-neutral-50">{user.reportsCount}</div>
             <div className="text-[11px] text-neutral-400">דיווחים</div>
           </div>
-        </div>
-        <div className="rounded-2xl bg-bg-panel2 border border-bg-border p-4 flex items-center gap-3">
-          <span className="w-10 h-10 rounded-full bg-amber-500/15 flex items-center justify-center">
+        </button>
+        <button
+          onClick={() => setPhotosOpen(true)}
+          className="rounded-2xl bg-bg-panel2 border border-bg-border p-4 flex items-center gap-3 active:scale-[0.98] transition text-right"
+        >
+          <span className="w-10 h-10 rounded-full bg-amber-500/15 flex items-center justify-center shrink-0">
             <Camera size={18} className="text-amber-400" />
           </span>
           <div>
             <div className="text-lg font-bold text-neutral-50">{user.reportsWithPhoto}</div>
             <div className="text-[11px] text-neutral-400">עם תמונה</div>
           </div>
-        </div>
+        </button>
       </div>
 
       <div className="flex items-center justify-between mb-3">
@@ -182,6 +191,8 @@ export default function ProfileScreen({ onOpenSettings }: { onOpenSettings: () =
       <EditProfileSheet open={editOpen} onClose={() => setEditOpen(false)} />
       <RideHistorySheet open={historyOpen} onClose={() => setHistoryOpen(false)} />
       <RideRouteSheet ride={selectedRide} onClose={() => setSelectedRide(null)} />
+      <MyReportsSheet open={reportsOpen} onClose={() => setReportsOpen(false)} />
+      <MyReportsSheet open={photosOpen} onClose={() => setPhotosOpen(false)} photoOnly />
     </div>
   );
 }
