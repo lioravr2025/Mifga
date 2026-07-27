@@ -3,7 +3,7 @@ import { Capacitor, registerPlugin } from "@capacitor/core";
 interface MicRecorderPlugin {
   start(): Promise<void>;
   stop(): Promise<{ base64: string; mimeType: string }>;
-  play(options: { url: string }): Promise<void>;
+  play(options: { base64: string; mimeType: string }): Promise<void>;
 }
 
 /**
@@ -22,10 +22,33 @@ export async function base64ToBlob(base64: string, mimeType: string): Promise<Bl
   return res.blob();
 }
 
-/** Plays a remote/blob URL through the native MediaPlayer on native builds, falling back to the DOM Audio element on web. */
+function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const result = reader.result as string;
+      const commaIdx = result.indexOf(",");
+      resolve(commaIdx >= 0 ? result.slice(commaIdx + 1) : result);
+    };
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+}
+
+/**
+ * Plays a remote clip URL. On native builds, the audio is fetched here (over
+ * the WebView's own already-warm connection to Supabase) and handed to the
+ * native MediaPlayer as local base64 data instead of a URL - letting
+ * MediaPlayer open its own independent network connection per clip was a
+ * real source of end-to-end delay. Falls back to the DOM Audio element on
+ * web (local dev/testing).
+ */
 export async function playAudioUrl(url: string): Promise<void> {
   if (isNative()) {
-    await MicRecorder.play({ url });
+    const res = await fetch(url);
+    const blob = await res.blob();
+    const base64 = await blobToBase64(blob);
+    await MicRecorder.play({ base64, mimeType: blob.type || "audio/mp4" });
     return;
   }
   await new Audio(url).play();

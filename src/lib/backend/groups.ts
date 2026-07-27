@@ -87,6 +87,13 @@ export async function createGroupRemote(ownerId: string, name: string, memberIds
   const { data, error } = await supabase.from("walkie_groups").insert({ name, owner_id: ownerId }).select("id").single();
   if (error) throw error;
   const groupId = data.id as string;
+  // send_group_message() requires an accepted walkie_group_members row for
+  // the sender - owner_id on walkie_groups alone doesn't satisfy that check,
+  // so without this the owner could never send to their own group.
+  const { error: ownerMemberError } = await supabase
+    .from("walkie_group_members")
+    .insert({ group_id: groupId, member_id: ownerId, status: "accepted" });
+  if (ownerMemberError) throw ownerMemberError;
   if (memberIds.length > 0) await inviteMembersRemote(groupId, memberIds);
   return groupId;
 }

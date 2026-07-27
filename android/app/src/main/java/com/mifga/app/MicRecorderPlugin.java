@@ -4,7 +4,6 @@ import android.Manifest;
 import android.content.pm.PackageManager;
 import android.media.MediaPlayer;
 import android.media.MediaRecorder;
-import android.net.Uri;
 import android.util.Base64;
 import androidx.core.content.ContextCompat;
 import com.getcapacitor.JSObject;
@@ -14,6 +13,7 @@ import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 
 /**
  * Walkie-talkie audio capture/playback done entirely through native Android
@@ -47,8 +47,13 @@ public class MicRecorderPlugin extends Plugin {
             r.setAudioSource(MediaRecorder.AudioSource.MIC);
             r.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
             r.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
-            r.setAudioEncodingBitRate(64000);
-            r.setAudioSamplingRate(44100);
+            // Voice-only, not music - a much lower bitrate/sample-rate keeps
+            // clips small (a 15s message drops from ~120KB to ~30KB), which
+            // directly cuts the upload+download time that was showing up as
+            // an end-to-end delay before the other side heard anything.
+            r.setAudioChannels(1);
+            r.setAudioEncodingBitRate(24000);
+            r.setAudioSamplingRate(16000);
             r.setOutputFile(outputFile.getAbsolutePath());
             r.prepare();
             r.start();
@@ -94,34 +99,54 @@ public class MicRecorderPlugin extends Plugin {
         }
     }
 
+    /**
+     * Takes base64 audio data (already fetched by the JS side, over the
+     * WebView's own already-warm connection to Supabase) and plays it from a
+     * local temp file. Deliberately NOT given a remote URL to open itself -
+     * MediaPlayer opening its own independent network connection per clip
+     * (DNS + TLS + buffering, on top of the one the WebView already has open)
+     * was a real, measurable chunk of the delay before the receiving side
+     * heard anything.
+     */
     @PluginMethod
     public void play(PluginCall call) {
-        String url = call.getString("url");
-        if (url == null) {
-            call.reject("NO_URL");
+        String base64 = call.getString("base64");
+        if (base64 == null) {
+            call.reject("NO_DATA");
             return;
         }
+        File playFile = null;
         try {
             if (player != null) {
                 player.release();
                 player = null;
             }
+            byte[] bytes = Base64.decode(base64, Base64.DEFAULT);
+            playFile = File.createTempFile("mifga_play_", ".m4a", getContext().getCacheDir());
+            try (FileOutputStream fos = new FileOutputStream(playFile)) {
+                fos.write(bytes);
+            }
+
+            final File cleanupFile = playFile;
             MediaPlayer mp = new MediaPlayer();
-            mp.setDataSource(getContext(), Uri.parse(url));
+            mp.setDataSource(playFile.getAbsolutePath());
             mp.setOnPreparedListener(MediaPlayer::start);
             mp.setOnCompletionListener(mediaPlayer -> {
                 mediaPlayer.release();
                 if (player == mediaPlayer) player = null;
+                cleanupFile.delete();
             });
             mp.setOnErrorListener((mediaPlayer, what, extra) -> {
                 mediaPlayer.release();
                 if (player == mediaPlayer) player = null;
+                cleanupFile.delete();
                 return true;
             });
             mp.prepareAsync();
             player = mp;
             call.resolve();
         } catch (Exception e) {
+            if (playFile != null) playFile.delete();
             call.reject("PLAY_FAILED: " + e.getMessage());
         }
     }

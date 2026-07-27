@@ -249,6 +249,18 @@ grant execute on function public.respond_group_invite(uuid, boolean) to authenti
 select public.ensure_realtime('public', 'walkie_groups');
 select public.ensure_realtime('public', 'walkie_group_members');
 
+-- Backfill: groups created before createGroupRemote() started adding the
+-- owner as an accepted member themselves - without this row, send_group_message()
+-- rejects every send attempt from the group's own creator.
+insert into public.walkie_group_members (group_id, member_id, status)
+select g.id, g.owner_id, 'accepted'
+from public.walkie_groups g
+where not exists (
+  select 1 from public.walkie_group_members m
+  where m.group_id = g.id and m.member_id = g.owner_id
+)
+on conflict (group_id, member_id) do nothing;
+
 -- ============================================================================
 -- walkie_group_messages - real push-to-talk voice messages (audio_url points
 -- at a file in the `walkie-audio` storage bucket, created below).
