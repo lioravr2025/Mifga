@@ -1,5 +1,6 @@
 import { User, Users, MapPin, Navigation } from "lucide-react";
 import clsx from "clsx";
+import { trackClick } from "../lib/analytics";
 import type { TabId } from "../App";
 
 // Order here is right-to-left visually (RTL row): ראשי sits rightmost, then
@@ -29,7 +30,10 @@ export default function BottomNav({
         return (
           <button
             key={id}
-            onClick={() => onChange(id)}
+            onClick={() => {
+              trackClick(`nav_${id}`, "nav");
+              onChange(id);
+            }}
             className="flex flex-col items-center gap-1 flex-1 py-1.5 relative"
           >
             <span className="relative">

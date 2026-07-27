@@ -3,6 +3,8 @@ import { useApp } from "../context/AppContext";
 import { rideAlertKind } from "../data/hazardTypes";
 import { distanceMeters } from "../lib/geo";
 import { playRideAlert, primeRideAudio } from "../lib/sound";
+import { isBackendConfigured } from "../lib/supabaseClient";
+import { setRidingStatus } from "../lib/backend/friends";
 import type { LatLng } from "../types";
 
 // Sample the route sparsely (not on every position update) so a long ride
@@ -27,7 +29,7 @@ export interface RideMonitor {
 }
 
 export function useRideMonitor(position: LatLng): RideMonitor {
-  const { hazards, settings, addRideLogEntry } = useApp();
+  const { hazards, settings, addRideLogEntry, user } = useApp();
   const [rideActive, setRideActive] = useState(false);
   const alertedRef = useRef<Set<string>>(new Set());
   // null (not 0) so "no ride running" is unambiguous - 0 is a valid (if
@@ -63,6 +65,7 @@ export function useRideMonitor(position: LatLng): RideMonitor {
     lastSampleRef.current = { pos: position, at: Date.now() };
     startedAtRef.current = Date.now();
     setRideActive(true);
+    if (isBackendConfigured && user.id) setRidingStatus(user.id, true).catch(() => {});
   };
 
   const stopRide = () => {
@@ -72,6 +75,7 @@ export function useRideMonitor(position: LatLng): RideMonitor {
     setRideActive(false);
     if (pathRef.current[pathRef.current.length - 1] !== position) pathRef.current.push(position);
     addRideLogEntry({ startedAt, endedAt: Date.now(), hazardsAvoided: alertedRef.current.size, path: pathRef.current });
+    if (isBackendConfigured && user.id) setRidingStatus(user.id, false).catch(() => {});
   };
 
   return { rideActive, startRide, stopRide };

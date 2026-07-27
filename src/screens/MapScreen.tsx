@@ -17,6 +17,7 @@ import { HAZARD_COLOR_HEX } from "../lib/colors";
 import { useWalkieRecorder } from "../hooks/useWalkieRecorder";
 import { useApp } from "../context/AppContext";
 import { isBackendConfigured } from "../lib/supabaseClient";
+import { trackClick } from "../lib/analytics";
 import type { RideMonitor } from "../hooks/useRideMonitor";
 import type { HazardTypeId, LatLng } from "../types";
 
@@ -57,6 +58,7 @@ export default function MapScreen({
   const [walkieSentLabel, setWalkieSentLabel] = useState<string | null>(null);
 
   const openReport = (type?: HazardTypeId, step: "type" | "more" = "type") => {
+    trackClick(type ? `report_quick_${type}` : "report_more", "map");
     setPresetType(type ?? null);
     setTapPosition(null);
     setReportStep(step);
@@ -180,7 +182,7 @@ export default function MapScreen({
             <div className="relative w-20 h-20">
               <PulseRing color="#ef4444" />
               <button
-                onClick={() => ride.stopRide()}
+                onClick={() => { trackClick("ride_stop", "map"); ride.stopRide(); }}
                 aria-label="הפסקת נסיעה"
                 className="absolute inset-0 rounded-full flex items-center justify-center shadow-glow border-4 border-bg-panel active:scale-95 transition bg-gradient-to-br from-red-600 to-red-500 shadow-red-500"
               >
@@ -205,7 +207,7 @@ export default function MapScreen({
         <div className="flex flex-col items-center mb-2">
           <div className="relative z-[600] w-20 h-20 -mt-[52px]">
             <button
-              onClick={() => ride.startRide()}
+              onClick={() => { trackClick("ride_start", "map"); ride.startRide(); }}
               aria-label="תחילת נסיעה"
               className="absolute inset-0 rounded-full flex items-center justify-center shadow-glow border-4 border-bg-panel active:scale-95 transition bg-gradient-to-br from-green-600 to-green-500 shadow-green-500"
             >

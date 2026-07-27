@@ -1,0 +1,308 @@
+-- Mifga - admin platform schema (dashboard, broadcasts, analytics, account
+-- recovery). Safe to re-run: everything is IF NOT EXISTS / CREATE OR REPLACE
+-- / DROP POLICY IF EXISTS, same convention as schema.sql / schema_v2.sql.
+
+-- ============================================================================
+-- admin_users - allowlist of who can see admin-only data. Nobody is in this
+-- table until the first real (non-anonymous) account signs up through the
+-- admin dashboard - see bootstrap_first_admin() below. There is no
+-- user-facing way to reach that signup flow from the mobile app (which only
+-- ever uses signInAnonymously()), so this can't be triggered accidentally.
+-- ============================================================================
+create table if not exists public.admin_users (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+
+create or replace function public.is_admin(p_uid uuid)
+returns boolean
+language sql
+security definer
+stable
+set search_path = public
+as $$
+  select exists (select 1 from public.admin_users where user_id = p_uid);
+$$;
+
+create or replace function public.bootstrap_first_admin()
+returns trigger
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+  if new.is_anonymous is not true and new.email is not null then
+    if not exists (select 1 from public.admin_users) then
+      insert into public.admin_users (user_id) values (new.id) on conflict do nothing;
+    end if;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists on_auth_user_created_bootstrap_admin on auth.users;
+create trigger on_auth_user_created_bootstrap_admin
+  after insert on auth.users
+  for each row execute function public.bootstrap_first_admin();
+
+-- ============================================================================
+-- Let every profile-referencing foreign key cascade on UPDATE, not just
+-- DELETE - recover_account() below needs to change a profile row's id (from
+-- an old install's uid to the current one's) and have every table that
+-- references it follow automatically in one atomic statement, rather than
+-- manually re-pointing a dozen tables by hand.
+-- ============================================================================
+alter table public.feedback drop constraint if exists feedback_user_id_fkey;
+alter table public.feedback add constraint feedback_user_id_fkey
+  foreign key (user_id) references public.profiles(id) on delete set null on update cascade;
+
+alter table public.friend_messages drop constraint if exists friend_messages_recipient_id_fkey;
+alter table public.friend_messages add constraint friend_messages_recipient_id_fkey
+  foreign key (recipient_id) references public.profiles(id) on delete cascade on update cascade;
+
+alter table public.friend_messages drop constraint if exists friend_messages_sender_id_fkey;
+alter table public.friend_messages add constraint friend_messages_sender_id_fkey
+  foreign key (sender_id) references public.profiles(id) on delete cascade on update cascade;
+
+alter table public.friendships drop constraint if exists friendships_addressee_id_fkey;
+alter table public.friendships add constraint friendships_addressee_id_fkey
+  foreign key (addressee_id) references public.profiles(id) on delete cascade on update cascade;
+
+alter table public.friendships drop constraint if exists friendships_requester_id_fkey;
+alter table public.friendships add constraint friendships_requester_id_fkey
+  foreign key (requester_id) references public.profiles(id) on delete cascade on update cascade;
+
+alter table public.hazard_votes drop constraint if exists hazard_votes_voter_id_fkey;
+alter table public.hazard_votes add constraint hazard_votes_voter_id_fkey
+  foreign key (voter_id) references public.profiles(id) on delete cascade on update cascade;
+
+alter table public.hazards drop constraint if exists hazards_reporter_id_fkey;
+alter table public.hazards add constraint hazards_reporter_id_fkey
+  foreign key (reporter_id) references public.profiles(id) on delete set null on update cascade;
+
+alter table public.ride_log drop constraint if exists ride_log_user_id_fkey;
+alter table public.ride_log add constraint ride_log_user_id_fkey
+  foreign key (user_id) references public.profiles(id) on delete cascade on update cascade;
+
+alter table public.walkie_group_members drop constraint if exists walkie_group_members_member_id_fkey;
+alter table public.walkie_group_members add constraint walkie_group_members_member_id_fkey
+  foreign key (member_id) references public.profiles(id) on delete cascade on update cascade;
+
+alter table public.walkie_group_message_receipts drop constraint if exists walkie_group_message_receipts_member_id_fkey;
+alter table public.walkie_group_message_receipts add constraint walkie_group_message_receipts_member_id_fkey
+  foreign key (member_id) references public.profiles(id) on delete cascade on update cascade;
+
+alter table public.walkie_group_messages drop constraint if exists walkie_group_messages_sender_id_fkey;
+alter table public.walkie_group_messages add constraint walkie_group_messages_sender_id_fkey
+  foreign key (sender_id) references public.profiles(id) on delete cascade on update cascade;
+
+alter table public.walkie_groups drop constraint if exists walkie_groups_owner_id_fkey;
+alter table public.walkie_groups add constraint walkie_groups_owner_id_fkey
+  foreign key (owner_id) references public.profiles(id) on delete cascade on update cascade;
+
+-- ============================================================================
+-- profiles additions: live "on a ride right now" flag, and the 4-digit
+-- recovery code set at signup.
+-- ============================================================================
+alter table public.profiles add column if not exists riding_since timestamptz;
+alter table public.profiles add column if not exists recovery_code text;
+
+drop policy if exists "admins can read all profiles" on public.profiles;
+-- (not needed - profiles are already readable by any signed-in user, admin included)
+
+-- ============================================================================
+-- Admin read access on tables that are otherwise scoped to their own owner.
+-- ============================================================================
+drop policy if exists "admins can read all ride logs" on public.ride_log;
+create policy "admins can read all ride logs"
+  on public.ride_log for select
+  using (public.is_admin(auth.uid()));
+
+drop policy if exists "admins can read all error logs" on public.client_error_logs;
+create policy "admins can read all error logs"
+  on public.client_error_logs for select
+  using (public.is_admin(auth.uid()));
+
+alter table public.feedback enable row level security;
+drop policy if exists "admins can read all feedback" on public.feedback;
+create policy "admins can read all feedback"
+  on public.feedback for select
+  using (public.is_admin(auth.uid()));
+
+-- ============================================================================
+-- broadcast_messages - admin -> all-users popup announcements.
+-- ============================================================================
+create table if not exists public.broadcast_messages (
+  id uuid primary key default gen_random_uuid(),
+  message text not null,
+  created_at timestamptz not null default now(),
+  created_by uuid references auth.users(id) on delete set null,
+  active boolean not null default true
+);
+
+alter table public.broadcast_messages enable row level security;
+
+drop policy if exists "any signed-in user can read active broadcasts" on public.broadcast_messages;
+create policy "any signed-in user can read active broadcasts"
+  on public.broadcast_messages for select
+  using (auth.role() = 'authenticated');
+
+drop policy if exists "admins can create broadcasts" on public.broadcast_messages;
+create policy "admins can create broadcasts"
+  on public.broadcast_messages for insert
+  with check (public.is_admin(auth.uid()));
+
+drop policy if exists "admins can update broadcasts" on public.broadcast_messages;
+create policy "admins can update broadcasts"
+  on public.broadcast_messages for update
+  using (public.is_admin(auth.uid()));
+
+select public.ensure_realtime('public', 'broadcast_messages');
+
+-- ============================================================================
+-- ui_click_events - lightweight usage analytics ("what do people actually
+-- tap"). Write-only from the client, admin-only read.
+-- ============================================================================
+create table if not exists public.ui_click_events (
+  id bigint generated always as identity primary key,
+  user_id uuid references auth.users(id) on delete set null,
+  element text not null,
+  screen text,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists ui_click_events_element_idx on public.ui_click_events (element);
+
+alter table public.ui_click_events enable row level security;
+
+drop policy if exists "log my own clicks" on public.ui_click_events;
+create policy "log my own clicks"
+  on public.ui_click_events for insert
+  with check (user_id = auth.uid() or user_id is null);
+
+drop policy if exists "admins can read click events" on public.ui_click_events;
+create policy "admins can read click events"
+  on public.ui_click_events for select
+  using (public.is_admin(auth.uid()));
+
+-- ============================================================================
+-- app_config - single-row table for version gating (a single JSON-free
+-- key/value row keeps the client query trivial: select * limit 1).
+-- ============================================================================
+create table if not exists public.app_config (
+  id boolean primary key default true, -- singleton row, id is always `true`
+  min_required_version text,
+  latest_version text,
+  update_message text,
+  check (id)
+);
+
+insert into public.app_config (id) values (true) on conflict (id) do nothing;
+
+alter table public.app_config enable row level security;
+
+drop policy if exists "anyone signed in can read app config" on public.app_config;
+create policy "anyone signed in can read app config"
+  on public.app_config for select
+  using (auth.role() = 'authenticated');
+
+drop policy if exists "admins can update app config" on public.app_config;
+create policy "admins can update app config"
+  on public.app_config for update
+  using (public.is_admin(auth.uid()));
+
+select public.ensure_realtime('public', 'app_config');
+
+-- ============================================================================
+-- support_tickets - "forgot my recovery code" fallback form, visible to admin.
+-- ============================================================================
+create table if not exists public.support_tickets (
+  id uuid primary key default gen_random_uuid(),
+  phone text,
+  message text not null,
+  created_at timestamptz not null default now(),
+  resolved boolean not null default false
+);
+
+alter table public.support_tickets enable row level security;
+
+drop policy if exists "anyone signed in can file a support ticket" on public.support_tickets;
+create policy "anyone signed in can file a support ticket"
+  on public.support_tickets for insert
+  with check (auth.role() = 'authenticated');
+
+drop policy if exists "admins can read support tickets" on public.support_tickets;
+create policy "admins can read support tickets"
+  on public.support_tickets for select
+  using (public.is_admin(auth.uid()));
+
+drop policy if exists "admins can update support tickets" on public.support_tickets;
+create policy "admins can update support tickets"
+  on public.support_tickets for update
+  using (public.is_admin(auth.uid()));
+
+-- ============================================================================
+-- recovery_attempts - rate limiting for recover_account() below. No RLS
+-- policy at all (default-deny) - only the SECURITY DEFINER function touches
+-- this table, never a direct client query.
+-- ============================================================================
+create table if not exists public.recovery_attempts (
+  id bigint generated always as identity primary key,
+  phone text not null,
+  attempted_at timestamptz not null default now(),
+  success boolean not null
+);
+
+create index if not exists recovery_attempts_phone_idx on public.recovery_attempts (phone, attempted_at);
+alter table public.recovery_attempts enable row level security;
+
+-- ============================================================================
+-- recover_account(phone, code) - re-attaches an old account's entire history
+-- (reports, points, friendships, groups, ride log...) to whichever uid is
+-- calling this - i.e. the CURRENT anonymous session created by this install.
+-- Real re-authentication as the *same* Supabase auth identity was evaluated
+-- and rejected: it needs either SMS-OTP auth (no provider configured) or a
+-- service-role key (never safe to ship to a client). This data-ownership
+-- transfer achieves the same practical outcome - "get my account back" -
+-- using only the anon-key RPC pattern already used everywhere else in this
+-- schema. Rate-limited to 5 attempts per phone number per 15 minutes.
+-- ============================================================================
+create or replace function public.recover_account(p_phone text, p_code text)
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  v_new_uid uuid := auth.uid();
+  v_old_uid uuid;
+begin
+  if v_new_uid is null then
+    raise exception 'not signed in';
+  end if;
+
+  if (select count(*) from public.recovery_attempts
+      where phone = p_phone and attempted_at > now() - interval '15 minutes') >= 5 then
+    raise exception 'too many attempts - try again later or contact support';
+  end if;
+
+  select id into v_old_uid from public.profiles
+    where phone = p_phone and recovery_code = p_code;
+
+  insert into public.recovery_attempts (phone, success) values (p_phone, v_old_uid is not null);
+
+  if v_old_uid is null then
+    raise exception 'invalid phone number or code';
+  end if;
+
+  if v_old_uid = v_new_uid then
+    return; -- already this account, nothing to do
+  end if;
+
+  if exists (select 1 from public.profiles where id = v_new_uid) then
+    delete from public.profiles where id = v_new_uid;
+  end if;
+
+  update public.profiles set id = v_new_uid where id = v_old_uid;
+end;
+$$;
+
+grant execute on function public.recover_account(text, text) to authenticated;

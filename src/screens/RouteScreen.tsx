@@ -6,6 +6,7 @@ import ScooterIcon from "../components/ScooterIcon";
 import PulseRing from "../components/PulseRing";
 import AddressAutocomplete from "../components/AddressAutocomplete";
 import { AutoFollow, MapResizeHandler } from "../components/MapView";
+import { trackClick } from "../lib/analytics";
 import { fetchRoute, minDistanceToPath, remainingDistanceAlongPath } from "../lib/routing";
 import { formatDistance } from "../lib/geo";
 import { getHazardType } from "../data/hazardTypes";
@@ -114,7 +115,10 @@ export default function RouteScreen({ position, ride }: { position: LatLng; ride
           <div className="relative">
             {ride.rideActive && <PulseRing color="#ef4444" />}
             <button
-              onClick={() => (ride.rideActive ? ride.stopRide() : ride.startRide())}
+              onClick={() => {
+                trackClick(ride.rideActive ? "ride_stop" : "ride_start", "route");
+                ride.rideActive ? ride.stopRide() : ride.startRide();
+              }}
               className={`relative w-full flex items-center justify-center gap-2 py-3.5 rounded-full shadow-lg border-4 border-bg-panel active:scale-95 transition ${
                 ride.rideActive ? "bg-gradient-to-br from-red-600 to-red-500" : "bg-gradient-to-br from-green-600 to-green-500"
               }`}

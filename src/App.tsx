@@ -4,6 +4,8 @@ import BottomNav from "./components/BottomNav";
 import LoadingScreen from "./components/LoadingScreen";
 import FeedbackButton from "./components/FeedbackButton";
 import SettingsSheet from "./components/SettingsSheet";
+import BroadcastPopup from "./components/BroadcastPopup";
+import UpdateRequiredScreen from "./components/UpdateRequiredScreen";
 import MapScreen from "./screens/MapScreen";
 import ProfileScreen from "./screens/ProfileScreen";
 import FriendsScreen from "./screens/FriendsScreen";
@@ -11,6 +13,8 @@ import RouteScreen from "./screens/RouteScreen";
 import OnboardingScreen from "./screens/OnboardingScreen";
 import { useGeolocation } from "./hooks/useGeolocation";
 import { useRideMonitor } from "./hooks/useRideMonitor";
+import { useAppConfig } from "./hooks/useAppConfig";
+import { isVersionBelow } from "./lib/versionCheck";
 import { useApp } from "./context/AppContext";
 
 export type TabId = "profile" | "friends" | "map" | "route";
@@ -21,16 +25,20 @@ export default function App() {
   const [focusFriendId, setFocusFriendId] = useState<string | null>(null);
   const { position } = useGeolocation();
   const { onboardingComplete, backendReady, lastIncomingVoiceLabel, incomingFriendRequests, incomingGroupInvites } = useApp();
+  const appConfig = useAppConfig();
   const pendingFriendsCount = incomingFriendRequests.length + incomingGroupInvites.length;
   // Lives here (not inside a screen) so a ride keeps beeping regardless of
   // which tab is open - Route isn't kept mounted like Map is.
   const ride = useRideMonitor(position);
+  const updateRequired = isVersionBelow(__APP_VERSION__, appConfig.minRequiredVersion);
 
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-[#05070d] sm:py-4">
       <div className="relative w-full h-[100dvh] sm:h-[92dvh] sm:max-h-[900px] max-w-[430px] bg-bg overflow-hidden flex flex-col sm:rounded-[2.5rem] sm:border-8 sm:border-black sm:shadow-2xl">
         {!backendReady ? (
           <LoadingScreen />
+        ) : updateRequired ? (
+          <UpdateRequiredScreen message={appConfig.updateMessage} />
         ) : !onboardingComplete ? (
           <OnboardingScreen />
         ) : (
@@ -82,6 +90,7 @@ export default function App() {
             )}
 
             <SettingsSheet open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+            <BroadcastPopup />
           </>
         )}
       </div>

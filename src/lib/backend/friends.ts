@@ -162,3 +162,9 @@ export async function updatePresence(uid: string, lat: number, lng: number): Pro
   if (!supabase) return;
   await supabase.from("profiles").update({ live_lat: lat, live_lng: lng, last_active_at: new Date().toISOString() }).eq("id", uid);
 }
+
+/** Marks/clears "on a ride right now" for the admin dashboard's live count - set on ride start, cleared on stop. */
+export async function setRidingStatus(uid: string, riding: boolean): Promise<void> {
+  if (!supabase) return;
+  await supabase.from("profiles").update({ riding_since: riding ? new Date().toISOString() : null }).eq("id", uid);
+}

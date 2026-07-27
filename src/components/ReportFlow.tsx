@@ -7,6 +7,7 @@ import { MORE_HAZARD_TYPES, POINTS_PER_REPORT, POINTS_PER_REPORT_WITH_PHOTO, PRI
 import { HAZARD_COLOR_HEX } from "../lib/colors";
 import type { HazardTypeId, LatLng } from "../types";
 import { useApp } from "../context/AppContext";
+import { trackClick } from "../lib/analytics";
 
 const NICKNAME_TYPES: HazardTypeId[] = ["police", "inspector"];
 
@@ -114,6 +115,7 @@ export default function ReportFlow({
 
   const submit = () => {
     if (!selectedType) return;
+    trackClick(`report_submit_${selectedType}`, "report");
     const position = manualPosition ?? userPosition;
     addReport({ type: selectedType, position, photoDataUrl: photo ?? undefined, nickname: nickname || undefined });
     close();

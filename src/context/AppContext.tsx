@@ -27,6 +27,7 @@ import {
 import { loadJSON, saveJSON } from "../lib/storage";
 import { playAudioUrl } from "../lib/nativeMic";
 import { setErrorLogUser } from "../lib/errorLogger";
+import { setAnalyticsUser } from "../lib/analytics";
 import { isBackendConfigured } from "../lib/supabaseClient";
 import { ensureSession, fetchOwnProfile } from "../lib/backend/auth";
 import { insertProfile, updateProfileRemote } from "../lib/backend/profile";
@@ -412,9 +413,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user.id]);
 
-  // Ties future crash/error reports to an account, once known
+  // Ties future crash/error reports and usage analytics to an account, once known
   useEffect(() => {
     setErrorLogUser(user.id || null);
+    setAnalyticsUser(user.id || null);
   }, [user.id]);
 
   // Live presence: push my position + activity timestamp periodically so
