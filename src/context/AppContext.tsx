@@ -142,11 +142,12 @@ const AppContext = createContext<AppContextValue | null>(null);
 
 const DEFAULT_SETTINGS: AppSettings = {
   theme: "dark",
-  notificationsEnabled: false,
+  notificationsEnabled: true,
   notifyTypes: { police: true, inspector: true, other: false },
   notifyRadiusM: 1000,
   notifyDailyLimit: "limited",
   rideAlertRadiusM: 100,
+  walkieTipDismissed: false,
 };
 
 const EMPTY_USER: UserProfile = {

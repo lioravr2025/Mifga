@@ -153,6 +153,8 @@ export interface AppSettings {
   notifyDailyLimit: NotifyDailyLimit;
   /** how close a hazard needs to be, in meters, to trigger an audio alert during an active ride (100-1000) */
   rideAlertRadiusM: number;
+  /** once the walkie-talkie tip on the Friends screen is dismissed, it stays gone */
+  walkieTipDismissed: boolean;
 }
 
 export interface RideLogEntry {

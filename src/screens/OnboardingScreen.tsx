@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { AlertTriangle, Bell, Camera, Footprints, Gauge, Loader2, Shield, ShieldCheck, Siren, TriangleAlert, Zap } from "lucide-react";
+import { AlertTriangle, Bell, Camera, Gauge, Loader2, Shield, ShieldCheck, Siren, TriangleAlert, Zap } from "lucide-react";
 import { useApp } from "../context/AppContext";
 import { VEHICLE_DEFS } from "../components/VehicleIcons";
 import VehicleModelInput from "../components/VehicleModelInput";
@@ -31,7 +31,6 @@ export default function OnboardingScreen() {
   const [photo, setPhoto] = useState<string | undefined>(undefined);
   const [vehicleType, setVehicleType] = useState<VehicleTypeId | undefined>(undefined);
   const [vehicleModel, setVehicleModel] = useState("");
-  const [noVehicle, setNoVehicle] = useState(false);
   const [notifyTypes, setNotifyTypes] = useState<NotifyTypePrefs>(settings.notifyTypes);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -39,7 +38,7 @@ export default function OnboardingScreen() {
   const fileRef = useRef<HTMLInputElement>(null);
 
   const phoneValid = isValidIsraeliPhone(phone);
-  const canSubmit = name.trim().length > 0 && phoneValid && usernameOk && !submitting;
+  const canSubmit = name.trim().length > 0 && phoneValid && usernameOk && !!vehicleType && !submitting;
 
   const activeHazardsCount = hazards.length;
   // "tickets avoided" = distinct encounters with a police/inspector hazard reported in
@@ -57,14 +56,7 @@ export default function OnboardingScreen() {
   };
 
   const selectVehicle = (id: VehicleTypeId) => {
-    setNoVehicle(false);
-    setVehicleType((prev) => (prev === id ? undefined : id));
-  };
-
-  const selectNoVehicle = () => {
-    setVehicleType(undefined);
-    setVehicleModel("");
-    setNoVehicle((prev) => !prev);
+    setVehicleType(id);
   };
 
   const submit = async () => {
@@ -173,7 +165,7 @@ export default function OnboardingScreen() {
         {phoneTouched && phone && !phoneValid && <p className="text-[11px] text-red-400 mb-3">מספר טלפון לא תקין</p>}
         {!(phoneTouched && phone && !phoneValid) && <div className="mb-3" />}
 
-        <label className="text-xs text-neutral-400 mb-1.5 block">הכלי שלי (אופציונלי)</label>
+        <label className="text-xs text-neutral-400 mb-1.5 block">הכלי שלי *</label>
         <div className="grid grid-cols-2 gap-2.5 mb-3">
           {VEHICLE_DEFS.map(({ id, label, Icon }) => {
             const active = vehicleType === id;
@@ -198,23 +190,6 @@ export default function OnboardingScreen() {
               </button>
             );
           })}
-          <button
-            onClick={selectNoVehicle}
-            className={`flex flex-col items-center gap-1.5 p-3 rounded-2xl border active:scale-95 transition ${
-              noVehicle ? "bg-brand/15 border-brand" : "bg-bg-panel2 border-bg-border"
-            }`}
-          >
-            <span
-              className={`w-11 h-11 rounded-full flex items-center justify-center border ${
-                noVehicle ? "bg-brand/20 border-brand" : "bg-bg-panel border-bg-border"
-              }`}
-            >
-              <Footprints size={20} color={noVehicle ? "#a78bfa" : "#9ca3af"} />
-            </span>
-            <span className={`text-[11px] font-semibold text-center leading-tight ${noVehicle ? "text-brand-light" : "text-neutral-300"}`}>
-              אין לי כלי
-            </span>
-          </button>
         </div>
         {vehicleType && (
           <div className="mb-4">
@@ -268,7 +243,7 @@ export default function OnboardingScreen() {
           {submitting ? "נרשמים..." : "בואו נתחיל לנסוע בטוח"}
         </button>
         {!canSubmit && !submitting && (
-          <p className="text-[11px] text-neutral-500 text-center mt-2">כינוי, שם משתמש ייחודי, ומספר טלפון תקין נדרשים כדי להמשיך</p>
+          <p className="text-[11px] text-neutral-500 text-center mt-2">כינוי, שם משתמש ייחודי, מספר טלפון תקין, והכלי שלך נדרשים כדי להמשיך</p>
         )}
         <p className="text-[10px] text-neutral-500 text-center mt-3">
           שימוש באפליקציה מהווה הסכמה ל

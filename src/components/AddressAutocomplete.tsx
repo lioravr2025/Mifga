@@ -3,23 +3,51 @@ import { Loader2, MapPinned, Search } from "lucide-react";
 import type { LatLng } from "../types";
 
 interface Suggestion {
+  /** short, Waze-style label: "street number, city" - what's actually shown and filled into the field */
   label: string;
+  /** full address, kept only as a fallback for places with no usable street/city breakdown */
+  fullLabel: string;
   position: LatLng;
+}
+
+interface NominatimAddress {
+  house_number?: string;
+  road?: string;
+  city?: string;
+  town?: string;
+  village?: string;
+  municipality?: string;
+  suburb?: string;
+  county?: string;
 }
 
 const NOMINATIM_URL = "https://nominatim.openstreetmap.org/search";
 const DEBOUNCE_MS = 400;
 
+/** "street number, city" like Waze shows - Nominatim's raw display_name is a full postal-style address (neighborhood, district, country, postcode) which is far too verbose for a suggestion list. */
+function shortLabel(name: string | undefined, address: NominatimAddress, fallback: string): string {
+  const city = address.city || address.town || address.village || address.municipality || address.suburb || address.county;
+  const parts: string[] = [];
+  if (address.road) {
+    parts.push(address.house_number ? `${address.road} ${address.house_number}` : address.road);
+  } else if (name) {
+    parts.push(name);
+  }
+  if (city && city !== parts[0]) parts.push(city);
+  return parts.length > 0 ? parts.join(", ") : fallback;
+}
+
 async function fetchSuggestions(query: string, biasNear: LatLng): Promise<Suggestion[]> {
-  const url = `${NOMINATIM_URL}?format=json&q=${encodeURIComponent(query)}&limit=5&viewbox=${biasNear.lng - 0.3},${biasNear.lat + 0.3},${
-    biasNear.lng + 0.3
-  },${biasNear.lat - 0.3}&bounded=0`;
+  const url = `${NOMINATIM_URL}?format=json&addressdetails=1&q=${encodeURIComponent(query)}&limit=5&viewbox=${biasNear.lng - 0.3},${
+    biasNear.lat + 0.3
+  },${biasNear.lng + 0.3},${biasNear.lat - 0.3}&bounded=0`;
   const res = await fetch(url, { headers: { Accept: "application/json" } });
   if (!res.ok) return [];
   const data = await res.json();
   if (!Array.isArray(data)) return [];
-  return data.map((d: { display_name: string; lat: string; lon: string }) => ({
-    label: d.display_name,
+  return data.map((d: { display_name: string; name?: string; address?: NominatimAddress; lat: string; lon: string }) => ({
+    label: shortLabel(d.name, d.address ?? {}, d.display_name),
+    fullLabel: d.display_name,
     position: { lat: parseFloat(d.lat), lng: parseFloat(d.lon) },
   }));
 }
@@ -89,10 +117,10 @@ export default function AddressAutocomplete({
             <button
               key={i}
               onClick={() => pick(s)}
-              className="w-full flex items-start gap-2 px-4 py-3 text-right text-xs text-neutral-200 active:bg-bg-panel border-b border-bg-border last:border-b-0"
+              className="w-full flex items-center gap-2 px-4 py-3 text-right text-sm text-neutral-100 active:bg-bg-panel border-b border-bg-border last:border-b-0"
             >
-              <MapPinned size={14} className="text-brand-light shrink-0 mt-0.5" />
-              <span className="leading-relaxed">{s.label}</span>
+              <MapPinned size={14} className="text-brand-light shrink-0" />
+              <span className="leading-relaxed truncate">{s.label}</span>
             </button>
           ))}
         </div>

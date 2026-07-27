@@ -31,6 +31,29 @@ function RecenterController({ target, signal }: { target: LatLng; signal: number
   return null;
 }
 
+/**
+ * Leaflet caches its container's pixel size internally and only recomputes it
+ * on window resize by default - if the container resizes for any other
+ * reason (a sibling panel appearing/disappearing, like the bottom bar
+ * hiding while picking a manual pin location), that cache goes stale and
+ * map.getCenter()/pixel<->latlng conversions become geographically wrong,
+ * even though the map visually re-renders at its new size. This is what was
+ * causing the manual-pin "gap between where I dropped it and where it
+ * actually landed" bug. Watching the container with ResizeObserver and
+ * calling invalidateSize() keeps Leaflet's internal size in sync with
+ * reality regardless of *why* the container resized.
+ */
+export function MapResizeHandler() {
+  const map = useMap();
+  useEffect(() => {
+    const container = map.getContainer();
+    const observer = new ResizeObserver(() => map.invalidateSize());
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [map]);
+  return null;
+}
+
 function CenterTracker({ onChange }: { onChange: (c: LatLng) => void }) {
   const map = useMapEvents({
     move: () => {
@@ -61,6 +84,15 @@ interface MapViewProps {
   onPickedCenterChange?: (c: LatLng) => void;
   /** shows a "protection radius" halo around the self marker, matching settings.rideAlertRadiusM, while a ride is active */
   rideActive?: boolean;
+  /** tapping a bare point on the map (not a marker/popup) - used to report a hazard right at that spot */
+  onMapClick?: (pos: LatLng) => void;
+}
+
+function ClickHandler({ onClick }: { onClick: (pos: LatLng) => void }) {
+  useMapEvents({
+    click: (e) => onClick({ lat: e.latlng.lat, lng: e.latlng.lng }),
+  });
+  return null;
 }
 
 export default function MapView({
@@ -76,6 +108,7 @@ export default function MapView({
   pickingLocation = false,
   onPickedCenterChange,
   rideActive = false,
+  onMapClick,
 }: MapViewProps) {
   const mapRef = useRef<LeafletMap | null>(null);
   const { user, settings } = useApp();
@@ -93,8 +126,10 @@ export default function MapView({
         {/* Default position, but lifted clear of the floating ride button via CSS (see index.css) - every other corner already has a control (menu/bell/locate). */}
         <AttributionControl position="bottomright" prefix={false} />
         <TileLayer url={theme === "dark" ? DARK_TILES : LIGHT_TILES} attribution="&copy; OpenStreetMap &copy; CARTO" />
+        <MapResizeHandler />
         <RecenterController target={cameraTarget ?? userPosition} signal={recenterSignal} />
         {pickingLocation && onPickedCenterChange && <CenterTracker onChange={onPickedCenterChange} />}
+        {!pickingLocation && onMapClick && <ClickHandler onClick={onMapClick} />}
 
         {rideActive && (
           <Circle

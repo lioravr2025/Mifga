@@ -23,6 +23,10 @@ interface ReportFlowProps {
   isPicking: boolean;
   /** When set (tapped a specific icon in the quick-report strip), skips straight to the location step. */
   initialType?: HazardTypeId | null;
+  /** When set (tapped a point directly on the map), skips the location step entirely and reports at that point once a type is picked. */
+  initialPosition?: LatLng | null;
+  /** Opens straight on the full hazard-type grid instead of the police/inspector/"more" screen - used by the home "עוד" button, which already showed police/inspector right next to it. */
+  initialStep?: "type" | "more";
 }
 
 export default function ReportFlow({
@@ -34,6 +38,8 @@ export default function ReportFlow({
   pickedCenter,
   isPicking,
   initialType,
+  initialPosition,
+  initialStep,
 }: ReportFlowProps) {
   const { addReport } = useApp();
   const [step, setStep] = useState<Step>("type");
@@ -50,9 +56,9 @@ export default function ReportFlow({
       setStep("location");
     } else {
       setSelectedType(null);
-      setStep("type");
+      setStep(initialStep ?? "type");
     }
-  }, [open, initialType]);
+  }, [open, initialType, initialStep]);
 
   const reset = () => {
     setStep("type");
@@ -70,7 +76,12 @@ export default function ReportFlow({
 
   const pickType = (id: HazardTypeId) => {
     setSelectedType(id);
-    setStep("location");
+    if (initialPosition) {
+      setManualPosition(initialPosition);
+      setStep("photo");
+    } else {
+      setStep("location");
+    }
   };
 
   const goManualPick = () => {
@@ -253,7 +264,7 @@ export default function ReportFlow({
       {step === "photo" && selectedType && (
         <div>
           <div className="flex items-center gap-2 mb-4">
-            <button onClick={() => setStep("location")} className="text-neutral-400">
+            <button onClick={() => setStep(initialPosition ? "type" : "location")} className="text-neutral-400">
               <ChevronRight size={22} />
             </button>
             <h2 className="text-lg font-bold text-neutral-50">רוצים לצרף תמונה?</h2>

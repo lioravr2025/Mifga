@@ -45,6 +45,8 @@ export default function MapScreen({
 
   const [reportOpen, setReportOpen] = useState(false);
   const [presetType, setPresetType] = useState<HazardTypeId | null>(null);
+  const [tapPosition, setTapPosition] = useState<LatLng | null>(null);
+  const [reportStep, setReportStep] = useState<"type" | "more">("type");
   const [selectedHazardId, setSelectedHazardId] = useState<string | null>(null);
   const [selfCardOpen, setSelfCardOpen] = useState(false);
   const [recenterSignal, setRecenterSignal] = useState(0);
@@ -54,8 +56,18 @@ export default function MapScreen({
   const [confettiTrigger, setConfettiTrigger] = useState(0);
   const [walkieSentLabel, setWalkieSentLabel] = useState<string | null>(null);
 
-  const openReport = (type?: HazardTypeId) => {
+  const openReport = (type?: HazardTypeId, step: "type" | "more" = "type") => {
     setPresetType(type ?? null);
+    setTapPosition(null);
+    setReportStep(step);
+    setReportOpen(true);
+  };
+
+  /** Tapping a point directly on the map reports at that exact point - skips the location step entirely. */
+  const openReportAtPosition = (pos: LatLng) => {
+    setPresetType(null);
+    setTapPosition(pos);
+    setReportStep("type");
     setReportOpen(true);
   };
 
@@ -104,6 +116,7 @@ export default function MapScreen({
           rideActive={ride.rideActive}
           pickingLocation={isPicking}
           onPickedCenterChange={setPickedCenter}
+          onMapClick={!reportOpen && !isPicking ? openReportAtPosition : undefined}
         />
 
         {isPicking && (
@@ -171,7 +184,7 @@ export default function MapScreen({
                 <span className="text-xs font-semibold text-neutral-200 text-center leading-tight">{h.label}</span>
               </button>
             ))}
-            <button onClick={() => openReport()} className="flex flex-col items-center gap-1.5 active:scale-95 transition">
+            <button onClick={() => openReport(undefined, "more")} className="flex flex-col items-center gap-1.5 active:scale-95 transition">
               <span className="w-16 h-16 rounded-full flex items-center justify-center bg-bg-panel2 border border-bg-border">
                 <span className="text-2xl leading-none text-neutral-300">···</span>
               </span>
@@ -264,6 +277,8 @@ export default function MapScreen({
         pickedCenter={pickedCenter}
         isPicking={isPicking}
         initialType={presetType}
+        initialPosition={tapPosition}
+        initialStep={reportStep}
       />
       <HazardDetailSheet hazardId={selectedHazardId} onClose={() => setSelectedHazardId(null)} />
       <MyProfileCard
