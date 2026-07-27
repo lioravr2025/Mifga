@@ -1,5 +1,19 @@
 import { useRef, useState } from "react";
-import { AlertTriangle, Bell, Camera, Gauge, Loader2, Shield, ShieldCheck, Siren, TriangleAlert, Zap } from "lucide-react";
+import {
+  AlertTriangle,
+  Bell,
+  Camera,
+  Check,
+  Gauge,
+  KeyRound,
+  Loader2,
+  LogIn,
+  Shield,
+  ShieldCheck,
+  Siren,
+  TriangleAlert,
+  Zap,
+} from "lucide-react";
 import { useApp } from "../context/AppContext";
 import { VEHICLE_DEFS } from "../components/VehicleIcons";
 import VehicleModelInput from "../components/VehicleModelInput";
@@ -7,6 +21,7 @@ import UsernameField from "../components/UsernameField";
 import InviteFriendButton from "../components/InviteFriendButton";
 import TermsSheet from "../components/TermsSheet";
 import { HAZARD_COLOR_HEX } from "../lib/colors";
+import { submitSupportTicket } from "../lib/backend/auth";
 import type { NotifyTypePrefs, VehicleTypeId } from "../types";
 
 function isValidIsraeliPhone(raw: string): boolean {
@@ -21,8 +36,11 @@ const NOTIFY_ROWS: { key: keyof NotifyTypePrefs; label: string; icon: typeof Sir
   { key: "other", label: "מפגע אחר", icon: TriangleAlert, color: HAZARD_COLOR_HEX.pothole },
 ];
 
+type Mode = "signup" | "login" | "support";
+
 export default function OnboardingScreen() {
-  const { updateNotifyTypes, completeOnboarding, settings, hazards } = useApp();
+  const { updateNotifyTypes, completeOnboarding, recoverAccount, settings, hazards } = useApp();
+  const [mode, setMode] = useState<Mode>("signup");
   const [name, setName] = useState("");
   const [username, setUsername] = useState("");
   const [usernameOk, setUsernameOk] = useState(false);
@@ -35,7 +53,19 @@ export default function OnboardingScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [termsOpen, setTermsOpen] = useState(false);
+  const [codeReveal, setCodeReveal] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // login mode
+  const [loginPhone, setLoginPhone] = useState("");
+  const [loginCode, setLoginCode] = useState("");
+  const [loginSubmitting, setLoginSubmitting] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
+
+  // "forgot my code" support ticket mode
+  const [supportMessage, setSupportMessage] = useState("");
+  const [supportSubmitting, setSupportSubmitting] = useState(false);
+  const [supportSent, setSupportSent] = useState(false);
 
   const phoneValid = isValidIsraeliPhone(phone);
   const canSubmit = name.trim().length > 0 && phoneValid && usernameOk && !!vehicleType && !submitting;
@@ -59,8 +89,16 @@ export default function OnboardingScreen() {
     setVehicleType(id);
   };
 
-  const submit = async () => {
+  // Step 1: validate, generate the recovery code, and show it before it's ever
+  // sent anywhere - so the rider has actually seen it once, not just had it
+  // silently created. Step 2 (confirmSignup) is what really submits.
+  const startSignup = () => {
     if (!canSubmit) return;
+    setCodeReveal(String(Math.floor(1000 + Math.random() * 9000)));
+  };
+
+  const confirmSignup = async () => {
+    if (!codeReveal) return;
     setSubmitting(true);
     setSubmitError(null);
     try {
@@ -71,6 +109,7 @@ export default function OnboardingScreen() {
         avatarPhoto: photo ?? null,
         vehicleType: vehicleType ?? null,
         vehicleModel: vehicleType ? vehicleModel.trim() || null : null,
+        recoveryCode: codeReveal,
       });
       updateNotifyTypes(notifyTypes);
     } catch (err) {
@@ -86,8 +125,163 @@ export default function OnboardingScreen() {
         setSubmitError(`ההרשמה נכשלה: ${message}`);
       }
       setSubmitting(false);
+      setCodeReveal(null);
     }
   };
+
+  const submitLogin = async () => {
+    setLoginSubmitting(true);
+    setLoginError(null);
+    const ok = await recoverAccount(loginPhone, loginCode);
+    setLoginSubmitting(false);
+    if (!ok) setLoginError("מספר טלפון או קוד שגויים.");
+  };
+
+  const submitSupport = async () => {
+    if (!supportMessage.trim()) return;
+    setSupportSubmitting(true);
+    try {
+      await submitSupportTicket(loginPhone.trim() || null, supportMessage.trim());
+      setSupportSent(true);
+    } catch (err) {
+      console.error("Mifga: submitSupportTicket failed", err);
+    }
+    setSupportSubmitting(false);
+  };
+
+  if (codeReveal) {
+    return (
+      <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar safe-top px-6 pt-10 pb-8 flex flex-col items-center text-center">
+        <span className="w-16 h-16 rounded-2xl bg-brand/15 border border-brand/40 flex items-center justify-center mb-4">
+          <KeyRound size={30} className="text-brand-light" />
+        </span>
+        <h1 className="text-lg font-bold text-neutral-50 mb-2">קוד השחזור שלכם</h1>
+        <p className="text-sm text-neutral-400 leading-relaxed mb-5">
+          שמרו את הקוד הזה במקום בטוח. אם תמחקו את האפליקציה ותתקינו אותה מחדש, תוכלו להתחבר שוב לחשבון שלכם ולכל
+          הנקודות, הדיווחים והחברים שלכם - עם מספר הטלפון וקוד זה.
+        </p>
+        <div className="text-4xl font-extrabold tracking-[0.3em] text-brand-light bg-bg-panel2 border border-brand/40 rounded-2xl px-8 py-5 mb-6" dir="ltr">
+          {codeReveal}
+        </div>
+        {submitError && (
+          <div className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-red-500/10 border border-red-500/40 text-red-300 text-xs font-semibold mb-3 w-full">
+            <AlertTriangle size={14} className="shrink-0" />
+            {submitError}
+          </div>
+        )}
+        <button
+          onClick={confirmSignup}
+          disabled={submitting}
+          className="w-full py-4 rounded-2xl bg-brand text-white font-bold text-base disabled:opacity-40 active:scale-95 transition flex items-center justify-center gap-2"
+        >
+          {submitting ? <Loader2 size={18} className="animate-spin" /> : <Check size={18} />}
+          {submitting ? "נרשמים..." : "שמרתי את הקוד, בואו נתחיל"}
+        </button>
+      </div>
+    );
+  }
+
+  if (mode === "login" || mode === "support") {
+    return (
+      <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar safe-top px-6 pt-10 pb-8">
+        <span className="w-14 h-14 rounded-2xl bg-brand/15 border border-brand/40 flex items-center justify-center mb-4">
+          <LogIn size={26} className="text-brand-light" />
+        </span>
+        {mode === "login" ? (
+          <>
+            <h1 className="text-xl font-bold text-neutral-50 mb-2">התחברות לחשבון קיים</h1>
+            <p className="text-sm text-neutral-400 leading-relaxed mb-5">
+              הזינו את מספר הטלפון וקוד השחזור בן 4 הספרות שקיבלתם בהרשמה - כל הנתונים שלכם (נקודות, דיווחים, חברים) יחזרו.
+            </p>
+            <label className="text-xs text-neutral-400 mb-1.5 block">מספר טלפון</label>
+            <input
+              value={loginPhone}
+              onChange={(e) => setLoginPhone(e.target.value)}
+              placeholder="050-1234567"
+              dir="ltr"
+              className="w-full px-4 py-3 rounded-2xl bg-bg-panel2 border border-bg-border text-sm text-neutral-100 outline-none focus:border-brand mb-4"
+            />
+            <label className="text-xs text-neutral-400 mb-1.5 block">קוד שחזור (4 ספרות)</label>
+            <input
+              value={loginCode}
+              onChange={(e) => setLoginCode(e.target.value.replace(/\D/g, "").slice(0, 4))}
+              placeholder="0000"
+              dir="ltr"
+              inputMode="numeric"
+              className="w-full px-4 py-3 rounded-2xl bg-bg-panel2 border border-bg-border text-center text-lg tracking-[0.4em] text-neutral-100 outline-none focus:border-brand mb-4"
+            />
+            {loginError && (
+              <div className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-red-500/10 border border-red-500/40 text-red-300 text-xs font-semibold mb-4">
+                <AlertTriangle size={14} className="shrink-0" />
+                {loginError}
+              </div>
+            )}
+            <button
+              onClick={submitLogin}
+              disabled={!loginPhone.trim() || loginCode.length !== 4 || loginSubmitting}
+              className="w-full py-3.5 rounded-2xl bg-brand text-white font-bold text-sm disabled:opacity-40 active:scale-95 transition flex items-center justify-center gap-2 mb-4"
+            >
+              {loginSubmitting && <Loader2 size={16} className="animate-spin" />}
+              התחברות
+            </button>
+            <div className="flex items-center justify-between text-xs">
+              <button onClick={() => setMode("signup")} className="text-neutral-400">
+                חזרה להרשמה
+              </button>
+              <button onClick={() => setMode("support")} className="text-brand-light font-semibold">
+                שכחתי את הקוד
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <h1 className="text-xl font-bold text-neutral-50 mb-2">פנייה לתמיכה</h1>
+            {supportSent ? (
+              <div className="p-4 rounded-2xl bg-brand/10 border border-brand/30 text-sm text-neutral-200 text-center leading-relaxed">
+                הפנייה נשלחה. ניצור קשר למספר הטלפון שהזנתם.
+                <button onClick={() => setMode("login")} className="block mx-auto mt-3 text-brand-light font-semibold text-sm">
+                  חזרה להתחברות
+                </button>
+              </div>
+            ) : (
+              <>
+                <p className="text-sm text-neutral-400 leading-relaxed mb-5">
+                  ספרו לנו מה קרה ואיזה מספר טלפון רשום אצלכם - ניצור קשר כדי לעזור לכם לשחזר את החשבון.
+                </p>
+                <label className="text-xs text-neutral-400 mb-1.5 block">מספר טלפון</label>
+                <input
+                  value={loginPhone}
+                  onChange={(e) => setLoginPhone(e.target.value)}
+                  placeholder="050-1234567"
+                  dir="ltr"
+                  className="w-full px-4 py-3 rounded-2xl bg-bg-panel2 border border-bg-border text-sm text-neutral-100 outline-none focus:border-brand mb-4"
+                />
+                <label className="text-xs text-neutral-400 mb-1.5 block">מה קרה?</label>
+                <textarea
+                  value={supportMessage}
+                  onChange={(e) => setSupportMessage(e.target.value)}
+                  placeholder="שכחתי את קוד השחזור שלי..."
+                  rows={3}
+                  className="w-full px-4 py-3 rounded-2xl bg-bg-panel2 border border-bg-border text-sm text-neutral-100 outline-none focus:border-brand mb-4 resize-none"
+                />
+                <button
+                  onClick={submitSupport}
+                  disabled={!supportMessage.trim() || supportSubmitting}
+                  className="w-full py-3.5 rounded-2xl bg-brand text-white font-bold text-sm disabled:opacity-40 active:scale-95 transition flex items-center justify-center gap-2 mb-4"
+                >
+                  {supportSubmitting && <Loader2 size={16} className="animate-spin" />}
+                  שליחת פנייה
+                </button>
+                <button onClick={() => setMode("login")} className="w-full text-center text-xs text-neutral-400">
+                  חזרה להתחברות
+                </button>
+              </>
+            )}
+          </>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar safe-top">
@@ -235,16 +429,19 @@ export default function OnboardingScreen() {
         )}
 
         <button
-          onClick={submit}
+          onClick={startSignup}
           disabled={!canSubmit}
           className="w-full py-4 rounded-2xl bg-brand text-white font-bold text-base disabled:opacity-40 active:scale-95 transition flex items-center justify-center gap-2"
         >
-          {submitting ? <Loader2 size={18} className="animate-spin" /> : <Zap size={18} />}
-          {submitting ? "נרשמים..." : "בואו נתחיל לנסוע בטוח"}
+          <Zap size={18} />
+          בואו נתחיל לנסוע בטוח
         </button>
-        {!canSubmit && !submitting && (
+        {!canSubmit && (
           <p className="text-[11px] text-neutral-500 text-center mt-2">כינוי, שם משתמש ייחודי, מספר טלפון תקין, והכלי שלך נדרשים כדי להמשיך</p>
         )}
+        <button onClick={() => setMode("login")} className="w-full text-center text-xs text-brand-light font-semibold mt-4">
+          כבר יש לכם חשבון? התחברות
+        </button>
         <p className="text-[10px] text-neutral-500 text-center mt-3">
           שימוש באפליקציה מהווה הסכמה ל
           <button onClick={() => setTermsOpen(true)} className="text-brand-light underline decoration-dotted underline-offset-2">

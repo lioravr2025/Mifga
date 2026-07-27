@@ -17,6 +17,7 @@ interface NewProfileInput {
   vehicleType?: string | null;
   vehicleModel?: string | null;
   avatarPhoto?: string | null;
+  recoveryCode?: string;
 }
 
 export async function insertProfile(input: NewProfileInput): Promise<UserProfile> {
@@ -32,6 +33,7 @@ export async function insertProfile(input: NewProfileInput): Promise<UserProfile
       vehicle_type: input.vehicleType ?? null,
       vehicle_model: input.vehicleModel ?? null,
       avatar_photo_url: avatarUrl ?? null,
+      recovery_code: input.recoveryCode ?? null,
     })
     .select("*")
     .single();

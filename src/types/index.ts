@@ -68,6 +68,8 @@ export interface UserProfile {
   phone?: string;
   /** unique handle used for friend search - checked for uniqueness against friends locally, see lib/username.ts */
   username?: string;
+  /** 4-digit code shown once at signup - lets the rider recover this account (phone + code) after a reinstall */
+  recoveryCode?: string;
 }
 
 export interface Friend {

@@ -55,6 +55,7 @@ export interface ProfileRow {
   live_lat?: number | null;
   live_lng?: number | null;
   last_active_at?: string | null;
+  recovery_code?: string | null;
 }
 
 export function profileFromRow(row: ProfileRow): UserProfile {
@@ -71,6 +72,7 @@ export function profileFromRow(row: ProfileRow): UserProfile {
     vehicleType: (row.vehicle_type as VehicleTypeId | null) ?? undefined,
     vehicleModel: row.vehicle_model ?? undefined,
     phone: row.phone ?? undefined,
+    recoveryCode: row.recovery_code ?? undefined,
   };
 }
 

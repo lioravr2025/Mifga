@@ -27,6 +27,30 @@ export async function fetchOwnProfile(uid: string): Promise<UserProfile | null> 
   return data ? profileFromRow(data as ProfileRow) : null;
 }
 
+/**
+ * Re-attaches an old account's entire history (points, reports, friendships,
+ * groups, ride log...) onto the current anonymous session, verified by phone
+ * + the 4-digit code shown once at signup. See recover_account() in
+ * supabase/schema_admin.sql for why this is a data-ownership transfer rather
+ * than true re-authentication as the same Supabase identity (no SMS-OTP
+ * provider configured, and a service-role key can't safely live in this
+ * client). Throws with a message meant to be shown directly to the user.
+ */
+export async function recoverAccount(phone: string, code: string): Promise<UserProfile | null> {
+  if (!supabase) throw new Error("Supabase not configured");
+  const uid = await ensureSession();
+  const { error } = await supabase.rpc("recover_account", { p_phone: phone, p_code: code });
+  if (error) throw error;
+  return fetchOwnProfile(uid);
+}
+
+/** "Forgot my recovery code" fallback - visible to the admin dashboard's SupportTicketsPanel. */
+export async function submitSupportTicket(phone: string | null, message: string): Promise<void> {
+  if (!supabase) throw new Error("Supabase not configured");
+  const { error } = await supabase.from("support_tickets").insert({ phone, message });
+  if (error) throw error;
+}
+
 export async function isUsernameTakenRemote(username: string, excludeUid?: string): Promise<boolean> {
   if (!supabase) throw new Error("Supabase not configured");
   let query = supabase.from("profiles").select("id", { count: "exact", head: true }).ilike("username", username);

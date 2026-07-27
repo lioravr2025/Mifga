@@ -29,7 +29,7 @@ import { playAudioUrl } from "../lib/nativeMic";
 import { setErrorLogUser } from "../lib/errorLogger";
 import { setAnalyticsUser } from "../lib/analytics";
 import { isBackendConfigured } from "../lib/supabaseClient";
-import { ensureSession, fetchOwnProfile } from "../lib/backend/auth";
+import { ensureSession, fetchOwnProfile, recoverAccount as recoverAccountRemote } from "../lib/backend/auth";
 import { insertProfile, updateProfileRemote } from "../lib/backend/profile";
 import { awardPointsRemote, awardVotePointsRemote } from "../lib/backend/profile";
 import { confirmHazardRemote, denyHazardRemote, fetchHazards, insertHazard, subscribeHazards } from "../lib/backend/hazards";
@@ -92,6 +92,7 @@ export interface OnboardingInput {
   vehicleType?: VehicleTypeId | null;
   vehicleModel?: string | null;
   avatarPhoto?: string | null;
+  recoveryCode?: string;
 }
 
 export const MAX_FAVORITE_FRIENDS = 3;
@@ -131,6 +132,7 @@ interface AppContextValue {
   clearLastAwarded: () => void;
   /** Throws on failure (e.g. network/backend error) so the onboarding screen can show it - local mode never throws. */
   completeOnboarding: (input: OnboardingInput) => Promise<void>;
+  recoverAccount: (phone: string, code: string) => Promise<boolean>;
   addRideLogEntry: (entry: Omit<RideLogEntry, "id">) => void;
   deleteRideLogEntry: (id: string) => void;
   submitFeedback: (liked: boolean, note: string) => void;
@@ -554,6 +556,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         vehicleType: input.vehicleType,
         vehicleModel: input.vehicleModel,
         avatarPhoto: input.avatarPhoto,
+        recoveryCode: input.recoveryCode,
       });
       setUser(profile);
       setOnboardingComplete(true);
@@ -567,8 +570,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
       vehicleType: input.vehicleType ?? undefined,
       vehicleModel: input.vehicleModel ?? undefined,
       avatarPhoto: input.avatarPhoto ?? undefined,
+      recoveryCode: input.recoveryCode,
     }));
     setOnboardingComplete(true);
+  };
+
+  /** Resolves true/false rather than throwing so the login screen can show a plain inline error instead of an unhandled rejection. */
+  const recoverAccount = async (phone: string, code: string): Promise<boolean> => {
+    if (!isBackendConfigured) return false;
+    try {
+      const profile = await recoverAccountRemote(phone.trim(), code.trim());
+      if (!profile) return false;
+      setUser(profile);
+      setOnboardingComplete(true);
+      return true;
+    } catch (err) {
+      console.error("Mifga: recoverAccount failed", err);
+      return false;
+    }
   };
 
   const addRideLogEntry = (entry: Omit<RideLogEntry, "id">) => {
@@ -809,6 +828,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     sendFriendMessage,
     clearLastAwarded: () => setLastAwardedPoints(null),
     completeOnboarding,
+    recoverAccount,
     addRideLogEntry,
     deleteRideLogEntry,
     submitFeedback,
