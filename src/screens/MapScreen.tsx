@@ -174,23 +174,36 @@ export default function MapScreen({
           </div>
         )}
 
-        {/* Ride mode: the ride button floats over the enlarged map instead of living
-            in the (now hidden) bottom panel - same spot/shape as usual, just lower,
-            since there's no panel underneath it to overlap anymore. */}
-        {ride.rideActive && (
-          <div className="absolute bottom-5 inset-x-0 z-[600] flex flex-col items-center">
+        {/* The ride button always lives here (never inside the collapsible bottom
+            panel below, which needs overflow-hidden for its slide animation - a
+            button deliberately poking up out of that panel was getting clipped by
+            it). Sits flush with the map's own bottom edge, nudged down so it still
+            overlaps the panel's top edge the same way it always visually has. */}
+        {!isPicking && (
+          <div className="absolute bottom-0 inset-x-0 z-[600] flex flex-col items-center translate-y-7">
             <div className="relative w-20 h-20">
-              <PulseRing color="#ef4444" />
+              {ride.rideActive && <PulseRing color="#ef4444" />}
               <button
-                onClick={() => { trackClick("ride_stop", "map"); ride.stopRide(); }}
-                aria-label="הפסקת נסיעה"
-                className="absolute inset-0 rounded-full flex items-center justify-center shadow-glow border-4 border-bg-panel active:scale-95 transition bg-gradient-to-br from-red-600 to-red-500 shadow-red-500"
+                onClick={() => {
+                  trackClick(ride.rideActive ? "ride_stop" : "ride_start", "map");
+                  ride.rideActive ? ride.stopRide() : ride.startRide();
+                }}
+                aria-label={ride.rideActive ? "הפסקת נסיעה" : "תחילת נסיעה"}
+                className={`absolute inset-0 rounded-full flex items-center justify-center shadow-glow border-4 border-bg-panel active:scale-95 transition ${
+                  ride.rideActive
+                    ? "bg-gradient-to-br from-red-600 to-red-500 shadow-red-500"
+                    : "bg-gradient-to-br from-green-600 to-green-500 shadow-green-500"
+                }`}
               >
-                <Square size={30} className="text-white fill-white" />
+                {ride.rideActive ? <Square size={30} className="text-white fill-white" /> : <ScooterIcon size={34} color="white" />}
               </button>
             </div>
-            <span className="text-[11px] text-neutral-200 mt-1 drop-shadow">נסיעה פעילה - נתריע על מפגעים בדרך</span>
-            <span className="text-sm font-bold text-white drop-shadow">הפסקת נסיעה</span>
+            <span className={`text-[11px] mt-1 ${ride.rideActive ? "text-neutral-200 drop-shadow" : "text-neutral-400"}`}>
+              {ride.rideActive ? "נסיעה פעילה - נתריע על מפגעים בדרך" : "מוכנים לזוז?"}
+            </span>
+            <span className={`text-sm font-bold ${ride.rideActive ? "text-white drop-shadow" : "text-neutral-50"}`}>
+              {ride.rideActive ? "הפסקת נסיעה" : "תחילת נסיעה"}
+            </span>
           </div>
         )}
 
@@ -204,19 +217,10 @@ export default function MapScreen({
           !isPicking && !ride.rideActive ? "max-h-[600px] opacity-100 translate-y-0" : "max-h-0 opacity-0 translate-y-6 pointer-events-none"
         }`}
       >
-        <div className="flex flex-col items-center mb-2">
-          <div className="relative z-[600] w-20 h-20 -mt-[52px]">
-            <button
-              onClick={() => { trackClick("ride_start", "map"); ride.startRide(); }}
-              aria-label="תחילת נסיעה"
-              className="absolute inset-0 rounded-full flex items-center justify-center shadow-glow border-4 border-bg-panel active:scale-95 transition bg-gradient-to-br from-green-600 to-green-500 shadow-green-500"
-            >
-              <ScooterIcon size={34} color="white" />
-            </button>
-          </div>
-          <span className="text-[11px] text-neutral-400 mt-1">מוכנים לזוז?</span>
-          <span className="text-sm font-bold text-neutral-50">תחילת נסיעה</span>
-        </div>
+        {/* Reserves the room the floating ride button (rendered in the map area
+            above, so it can't be clipped by this panel's overflow-hidden) visually
+            overlaps down into. */}
+        <div className="h-9" />
 
           <div className="flex justify-center gap-5 mb-3">
             {PRIMARY_HAZARD_TYPES.map((h) => (
