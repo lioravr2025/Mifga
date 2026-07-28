@@ -174,14 +174,30 @@ export default function MapScreen({
           </div>
         )}
 
-        {/* The ride button always lives here (never inside the collapsible bottom
-            panel below, which needs overflow-hidden for its slide animation - a
-            button deliberately poking up out of that panel was getting clipped by
+        {/* The ride button itself always lives here (never inside the collapsible
+            bottom panel below, which needs overflow-hidden for its slide animation -
+            a button deliberately poking up out of that panel was getting clipped by
             it). Sits flush with the map's own bottom edge, nudged down so it still
-            overlaps the panel's top edge the same way it always visually has. */}
+            overlaps the panel's top edge the same way it always visually has.
+            Deliberately NOT wrapping the text labels below in this same block - a
+            flex-col block anchored by its own bottom edge is anchored by whatever
+            its LAST child is, so adding the labels here pushed the button itself
+            higher than intended instead of straddling the boundary. */}
         {!isPicking && (
           <div className="absolute bottom-0 inset-x-0 z-[600] flex flex-col items-center translate-y-7">
-            <div className="relative w-20 h-20">
+            {/* Riding: the panel is collapsed to nothing, so there's no "below" to put
+                these in (that would run past the screen edge, under the bottom nav,
+                as translating them further down did) - stack them above the button
+                instead. Being earlier in this same flex-col doesn't disturb the
+                button's own position, since the button (last child) is still what
+                the bottom-0 anchor lines up with. */}
+            {ride.rideActive && (
+              <div className="flex flex-col items-center gap-0.5 mb-1.5 px-3 py-1 rounded-full bg-black/45 backdrop-blur-sm pointer-events-none">
+                <span className="text-[11px] text-neutral-200">נסיעה פעילה - נתריע על מפגעים בדרך</span>
+                <span className="text-sm font-bold text-white">הפסקת נסיעה</span>
+              </div>
+            )}
+            <div className="relative w-20 h-20 shrink-0">
               {ride.rideActive && <PulseRing color="#ef4444" />}
               <button
                 onClick={() => {
@@ -198,12 +214,6 @@ export default function MapScreen({
                 {ride.rideActive ? <Square size={30} className="text-white fill-white" /> : <ScooterIcon size={34} color="white" />}
               </button>
             </div>
-            <span className={`text-[11px] mt-1 ${ride.rideActive ? "text-neutral-200 drop-shadow" : "text-neutral-400"}`}>
-              {ride.rideActive ? "נסיעה פעילה - נתריע על מפגעים בדרך" : "מוכנים לזוז?"}
-            </span>
-            <span className={`text-sm font-bold ${ride.rideActive ? "text-white drop-shadow" : "text-neutral-50"}`}>
-              {ride.rideActive ? "הפסקת נסיעה" : "תחילת נסיעה"}
-            </span>
           </div>
         )}
 
@@ -217,10 +227,14 @@ export default function MapScreen({
           !isPicking && !ride.rideActive ? "max-h-[600px] opacity-100 translate-y-0" : "max-h-0 opacity-0 translate-y-6 pointer-events-none"
         }`}
       >
-        {/* Reserves the room the floating ride button (rendered in the map area
-            above, so it can't be clipped by this panel's overflow-hidden) visually
-            overlaps down into. */}
-        <div className="h-9" />
+        {/* Sits right below where the floating ride button (rendered in the map
+            area above, so it can't be clipped by this panel's overflow-hidden)
+            visually overlaps down into - normal document flow here, so no
+            position math needed to line it up with the button above it. */}
+        <div className="flex flex-col items-center mb-2 pt-7">
+          <span className="text-[11px] text-neutral-400">מוכנים לזוז?</span>
+          <span className="text-sm font-bold text-neutral-50">תחילת נסיעה</span>
+        </div>
 
           <div className="flex justify-center gap-5 mb-3">
             {PRIMARY_HAZARD_TYPES.map((h) => (
