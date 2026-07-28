@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Loader2, MapPinned, Search } from "lucide-react";
 import type { LatLng } from "../types";
 
@@ -66,7 +67,32 @@ export default function AddressAutocomplete({
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
+  const [dropdownRect, setDropdownRect] = useState<{ top: number; left: number; width: number } | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  // Screens embedding this field (e.g. the route planner) clip their header with
+  // overflow-hidden for a slide-collapse animation, which was swallowing the
+  // dropdown before it could ever be seen. Portal it to <body> instead, positioned
+  // from the field's own screen coordinates so no ancestor's overflow can clip it.
+  useEffect(() => {
+    const showing = open && suggestions.length > 0;
+    if (!showing) {
+      setDropdownRect(null);
+      return;
+    }
+    const updateRect = () => {
+      const r = wrapRef.current?.getBoundingClientRect();
+      if (r) setDropdownRect({ top: r.bottom + 6, left: r.left, width: r.width });
+    };
+    updateRect();
+    window.addEventListener("resize", updateRect);
+    window.addEventListener("scroll", updateRect, true);
+    return () => {
+      window.removeEventListener("resize", updateRect);
+      window.removeEventListener("scroll", updateRect, true);
+    };
+  }, [open, suggestions.length]);
 
   useEffect(() => {
     if (timer.current) clearTimeout(timer.current);
@@ -97,7 +123,7 @@ export default function AddressAutocomplete({
   };
 
   return (
-    <div className="relative">
+    <div className="relative" ref={wrapRef}>
       <div className="flex items-center gap-2 px-4 py-3 rounded-2xl bg-bg-panel2 border border-bg-border">
         {loading ? <Loader2 size={16} className="text-neutral-400 animate-spin shrink-0" /> : <Search size={16} className="text-neutral-400 shrink-0" />}
         <input
@@ -111,20 +137,27 @@ export default function AddressAutocomplete({
           className="flex-1 bg-transparent outline-none text-sm text-neutral-100 placeholder:text-neutral-500"
         />
       </div>
-      {open && suggestions.length > 0 && (
-        <div className="absolute z-10 top-full inset-x-0 mt-1.5 rounded-2xl bg-bg-panel2 border border-bg-border shadow-2xl overflow-hidden max-h-56 overflow-y-auto no-scrollbar">
-          {suggestions.map((s, i) => (
-            <button
-              key={i}
-              onClick={() => pick(s)}
-              className="w-full flex items-center gap-2 px-4 py-3 text-right text-sm text-neutral-100 active:bg-bg-panel border-b border-bg-border last:border-b-0"
-            >
-              <MapPinned size={14} className="text-brand-light shrink-0" />
-              <span className="leading-relaxed truncate">{s.label}</span>
-            </button>
-          ))}
-        </div>
-      )}
+      {open &&
+        suggestions.length > 0 &&
+        dropdownRect &&
+        createPortal(
+          <div
+            style={{ position: "fixed", top: dropdownRect.top, left: dropdownRect.left, width: dropdownRect.width }}
+            className="z-[2000] rounded-2xl bg-bg-panel2 border border-bg-border shadow-2xl overflow-hidden max-h-56 overflow-y-auto no-scrollbar"
+          >
+            {suggestions.map((s, i) => (
+              <button
+                key={i}
+                onClick={() => pick(s)}
+                className="w-full flex items-center gap-2 px-4 py-3 text-right text-sm text-neutral-100 active:bg-bg-panel border-b border-bg-border last:border-b-0"
+              >
+                <MapPinned size={14} className="text-brand-light shrink-0" />
+                <span className="leading-relaxed truncate">{s.label}</span>
+              </button>
+            ))}
+          </div>,
+          document.body
+        )}
     </div>
   );
 }

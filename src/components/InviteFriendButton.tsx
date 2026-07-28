@@ -71,7 +71,7 @@ export default function InviteFriendButton({
           className="w-10 h-10 rounded-xl bg-bg-panel border border-bg-border flex items-center justify-center active:scale-95 transition"
           title={label}
         >
-          <UserPlus size={18} className="text-neutral-300" />
+          <Share2 size={18} className="text-neutral-300" />
         </button>
       )}
 

@@ -150,10 +150,9 @@ export interface AppSettings {
   theme: ThemeMode;
   notificationsEnabled: boolean;
   notifyTypes: NotifyTypePrefs;
-  notifyRadiusM: number;
   /** "limited" = free tier (3/day), "unlimited" is a locked paid feature not yet purchasable in this prototype */
   notifyDailyLimit: NotifyDailyLimit;
-  /** how close a hazard needs to be, in meters, to trigger an audio alert during an active ride (100-1000) */
+  /** how close a hazard needs to be, in meters, to trigger an audio alert during an active ride - alerts only fire while riding, never just from having hazards nearby on the map */
   rideAlertRadiusM: number;
   /** once the walkie-talkie tip on the Friends screen is dismissed, it stays gone */
   walkieTipDismissed: boolean;

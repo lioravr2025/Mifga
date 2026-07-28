@@ -1,4 +1,4 @@
-import { Bell, KeyRound, Map, Shield, Siren, TriangleAlert, Volume2, X } from "lucide-react";
+import { Bell, KeyRound, Map, Shield, Siren, TriangleAlert, X } from "lucide-react";
 import BottomSheet from "./BottomSheet";
 import { useApp } from "../context/AppContext";
 import { HAZARD_COLOR_HEX } from "../lib/colors";
@@ -81,21 +81,23 @@ export default function SettingsSheet({ open, onClose }: { open: boolean; onClos
             />
           </button>
         </div>
-        {settings.notificationsEnabled && (
-          <div className="mt-3 pt-3 border-t border-bg-border">
-            <div className="text-xs font-semibold text-neutral-300 mb-1.5">טווח התראה</div>
-            <input
-              type="range"
-              min={200}
-              max={3000}
-              step={100}
-              value={settings.notifyRadiusM}
-              onChange={(e) => updateSettings({ notifyRadiusM: Number(e.target.value) })}
-              className="w-full accent-brand"
-            />
-            <div className="text-xs text-neutral-400 mt-1">{settings.notifyRadiusM} מטר</div>
-          </div>
-        )}
+        <div className="mt-3 pt-3 border-t border-bg-border">
+          <div className="text-xs font-semibold text-neutral-300 mb-1">רדיוס התרעות בזמן נסיעה</div>
+          <p className="text-xs text-neutral-400 mb-2 leading-relaxed">
+            ברירת המחדל היא 100 מטר. כל עוד לא לחצתם "תחילת נסיעה" תראו את המפגעים על המפה בלבד - הצפצופים מתרחשים רק בעת נסיעה
+            פעילה, כשמפגע נכנס לטווח שקבעתם כאן.
+          </p>
+          <input
+            type="range"
+            min={10}
+            max={200}
+            step={10}
+            value={settings.rideAlertRadiusM}
+            onChange={(e) => updateSettings({ rideAlertRadiusM: Number(e.target.value) })}
+            className="w-full accent-brand"
+          />
+          <div className="text-xs text-neutral-400 mt-1">{settings.rideAlertRadiusM} מטר</div>
+        </div>
       </div>
 
       {settings.notificationsEnabled && (
@@ -124,28 +126,6 @@ export default function SettingsSheet({ open, onClose }: { open: boolean; onClos
           </div>
         </div>
       )}
-
-      <div className="p-4 rounded-2xl bg-bg-panel2 border border-bg-border">
-        <div className="flex items-center gap-3 mb-3">
-          <span className="w-9 h-9 rounded-full bg-bg-panel flex items-center justify-center">
-            <Volume2 size={17} className="text-brand-light" />
-          </span>
-          <div>
-            <div className="text-sm font-semibold text-neutral-50">רדיוס התרעות בזמן נסיעה</div>
-            <div className="text-xs text-neutral-400">צפצוף שונה לשוטר, לפקח ולמפגע אחר תוך כדי נסיעה</div>
-          </div>
-        </div>
-        <input
-          type="range"
-          min={10}
-          max={200}
-          step={10}
-          value={settings.rideAlertRadiusM}
-          onChange={(e) => updateSettings({ rideAlertRadiusM: Number(e.target.value) })}
-          className="w-full accent-brand"
-        />
-        <div className="text-xs text-neutral-400 mt-1">רדיוס התרעה: {settings.rideAlertRadiusM} מטר</div>
-      </div>
 
       {user.recoveryCode && (
         <div className="p-4 rounded-2xl bg-bg-panel2 border border-bg-border mt-3">
