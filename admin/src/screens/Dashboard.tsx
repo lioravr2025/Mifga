@@ -12,6 +12,7 @@ import ErrorLogsPanel from "../components/ErrorLogsPanel";
 import SupportTicketsPanel from "../components/SupportTicketsPanel";
 import BroadcastPanel from "../components/BroadcastPanel";
 import VersionConfigPanel from "../components/VersionConfigPanel";
+import DangerZonePanel from "../components/DangerZonePanel";
 
 function isRecentlyActive(lastActiveAt: string | null) {
   if (!lastActiveAt) return false;
@@ -42,10 +43,33 @@ export default function Dashboard({ onSignOut }: { onSignOut: () => void }) {
 
   useEffect(() => {
     loadAll();
+
+    // Live updates for the map + counts: profiles ping every ~25s while the app
+    // is open (position/riding state), so a debounce collapses bursts from many
+    // riders into one refetch instead of hammering the DB per row change.
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    const scheduleReload = () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(loadAll, 1500);
+    };
+    const channel = supabase
+      .channel("dashboard-live")
+      .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, scheduleReload)
+      .on("postgres_changes", { event: "*", schema: "public", table: "hazards" }, scheduleReload)
+      .subscribe();
+
+    return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const activeCount = profiles.filter((p) => isRecentlyActive(p.last_active_at)).length;
-  const ridingCount = profiles.filter((p) => p.riding_since).length;
+  // riding_since alone isn't enough - if a ride is abandoned (app killed/crashed,
+  // uninstalled) without ever calling stopRide(), it stays set forever. Requiring
+  // a recent presence heartbeat too means a stale flag stops counting once the
+  // app stops actively pinging, without needing the DB to know a ride "ended".
+  const ridingCount = profiles.filter((p) => p.riding_since && isRecentlyActive(p.last_active_at)).length;
 
   return (
     <div className="min-h-screen bg-bg">
@@ -103,6 +127,7 @@ export default function Dashboard({ onSignOut }: { onSignOut: () => void }) {
         </div>
 
         <BroadcastPanel />
+        <DangerZonePanel onDone={loadAll} />
       </main>
     </div>
   );

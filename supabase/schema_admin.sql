@@ -306,3 +306,34 @@ end;
 $$;
 
 grant execute on function public.recover_account(text, text) to authenticated;
+
+-- ============================================================================
+-- admin_reset_all_profiles() - wipes every rider profile (test/dev cleanup,
+-- or a full reset before a real launch). Every profile-referencing foreign key
+-- is already "on delete cascade" (or "set null" for hazards.reporter_id), so
+-- one delete here cascades through ride_log, hazard_votes, friendships,
+-- friend_messages, walkie_groups/members/messages, feedback, ui_click_events
+-- and client_error_logs automatically - hazard reports themselves survive,
+-- just lose their reporter attribution. There's deliberately no "delete own
+-- profile" RLS policy for regular users, so this is the only delete path,
+-- and it's admin-gated.
+-- ============================================================================
+create or replace function public.admin_reset_all_profiles()
+returns integer
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  v_count integer;
+begin
+  if not public.is_admin(auth.uid()) then
+    raise exception 'not an admin';
+  end if;
+
+  select count(*) into v_count from public.profiles;
+  delete from public.profiles;
+  return v_count;
+end;
+$$;
+
+grant execute on function public.admin_reset_all_profiles() to authenticated;

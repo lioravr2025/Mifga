@@ -6,6 +6,7 @@ import FeedbackButton from "./components/FeedbackButton";
 import SettingsSheet from "./components/SettingsSheet";
 import BroadcastPopup from "./components/BroadcastPopup";
 import UpdateRequiredScreen from "./components/UpdateRequiredScreen";
+import UpdateNudge from "./components/UpdateNudge";
 import MapScreen from "./screens/MapScreen";
 import ProfileScreen from "./screens/ProfileScreen";
 import FriendsScreen from "./screens/FriendsScreen";
@@ -14,7 +15,7 @@ import OnboardingScreen from "./screens/OnboardingScreen";
 import { useGeolocation } from "./hooks/useGeolocation";
 import { useRideMonitor } from "./hooks/useRideMonitor";
 import { useAppConfig } from "./hooks/useAppConfig";
-import { isVersionBelow } from "./lib/versionCheck";
+import { compareVersions, isVersionBelow } from "./lib/versionCheck";
 import { useApp } from "./context/AppContext";
 
 export type TabId = "profile" | "friends" | "map" | "route";
@@ -31,6 +32,8 @@ export default function App() {
   // which tab is open - Route isn't kept mounted like Map is.
   const ride = useRideMonitor(position);
   const updateRequired = isVersionBelow(__APP_VERSION__, appConfig.minRequiredVersion);
+  const optionalUpdateAvailable =
+    !updateRequired && !!appConfig.latestVersion && compareVersions(__APP_VERSION__, appConfig.latestVersion) < 0;
 
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-[#05070d] sm:py-4">
@@ -91,6 +94,7 @@ export default function App() {
 
             <SettingsSheet open={settingsOpen} onClose={() => setSettingsOpen(false)} />
             <BroadcastPopup />
+            {optionalUpdateAvailable && <UpdateNudge latestVersion={appConfig.latestVersion!} message={appConfig.updateMessage} />}
           </>
         )}
       </div>
