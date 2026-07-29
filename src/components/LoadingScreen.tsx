@@ -32,7 +32,10 @@ export default function LoadingScreen() {
 
       <div className="text-center">
         <p className="text-sm font-semibold text-neutral-200 mb-1">טוען את האפליקציה...</p>
-        <p className="text-xs text-neutral-500">תכף מתחילים לנסוע בטוח</p>
+        <p className="text-xs text-neutral-500 mb-3">תכף מתחילים לנסוע בטוח</p>
+        <span className="inline-block px-2.5 py-1 rounded-full bg-brand/15 border border-brand/40 text-[10px] font-semibold text-brand-light">
+          גרסת ניסיון מוקדמת
+        </span>
       </div>
     </div>
   );

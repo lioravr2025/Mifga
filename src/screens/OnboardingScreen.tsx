@@ -3,7 +3,6 @@ import {
   AlertTriangle,
   Bell,
   Camera,
-  Check,
   Gauge,
   KeyRound,
   Loader2,
@@ -53,7 +52,8 @@ export default function OnboardingScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [termsOpen, setTermsOpen] = useState(false);
-  const [codeReveal, setCodeReveal] = useState<string | null>(null);
+  const [recoveryCode, setRecoveryCode] = useState("");
+  const [recoveryCodeConfirm, setRecoveryCodeConfirm] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
 
   // login mode
@@ -68,7 +68,8 @@ export default function OnboardingScreen() {
   const [supportSent, setSupportSent] = useState(false);
 
   const phoneValid = isValidIsraeliPhone(phone);
-  const canSubmit = name.trim().length > 0 && phoneValid && usernameOk && !!vehicleType && !submitting;
+  const recoveryCodeValid = recoveryCode.length === 6 && recoveryCode === recoveryCodeConfirm;
+  const canSubmit = name.trim().length > 0 && phoneValid && usernameOk && !!vehicleType && recoveryCodeValid && !submitting;
 
   const activeHazardsCount = hazards.length;
   // "tickets avoided" = distinct encounters with a police/inspector hazard reported in
@@ -89,16 +90,11 @@ export default function OnboardingScreen() {
     setVehicleType(id);
   };
 
-  // Step 1: validate, generate the recovery code, and show it before it's ever
-  // sent anywhere - so the rider has actually seen it once, not just had it
-  // silently created. Step 2 (confirmSignup) is what really submits.
-  const startSignup = () => {
+  // The rider picks their own recovery code (typed twice, to catch typos) instead
+  // of the app generating one for them - so nothing needs to be "revealed" before
+  // submitting, unlike the old flow.
+  const submitSignup = async () => {
     if (!canSubmit) return;
-    setCodeReveal(String(Math.floor(1000 + Math.random() * 9000)));
-  };
-
-  const confirmSignup = async () => {
-    if (!codeReveal) return;
     setSubmitting(true);
     setSubmitError(null);
     try {
@@ -109,7 +105,7 @@ export default function OnboardingScreen() {
         avatarPhoto: photo ?? null,
         vehicleType: vehicleType ?? null,
         vehicleModel: vehicleType ? vehicleModel.trim() || null : null,
-        recoveryCode: codeReveal,
+        recoveryCode,
       });
       updateNotifyTypes(notifyTypes);
     } catch (err) {
@@ -125,7 +121,6 @@ export default function OnboardingScreen() {
         setSubmitError(`ההרשמה נכשלה: ${message}`);
       }
       setSubmitting(false);
-      setCodeReveal(null);
     }
   };
 
@@ -149,38 +144,6 @@ export default function OnboardingScreen() {
     setSupportSubmitting(false);
   };
 
-  if (codeReveal) {
-    return (
-      <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar safe-top px-6 pt-10 pb-8 flex flex-col items-center text-center">
-        <span className="w-16 h-16 rounded-2xl bg-brand/15 border border-brand/40 flex items-center justify-center mb-4">
-          <KeyRound size={30} className="text-brand-light" />
-        </span>
-        <h1 className="text-lg font-bold text-neutral-50 mb-2">קוד השחזור שלכם</h1>
-        <p className="text-sm text-neutral-400 leading-relaxed mb-5">
-          שמרו את הקוד הזה במקום בטוח. אם תמחקו את האפליקציה ותתקינו אותה מחדש, תוכלו להתחבר שוב לחשבון שלכם ולכל
-          הנקודות, הדיווחים והחברים שלכם - עם מספר הטלפון וקוד זה.
-        </p>
-        <div className="text-4xl font-extrabold tracking-[0.3em] text-brand-light bg-bg-panel2 border border-brand/40 rounded-2xl px-8 py-5 mb-6" dir="ltr">
-          {codeReveal}
-        </div>
-        {submitError && (
-          <div className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-red-500/10 border border-red-500/40 text-red-300 text-xs font-semibold mb-3 w-full">
-            <AlertTriangle size={14} className="shrink-0" />
-            {submitError}
-          </div>
-        )}
-        <button
-          onClick={confirmSignup}
-          disabled={submitting}
-          className="w-full py-4 rounded-2xl bg-brand text-white font-bold text-base disabled:opacity-40 active:scale-95 transition flex items-center justify-center gap-2"
-        >
-          {submitting ? <Loader2 size={18} className="animate-spin" /> : <Check size={18} />}
-          {submitting ? "נרשמים..." : "שמרתי את הקוד, בואו נתחיל"}
-        </button>
-      </div>
-    );
-  }
-
   if (mode === "login" || mode === "support") {
     return (
       <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar safe-top px-6 pt-10 pb-8">
@@ -191,7 +154,7 @@ export default function OnboardingScreen() {
           <>
             <h1 className="text-xl font-bold text-neutral-50 mb-2">התחברות לחשבון קיים</h1>
             <p className="text-sm text-neutral-400 leading-relaxed mb-5">
-              הזינו את מספר הטלפון וקוד השחזור בן 4 הספרות שקיבלתם בהרשמה - כל הנתונים שלכם (נקודות, דיווחים, חברים) יחזרו.
+              הזינו את מספר הטלפון וקוד השחזור בן 6 הספרות שבחרתם בהרשמה - כל הנתונים שלכם (נקודות, דיווחים, חברים) יחזרו.
             </p>
             <label className="text-xs text-neutral-400 mb-1.5 block">מספר טלפון</label>
             <input
@@ -201,11 +164,11 @@ export default function OnboardingScreen() {
               dir="ltr"
               className="w-full px-4 py-3 rounded-2xl bg-bg-panel2 border border-bg-border text-sm text-neutral-100 outline-none focus:border-brand mb-4"
             />
-            <label className="text-xs text-neutral-400 mb-1.5 block">קוד שחזור (4 ספרות)</label>
+            <label className="text-xs text-neutral-400 mb-1.5 block">קוד שחזור (6 ספרות)</label>
             <input
               value={loginCode}
-              onChange={(e) => setLoginCode(e.target.value.replace(/\D/g, "").slice(0, 4))}
-              placeholder="0000"
+              onChange={(e) => setLoginCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              placeholder="000000"
               dir="ltr"
               inputMode="numeric"
               className="w-full px-4 py-3 rounded-2xl bg-bg-panel2 border border-bg-border text-center text-lg tracking-[0.4em] text-neutral-100 outline-none focus:border-brand mb-4"
@@ -218,7 +181,7 @@ export default function OnboardingScreen() {
             )}
             <button
               onClick={submitLogin}
-              disabled={!loginPhone.trim() || loginCode.length !== 4 || loginSubmitting}
+              disabled={!loginPhone.trim() || loginCode.length !== 6 || loginSubmitting}
               className="w-full py-3.5 rounded-2xl bg-brand text-white font-bold text-sm disabled:opacity-40 active:scale-95 transition flex items-center justify-center gap-2 mb-4"
             >
               {loginSubmitting && <Loader2 size={16} className="animate-spin" />}
@@ -286,8 +249,13 @@ export default function OnboardingScreen() {
   return (
     <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar safe-top">
       <div className="px-6 pt-8 pb-6 bg-gradient-to-br from-brand to-purple-800 rounded-b-[2rem] mb-6">
-        <div className="w-14 h-14 rounded-2xl bg-white/15 flex items-center justify-center mb-4">
-          <Gauge size={28} className="text-white" />
+        <div className="flex items-center justify-between mb-4">
+          <div className="w-14 h-14 rounded-2xl bg-white/15 flex items-center justify-center">
+            <Gauge size={28} className="text-white" />
+          </div>
+          <span className="px-2.5 py-1 rounded-full bg-white/15 border border-white/25 text-[10px] font-semibold text-white/90">
+            גרסת ניסיון מוקדמת
+          </span>
         </div>
         <h1 className="text-2xl font-extrabold text-white mb-2">ברוכים הבאים ל-Mifga</h1>
         <p className="text-sm text-white/85 leading-relaxed mb-4">
@@ -392,6 +360,43 @@ export default function OnboardingScreen() {
         )}
 
         <div className="p-4 rounded-2xl bg-bg-panel2 border border-bg-border mb-6">
+          <div className="flex items-center gap-2 mb-2">
+            <KeyRound size={15} className="text-brand-light" />
+            <span className="text-sm font-semibold text-neutral-50">קוד שחזור אישי (6 ספרות) *</span>
+          </div>
+          <p className="text-[11px] text-neutral-500 leading-relaxed mb-3">
+            בחרו בעצמכם קוד בן 6 ספרות וזכרו אותו - הוא ישמש אתכם להתחברות מחדש עם החשבון אם תמחקו את האפליקציה ותתקינו אותה מחדש.
+          </p>
+          <div className="grid grid-cols-2 gap-2.5">
+            <div>
+              <label className="text-[11px] text-neutral-400 mb-1 block">קוד</label>
+              <input
+                value={recoveryCode}
+                onChange={(e) => setRecoveryCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                placeholder="123456"
+                dir="ltr"
+                inputMode="numeric"
+                className="w-full px-3 py-2.5 rounded-xl bg-bg-panel border border-bg-border text-center text-sm tracking-[0.3em] text-neutral-100 outline-none focus:border-brand"
+              />
+            </div>
+            <div>
+              <label className="text-[11px] text-neutral-400 mb-1 block">אימות קוד</label>
+              <input
+                value={recoveryCodeConfirm}
+                onChange={(e) => setRecoveryCodeConfirm(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                placeholder="123456"
+                dir="ltr"
+                inputMode="numeric"
+                className="w-full px-3 py-2.5 rounded-xl bg-bg-panel border border-bg-border text-center text-sm tracking-[0.3em] text-neutral-100 outline-none focus:border-brand"
+              />
+            </div>
+          </div>
+          {recoveryCode.length === 6 && recoveryCodeConfirm.length === 6 && recoveryCode !== recoveryCodeConfirm && (
+            <p className="text-[11px] text-red-400 mt-2">הקודים לא תואמים</p>
+          )}
+        </div>
+
+        <div className="p-4 rounded-2xl bg-bg-panel2 border border-bg-border mb-6">
           <div className="flex items-center gap-2 mb-3">
             <Bell size={15} className="text-brand-light" />
             <span className="text-sm font-semibold text-neutral-50">על מה תרצו לקבל התרעה?</span>
@@ -429,15 +434,17 @@ export default function OnboardingScreen() {
         )}
 
         <button
-          onClick={startSignup}
+          onClick={submitSignup}
           disabled={!canSubmit}
           className="w-full py-4 rounded-2xl bg-brand text-white font-bold text-base disabled:opacity-40 active:scale-95 transition flex items-center justify-center gap-2"
         >
-          <Zap size={18} />
-          בואו נתחיל לנסוע בטוח
+          {submitting ? <Loader2 size={18} className="animate-spin" /> : <Zap size={18} />}
+          {submitting ? "נרשמים..." : "בואו נתחיל לנסוע בטוח"}
         </button>
         {!canSubmit && (
-          <p className="text-[11px] text-neutral-500 text-center mt-2">כינוי, שם משתמש ייחודי, מספר טלפון תקין, והכלי שלך נדרשים כדי להמשיך</p>
+          <p className="text-[11px] text-neutral-500 text-center mt-2">
+            כינוי, שם משתמש ייחודי, מספר טלפון תקין, הכלי שלך, וקוד שחזור תואם בן 6 ספרות נדרשים כדי להמשיך
+          </p>
         )}
         <button onClick={() => setMode("login")} className="w-full text-center text-xs text-brand-light font-semibold mt-4">
           כבר יש לכם חשבון? התחברות

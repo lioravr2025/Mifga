@@ -30,7 +30,7 @@ export async function fetchOwnProfile(uid: string): Promise<UserProfile | null> 
 /**
  * Re-attaches an old account's entire history (points, reports, friendships,
  * groups, ride log...) onto the current anonymous session, verified by phone
- * + the 4-digit code shown once at signup. See recover_account() in
+ * + the 6-digit code the rider picked for themselves at signup. See recover_account() in
  * supabase/schema_admin.sql for why this is a data-ownership transfer rather
  * than true re-authentication as the same Supabase identity (no SMS-OTP
  * provider configured, and a service-role key can't safely live in this
