@@ -40,7 +40,7 @@ export default function MapScreen({
   focusFriendId: string | null;
   onConsumeFocusFriend: () => void;
 }) {
-  const { hazards, friends, settings, lastAwardedPoints, clearLastAwarded, sendFriendMessage } = useApp();
+  const { hazards, prizes, collectPrize, friends, settings, lastAwardedPoints, clearLastAwarded, sendFriendMessage } = useApp();
   const friendsInMotionCount = friends.filter((f) => f.online && f.shareLocation).length;
   const favoriteFriends = friends.filter((f) => f.favorite);
 
@@ -110,6 +110,11 @@ export default function MapScreen({
           cameraTarget={cameraTarget ?? undefined}
           recenterSignal={recenterSignal}
           hazards={hazards}
+          prizes={prizes}
+          onCollectPrize={(id) => {
+            trackClick("prize_collect", "map");
+            collectPrize(id);
+          }}
           friends={friends}
           showFriends
           theme={settings.theme}

@@ -2,6 +2,8 @@ import { CircleMarker, MapContainer, Popup, TileLayer } from "react-leaflet";
 import type { ProfileRow, HazardRow } from "../lib/types";
 import { Card } from "./Card";
 import { Map as MapIcon } from "lucide-react";
+import { supabase } from "../lib/supabaseClient";
+import { HAZARD_TYPE_LABELS } from "../lib/hazardTypes";
 
 const TILES = "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
 const ISRAEL_CENTER: [number, number] = [31.5, 34.9];
@@ -11,8 +13,13 @@ function isRecentlyActive(lastActiveAt: string | null) {
   return Date.now() - new Date(lastActiveAt).getTime() < 5 * 60_000;
 }
 
-export default function UsersMap({ profiles, hazards }: { profiles: ProfileRow[]; hazards: HazardRow[] }) {
+export default function UsersMap({ profiles, hazards, onHazardRemoved }: { profiles: ProfileRow[]; hazards: HazardRow[]; onHazardRemoved?: () => void }) {
   const located = profiles.filter((p) => p.live_lat != null && p.live_lng != null);
+
+  const removeHazard = async (id: string) => {
+    const { error } = await supabase.rpc("admin_remove_hazard", { p_hazard_id: id });
+    if (!error) onHazardRemoved?.();
+  };
 
   return (
     <Card title="מפת משתמשים ומפגעים" icon={<MapIcon size={16} className="text-brand-light" />}>
@@ -49,8 +56,15 @@ export default function UsersMap({ profiles, hazards }: { profiles: ProfileRow[]
             >
               <Popup>
                 <div style={{ direction: "rtl" }}>
-                  {h.type} - {h.reporter_name}
+                  {HAZARD_TYPE_LABELS[h.type] ?? h.type} - {h.reporter_name}
                   <br />+{h.confirmations} / -{h.denials}
+                  <br />
+                  <button
+                    onClick={() => removeHazard(h.id)}
+                    style={{ marginTop: 6, color: "#dc2626", fontWeight: 600, fontSize: 12, cursor: "pointer" }}
+                  >
+                    הסרת מפגע
+                  </button>
                 </div>
               </Popup>
             </CircleMarker>

@@ -1,9 +1,9 @@
 import { useEffect, useRef } from "react";
 import { AttributionControl, Circle, MapContainer, Marker, Popup, TileLayer, useMap, useMapEvents } from "react-leaflet";
 import type { Map as LeafletMap } from "leaflet";
-import type { Friend, HazardReport, LatLng } from "../types";
+import type { Friend, HazardReport, LatLng, Prize } from "../types";
 import { getHazardType } from "../data/hazardTypes";
-import { friendDivIcon, hazardDivIcon, selfDivIcon } from "../lib/mapIcons";
+import { friendDivIcon, hazardDivIcon, prizeDivIcon, selfDivIcon } from "../lib/mapIcons";
 import { timeAgo } from "../lib/geo";
 import { useApp } from "../context/AppContext";
 
@@ -85,6 +85,9 @@ interface MapViewProps {
   cameraTarget?: LatLng;
   recenterSignal: number;
   hazards: HazardReport[];
+  prizes?: Prize[];
+  /** tapping a prize marker collects it immediately - no confirmation sheet, matching the "grab it" feel of a game pickup */
+  onCollectPrize?: (id: string) => void;
   friends?: Friend[];
   showFriends?: boolean;
   theme: "dark" | "light";
@@ -112,6 +115,8 @@ export default function MapView({
   cameraTarget,
   recenterSignal,
   hazards,
+  prizes = [],
+  onCollectPrize,
   friends = [],
   showFriends = false,
   theme,
@@ -177,6 +182,10 @@ export default function MapView({
                 </Popup>
               </Marker>
             ))}
+
+        {prizes.map((p) => (
+          <Marker key={p.id} position={[p.position.lat, p.position.lng]} icon={prizeDivIcon(p.icon)} eventHandlers={{ click: () => onCollectPrize?.(p.id) }} />
+        ))}
 
         {hazards.map((h) => {
           const def = getHazardType(h.type);

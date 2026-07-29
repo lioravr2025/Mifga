@@ -2,7 +2,7 @@
 // mappers to/from the camelCase app types in src/types/index.ts. Keeping the
 // mapping in one place means AppContext never has to think about column
 // naming - it only ever sees HazardReport/UserProfile.
-import type { HazardReport, HazardTypeId, RideLogEntry, UserProfile, VehicleTypeId } from "../../types";
+import type { HazardReport, HazardTypeId, Prize, RideLogEntry, UserProfile, VehicleTypeId } from "../../types";
 
 export interface HazardRow {
   id: string;
@@ -37,6 +37,19 @@ export function hazardFromRow(row: HazardRow): HazardReport {
     nickname: row.nickname ?? undefined,
     lastVoteAt: row.last_vote_at ? new Date(row.last_vote_at).getTime() : undefined,
   };
+}
+
+export interface PrizeRow {
+  id: string;
+  icon: string;
+  points: number;
+  lat: number;
+  lng: number;
+  collected_at: string | null;
+}
+
+export function prizeFromRow(row: PrizeRow): Prize {
+  return { id: row.id, icon: row.icon, points: row.points, position: { lat: row.lat, lng: row.lng } };
 }
 
 export interface ProfileRow {

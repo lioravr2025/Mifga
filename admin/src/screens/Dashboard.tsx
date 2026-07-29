@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { LogOut, RefreshCw, ShieldCheck, Users, Zap, Route as RouteIcon } from "lucide-react";
+import { LogOut, RefreshCw, ShieldCheck, Users, Zap, Route as RouteIcon, LayoutGrid, Shuffle } from "lucide-react";
 import { supabase } from "../lib/supabaseClient";
 import type { FeedbackRow, HazardRow, ProfileRow, RideLogRow } from "../lib/types";
 import { StatCard } from "../components/Card";
@@ -12,7 +12,7 @@ import ErrorLogsPanel from "../components/ErrorLogsPanel";
 import SupportTicketsPanel from "../components/SupportTicketsPanel";
 import BroadcastPanel from "../components/BroadcastPanel";
 import VersionConfigPanel from "../components/VersionConfigPanel";
-import DangerZonePanel from "../components/DangerZonePanel";
+import SeedPanel from "../components/SeedPanel";
 
 function isRecentlyActive(lastActiveAt: string | null) {
   if (!lastActiveAt) return false;
@@ -20,6 +20,7 @@ function isRecentlyActive(lastActiveAt: string | null) {
 }
 
 export default function Dashboard({ onSignOut }: { onSignOut: () => void }) {
+  const [tab, setTab] = useState<"overview" | "seed">("overview");
   const [profiles, setProfiles] = useState<ProfileRow[]>([]);
   const [hazards, setHazards] = useState<HazardRow[]>([]);
   const [rides, setRides] = useState<RideLogRow[]>([]);
@@ -97,37 +98,63 @@ export default function Dashboard({ onSignOut }: { onSignOut: () => void }) {
         </div>
       </header>
 
+      <div className="max-w-5xl mx-auto px-5 pt-4 flex gap-2">
+        <button
+          onClick={() => setTab("overview")}
+          className={`flex items-center gap-1.5 px-4 py-2 rounded-xl border text-sm font-semibold transition ${
+            tab === "overview" ? "bg-brand/15 border-brand text-brand-light" : "bg-bg-panel2 border-bg-border text-neutral-400"
+          }`}
+        >
+          <LayoutGrid size={14} />
+          סקירה
+        </button>
+        <button
+          onClick={() => setTab("seed")}
+          className={`flex items-center gap-1.5 px-4 py-2 rounded-xl border text-sm font-semibold transition ${
+            tab === "seed" ? "bg-brand/15 border-brand text-brand-light" : "bg-bg-panel2 border-bg-border text-neutral-400"
+          }`}
+        >
+          <Shuffle size={14} />
+          פיזור
+        </button>
+      </div>
+
       <main className="max-w-5xl mx-auto px-5 py-5 space-y-4">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <StatCard label="חשבונות שנרשמו" value={profiles.length} icon={<Users size={17} className="text-brand-light" />} />
-          <StatCard label="פעילים כרגע (5 דק')" value={activeCount} icon={<Zap size={17} className="text-sky-400" />} accent="#38bdf8" />
-          <StatCard label="בנסיעה כרגע" value={ridingCount} icon={<RouteIcon size={17} className="text-green-400" />} accent="#22c55e" />
-          <StatCard label="דיווחי מפגעים" value={hazards.length} icon={<ShieldCheck size={17} className="text-amber-400" />} accent="#f59e0b" />
-        </div>
+        {tab === "overview" ? (
+          <>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <StatCard label="חשבונות שנרשמו" value={profiles.length} icon={<Users size={17} className="text-brand-light" />} />
+              <StatCard label="פעילים כרגע (5 דק')" value={activeCount} icon={<Zap size={17} className="text-sky-400" />} accent="#38bdf8" />
+              <StatCard label="בנסיעה כרגע" value={ridingCount} icon={<RouteIcon size={17} className="text-green-400" />} accent="#22c55e" />
+              <StatCard label="דיווחי מפגעים" value={hazards.length} icon={<ShieldCheck size={17} className="text-amber-400" />} accent="#f59e0b" />
+            </div>
 
-        <UsersMap profiles={profiles} hazards={hazards} />
+            <UsersMap profiles={profiles} hazards={hazards} onHazardRemoved={loadAll} />
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <HazardsPanel hazards={hazards} />
-          <FeedbackPanel feedback={feedback} profiles={profiles} />
-        </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <HazardsPanel hazards={hazards} onChanged={loadAll} />
+              <FeedbackPanel feedback={feedback} profiles={profiles} />
+            </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <RideAnalyticsPanel rides={rides} profiles={profiles} />
-        </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <RideAnalyticsPanel rides={rides} profiles={profiles} />
+            </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <ClickAnalyticsPanel />
-          <ErrorLogsPanel />
-        </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <ClickAnalyticsPanel />
+              <ErrorLogsPanel />
+            </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <SupportTicketsPanel />
-          <VersionConfigPanel />
-        </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <SupportTicketsPanel />
+              <VersionConfigPanel />
+            </div>
 
-        <BroadcastPanel />
-        <DangerZonePanel onDone={loadAll} />
+            <BroadcastPanel />
+          </>
+        ) : (
+          <SeedPanel />
+        )}
       </main>
     </div>
   );

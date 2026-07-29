@@ -51,6 +51,14 @@ export interface HazardReport {
   lastVoteAt?: number;
 }
 
+/** Admin-seeded collectible reward marker (see the admin dashboard's "פיזור" tab) - disappears for everyone the instant anyone collects it. */
+export interface Prize {
+  id: string;
+  icon: string;
+  points: number;
+  position: LatLng;
+}
+
 export type VehicleTypeId = "scooter" | "ebike" | "emotorcycle";
 
 export interface UserProfile {

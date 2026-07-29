@@ -103,6 +103,42 @@ export function selfDivIcon(vehicleType?: VehicleTypeId): L.DivIcon {
   return L.divIcon({ html, className: "mifga-user-marker", iconSize: [size, size], iconAnchor: [size / 2, size / 2] });
 }
 
+/** Admin-seeded collectible reward - a pulsing gold glow so it reads as "grab me" distinctly from hazard markers. */
+export function prizeDivIcon(icon: string): L.DivIcon {
+  const size = 40;
+  const html = renderToStaticMarkup(
+    <div style={{ position: "relative", width: size, height: size }}>
+      <span
+        className="animate-pulseRing"
+        style={{ position: "absolute", inset: 0, borderRadius: "9999px", border: "2px solid #f59e0b" }}
+      />
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          borderRadius: "9999px",
+          background: "#0f1830",
+          border: "2px solid #f59e0b",
+          boxShadow: "0 0 14px -1px #f59e0b",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: 20,
+        }}
+      >
+        {icon}
+      </div>
+    </div>
+  );
+  return L.divIcon({
+    html,
+    className: "mifga-prize-marker",
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+    popupAnchor: [0, -size / 2],
+  });
+}
+
 export function destinationDivIcon(): L.DivIcon {
   const html = renderToStaticMarkup(
     <div style={{ position: "relative", width: 30, height: 40 }}>

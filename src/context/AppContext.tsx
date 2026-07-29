@@ -10,6 +10,7 @@ import type {
   IncomingGroupInvite,
   LatLng,
   NotifyTypePrefs,
+  Prize,
   RideLogEntry,
   UserProfile,
   VehicleTypeId,
@@ -33,6 +34,7 @@ import { ensureSession, fetchOwnProfile, recoverAccount as recoverAccountRemote 
 import { insertProfile, updateProfileRemote } from "../lib/backend/profile";
 import { awardPointsRemote, awardVotePointsRemote } from "../lib/backend/profile";
 import { confirmHazardRemote, denyHazardRemote, fetchHazards, insertHazard, subscribeHazards } from "../lib/backend/hazards";
+import { collectPrizeRemote, fetchPrizes, subscribePrizes } from "../lib/backend/prizes";
 import { uploadBlob } from "../lib/backend/storage";
 import {
   fetchFriends,
@@ -101,6 +103,7 @@ interface AppContextValue {
   user: UserProfile;
   friends: Friend[];
   hazards: HazardReport[];
+  prizes: Prize[];
   groups: WalkieGroup[];
   settings: AppSettings;
   lastAwardedPoints: number | null;
@@ -117,6 +120,7 @@ interface AppContextValue {
   addReport: (input: NewReportInput) => void;
   confirmHazard: (id: string) => void;
   denyHazard: (id: string) => void;
+  collectPrize: (id: string) => void;
   updateSettings: (patch: Partial<AppSettings>) => void;
   updateNotifyTypes: (patch: Partial<NotifyTypePrefs>) => void;
   updateProfile: (patch: ProfileUpdate) => void;
@@ -191,6 +195,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const stored = loadJSON<HazardReport[] | null>("hazards", null);
     return stored ?? seedHazards();
   });
+  // Backend-only feature (admin-seeded via the dashboard's "פיזור" tab) - no
+  // offline/local-mode equivalent, so it just starts empty there.
+  const [prizes, setPrizes] = useState<Prize[]>([]);
   const [groups, setGroups] = useState<WalkieGroup[]>(() => {
     if (isBackendConfigured) return []; // populated by the bootstrap effect below
     // backfill `messages` for groups created before that field existed - otherwise
@@ -273,6 +280,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
   };
 
+  const addPrize = (incoming: Prize) => {
+    setPrizes((prev) => (prev.some((p) => p.id === incoming.id) ? prev : [...prev, incoming]));
+  };
+
+  const removePrize = (id: string) => {
+    setPrizes((prev) => prev.filter((p) => p.id !== id));
+  };
+
   const reloadFriendsAndRequests = async (uid: string) => {
     try {
       const [friendsList, requests] = await Promise.all([fetchFriends(uid), fetchIncomingFriendRequests(uid)]);
@@ -317,6 +332,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setHazards(remoteHazards);
         setRideLog(rideLogEntries);
         await Promise.all([reloadFriendsAndRequests(uid), reloadGroups(uid)]);
+
+        // Isolated from the critical path above on purpose - the prizes table
+        // is a newer addition, and a hiccup fetching it (or the SQL simply not
+        // having been applied yet on a given environment) must never block
+        // hazards/ride-log/friends/groups from loading.
+        fetchPrizes()
+          .then((remotePrizes) => {
+            if (!cancelled) setPrizes(remotePrizes);
+          })
+          .catch((err) => console.error("Mifga: fetchPrizes failed", err));
       } catch (err) {
         console.error("Mifga: backend bootstrap failed", err);
       } finally {
@@ -332,6 +357,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!isBackendConfigured) return;
     return subscribeHazards(mergeHazard);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!isBackendConfigured) return;
+    return subscribePrizes(addPrize, removePrize);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -506,6 +537,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
     setHazards((prev) => prev.map((h) => (h.id === id ? { ...h, confirmations: h.confirmations + 1, lastVoteAt: Date.now() } : h)));
     awardVotePoints();
+  };
+
+  const collectPrize = (id: string) => {
+    if (!isBackendConfigured) return; // no local-mode equivalent - admin-seeded only
+    // Optimistic removal - the realtime UPDATE would also remove it, but that
+    // round trip is what a fast second tap could otherwise sneak past.
+    removePrize(id);
+    collectPrizeRemote(id)
+      .then((points) => {
+        if (points === null) return; // someone else got there first
+        setUser((prev) => ({ ...prev, points: prev.points + points }));
+        setLastAwardedPoints(points);
+      })
+      .catch((err) => console.error("Mifga: collectPrize failed", err));
   };
 
   const denyHazard = (id: string) => {
@@ -802,6 +847,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     user,
     friends,
     hazards: visibleHazards,
+    prizes,
     groups,
     settings,
     lastAwardedPoints,
@@ -814,6 +860,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     addReport,
     confirmHazard,
     denyHazard,
+    collectPrize,
     updateSettings,
     updateNotifyTypes,
     updateProfile,

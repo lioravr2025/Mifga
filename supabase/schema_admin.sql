@@ -337,3 +337,153 @@ end;
 $$;
 
 grant execute on function public.admin_reset_all_profiles() to authenticated;
+
+-- ============================================================================
+-- prizes - admin-seeded collectible rewards shown on the map (see the "פיזור"
+-- tab in the admin dashboard). A prize disappears for everyone the instant
+-- someone collects it (collected_at set), same realtime-driven pattern as
+-- hazards. Points are awarded atomically in collect_prize() below so two
+-- riders racing for the same one can't both get credited.
+-- ============================================================================
+create table if not exists public.prizes (
+  id uuid primary key default gen_random_uuid(),
+  icon text not null,
+  points integer not null,
+  lat double precision not null,
+  lng double precision not null,
+  collected_by uuid references public.profiles(id) on delete set null,
+  collected_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists prizes_uncollected_idx on public.prizes (collected_at);
+
+alter table public.prizes enable row level security;
+
+drop policy if exists "prizes are readable by any signed-in user" on public.prizes;
+create policy "prizes are readable by any signed-in user"
+  on public.prizes for select
+  using (auth.role() = 'authenticated');
+
+-- no insert/update policy for regular users - seeding and collection only
+-- happen through the SECURITY DEFINER functions below.
+
+select public.ensure_realtime('public', 'prizes');
+
+create or replace function public.collect_prize(p_prize_id uuid)
+returns integer
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  v_points integer;
+begin
+  update public.prizes
+  set collected_by = auth.uid(), collected_at = now()
+  where id = p_prize_id and collected_at is null
+  returning points into v_points;
+
+  if v_points is null then
+    return -1; -- already collected (or doesn't exist) - client should just drop the marker
+  end if;
+
+  update public.profiles set points = points + v_points where id = auth.uid();
+  return v_points;
+end;
+$$;
+
+grant execute on function public.collect_prize(uuid) to authenticated;
+
+-- ============================================================================
+-- admin_seed_hazards / admin_seed_prizes - bulk-scatter fake hazards or
+-- prizes randomly within p_radius_m meters of a center point (a city, picked
+-- in the admin UI). Capped at 200/call so a typo can't accidentally paper a
+-- whole city. Seeded hazards use a distinct, honest reporter_name (never a
+-- name that could pass as a real rider) precisely so this data stays
+-- distinguishable from genuine crowd-sourced reports later.
+-- ============================================================================
+create or replace function public.admin_seed_hazards(p_type text, p_lat double precision, p_lng double precision, p_radius_m integer, p_count integer)
+returns integer
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  i integer;
+  v_angle double precision;
+  v_dist double precision;
+  v_lat double precision;
+  v_lng double precision;
+begin
+  if not public.is_admin(auth.uid()) then
+    raise exception 'not an admin';
+  end if;
+  if p_count < 1 or p_count > 200 then
+    raise exception 'count must be between 1 and 200';
+  end if;
+
+  for i in 1..p_count loop
+    v_angle := random() * 2 * pi();
+    v_dist := random() * p_radius_m;
+    v_lat := p_lat + (v_dist * cos(v_angle)) / 111320.0;
+    v_lng := p_lng + (v_dist * sin(v_angle)) / (111320.0 * cos(radians(p_lat)));
+    insert into public.hazards (type, lat, lng, reporter_id, reporter_name)
+    values (p_type, v_lat, v_lng, null, 'דיווח מערכת');
+  end loop;
+  return p_count;
+end;
+$$;
+
+grant execute on function public.admin_seed_hazards(text, double precision, double precision, integer, integer) to authenticated;
+
+create or replace function public.admin_seed_prizes(p_icon text, p_points integer, p_lat double precision, p_lng double precision, p_radius_m integer, p_count integer)
+returns integer
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  i integer;
+  v_angle double precision;
+  v_dist double precision;
+  v_lat double precision;
+  v_lng double precision;
+begin
+  if not public.is_admin(auth.uid()) then
+    raise exception 'not an admin';
+  end if;
+  if p_count < 1 or p_count > 200 then
+    raise exception 'count must be between 1 and 200';
+  end if;
+  if p_points < 1 then
+    raise exception 'points must be positive';
+  end if;
+
+  for i in 1..p_count loop
+    v_angle := random() * 2 * pi();
+    v_dist := random() * p_radius_m;
+    v_lat := p_lat + (v_dist * cos(v_angle)) / 111320.0;
+    v_lng := p_lng + (v_dist * sin(v_angle)) / (111320.0 * cos(radians(p_lat)));
+    insert into public.prizes (icon, points, lat, lng) values (p_icon, p_points, v_lat, v_lng);
+  end loop;
+  return p_count;
+end;
+$$;
+
+grant execute on function public.admin_seed_prizes(text, integer, double precision, double precision, integer, integer) to authenticated;
+
+-- admin_remove_hazard - manual takedown of ANY hazard (seeded or genuinely
+-- reported) from the admin dashboard, soft-deleted the same way denial-voting
+-- already does (removed = true), so it stays consistent with existing stats.
+create or replace function public.admin_remove_hazard(p_hazard_id uuid)
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+  if not public.is_admin(auth.uid()) then
+    raise exception 'not an admin';
+  end if;
+  update public.hazards set removed = true where id = p_hazard_id;
+end;
+$$;
+
+grant execute on function public.admin_remove_hazard(uuid) to authenticated;
