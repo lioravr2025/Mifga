@@ -34,6 +34,16 @@ create table if not exists public.meetups (
 
 create index if not exists meetups_starts_at_idx on public.meetups (starts_at);
 
+create table if not exists public.meetup_rsvps (
+  meetup_id uuid not null references public.meetups(id) on delete cascade,
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (meetup_id, user_id)
+);
+
+-- meetups' own SELECT policy below references meetup_rsvps, so that table
+-- has to exist first - both tables are created above, policies follow here.
+
 alter table public.meetups enable row level security;
 
 -- Public meetups are visible to everyone signed in; private ones only to
@@ -63,13 +73,6 @@ drop policy if exists "hosts can delete their own meetups" on public.meetups;
 create policy "hosts can delete their own meetups"
   on public.meetups for delete
   using (auth.uid() = host_id);
-
-create table if not exists public.meetup_rsvps (
-  meetup_id uuid not null references public.meetups(id) on delete cascade,
-  user_id uuid not null references public.profiles(id) on delete cascade,
-  created_at timestamptz not null default now(),
-  primary key (meetup_id, user_id)
-);
 
 alter table public.meetup_rsvps enable row level security;
 
