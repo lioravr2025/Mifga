@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { Search, TrendingUp, User, X } from "lucide-react";
+import { Search, Trash2, TrendingUp, User, X } from "lucide-react";
+import { supabase } from "../lib/supabaseClient";
 import type { ProfileRow, RideLogRow } from "../lib/types";
 import { Card } from "./Card";
 
@@ -18,14 +19,32 @@ function fmtDate(iso: string | null): string {
   return new Date(iso).toLocaleString("he-IL", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
 }
 
-export default function RidersPanel({ profiles, rides }: { profiles: ProfileRow[]; rides: RideLogRow[] }) {
+function isRecentlyActive(lastActiveAt: string | null) {
+  if (!lastActiveAt) return false;
+  return Date.now() - new Date(lastActiveAt).getTime() < 5 * 60_000;
+}
+
+export default function RidersPanel({ profiles, rides, onChanged }: { profiles: ProfileRow[]; rides: RideLogRow[]; onChanged?: () => void }) {
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SortKey>("newest");
   const [selected, setSelected] = useState<ProfileRow | null>(null);
   const [rangeFrom, setRangeFrom] = useState("");
   const [rangeTo, setRangeTo] = useState("");
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const rideCountFor = (uid: string) => rides.filter((r) => r.user_id === uid).length;
+
+  const deleteRider = async (id: string) => {
+    setDeleting(true);
+    const { error } = await supabase.rpc("admin_delete_profile", { p_uid: id });
+    setDeleting(false);
+    setConfirmingDelete(false);
+    if (!error) {
+      setSelected(null);
+      onChanged?.();
+    }
+  };
 
   const dailySignups = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -188,8 +207,13 @@ export default function RidersPanel({ profiles, rides }: { profiles: ProfileRow[
                 onClick={() => setSelected(p)}
                 className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl bg-bg-panel border border-bg-border text-right active:scale-[0.99] transition"
               >
-                <span className="w-9 h-9 rounded-full bg-bg-panel2 border border-bg-border flex items-center justify-center shrink-0 overflow-hidden text-base">
-                  {p.avatar_photo_url ? <img src={p.avatar_photo_url} alt="" className="w-full h-full object-cover" /> : p.avatar_emoji}
+                <span className="relative shrink-0">
+                  <span className="w-9 h-9 rounded-full bg-bg-panel2 border border-bg-border flex items-center justify-center overflow-hidden text-base">
+                    {p.avatar_photo_url ? <img src={p.avatar_photo_url} alt="" className="w-full h-full object-cover" /> : p.avatar_emoji}
+                  </span>
+                  {isRecentlyActive(p.last_active_at) && (
+                    <span className="absolute bottom-0 left-0 w-2.5 h-2.5 rounded-full bg-green-500 border-2 border-bg-panel" title="פעיל כרגע" />
+                  )}
                 </span>
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-semibold text-neutral-100 truncate">{p.name}</div>
@@ -209,18 +233,29 @@ export default function RidersPanel({ profiles, rides }: { profiles: ProfileRow[
       </Card>
 
       {selected && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4" onClick={() => setSelected(null)}>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4"
+          onClick={() => {
+            setSelected(null);
+            setConfirmingDelete(false);
+          }}
+        >
           <div
             className="w-full max-w-sm bg-bg-panel2 border border-bg-border rounded-2xl p-5 max-h-[85vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
-                <span className="w-12 h-12 rounded-full bg-bg-panel border border-bg-border flex items-center justify-center overflow-hidden text-xl">
-                  {selected.avatar_photo_url ? (
-                    <img src={selected.avatar_photo_url} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    selected.avatar_emoji
+                <span className="relative">
+                  <span className="w-12 h-12 rounded-full bg-bg-panel border border-bg-border flex items-center justify-center overflow-hidden text-xl">
+                    {selected.avatar_photo_url ? (
+                      <img src={selected.avatar_photo_url} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      selected.avatar_emoji
+                    )}
+                  </span>
+                  {isRecentlyActive(selected.last_active_at) && (
+                    <span className="absolute bottom-0 left-0 w-3 h-3 rounded-full bg-green-500 border-2 border-bg-panel2" title="פעיל כרגע" />
                   )}
                 </span>
                 <div>
@@ -230,7 +265,13 @@ export default function RidersPanel({ profiles, rides }: { profiles: ProfileRow[
                   </div>
                 </div>
               </div>
-              <button onClick={() => setSelected(null)} className="text-neutral-400">
+              <button
+                onClick={() => {
+                  setSelected(null);
+                  setConfirmingDelete(false);
+                }}
+                className="text-neutral-400"
+              >
                 <X size={20} />
               </button>
             </div>
@@ -256,6 +297,36 @@ export default function RidersPanel({ profiles, rides }: { profiles: ProfileRow[
                   </span>
                 </div>
               ))}
+            </div>
+
+            <div className="pt-4 mt-4 border-t border-bg-border">
+              {!confirmingDelete ? (
+                <button
+                  onClick={() => setConfirmingDelete(true)}
+                  className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-red-500/10 border border-red-500/40 text-red-300 text-xs font-semibold active:scale-95 transition"
+                >
+                  <Trash2 size={13} />
+                  מחיקת המשתמש
+                </button>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <span className="flex-1 text-xs text-red-300 font-semibold">למחוק את {selected.name} לצמיתות?</span>
+                  <button
+                    onClick={() => deleteRider(selected.id)}
+                    disabled={deleting}
+                    className="px-3 py-2 rounded-xl bg-red-500 text-white text-xs font-bold active:scale-95 transition disabled:opacity-40"
+                  >
+                    {deleting ? "מוחק..." : "כן, מחיקה"}
+                  </button>
+                  <button
+                    onClick={() => setConfirmingDelete(false)}
+                    disabled={deleting}
+                    className="px-3 py-2 rounded-xl bg-bg-panel border border-bg-border text-neutral-300 text-xs font-semibold active:scale-95 transition"
+                  >
+                    ביטול
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>

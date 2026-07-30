@@ -291,3 +291,24 @@ end;
 $$;
 
 grant execute on function public.admin_remove_meetup(uuid) to authenticated;
+
+-- admin_delete_profile - a single-rider version of admin_reset_all_profiles.
+-- Same cascade behavior: ride_log, hazard_votes, friendships, walkie
+-- groups/messages, feedback, meetup_rsvps, hosted meetups, and marketplace
+-- listings all cascade-delete via their existing FKs. hazards.reporter_id
+-- is the one "set null" instead, so the hazard report itself survives,
+-- just loses its reporter attribution.
+create or replace function public.admin_delete_profile(p_uid uuid)
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+  if not public.is_admin(auth.uid()) then
+    raise exception 'not an admin';
+  end if;
+  delete from public.profiles where id = p_uid;
+end;
+$$;
+
+grant execute on function public.admin_delete_profile(uuid) to authenticated;

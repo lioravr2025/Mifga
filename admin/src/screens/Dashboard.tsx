@@ -197,7 +197,7 @@ export default function Dashboard({ onSignOut }: { onSignOut: () => void }) {
             <BroadcastPanel totalRiders={profiles.length} />
           </>
         ) : tab === "riders" ? (
-          <RidersPanel profiles={profiles} rides={rides} />
+          <RidersPanel profiles={profiles} rides={rides} onChanged={loadAll} />
         ) : tab === "meetups" ? (
           <MeetupsAdminPanel />
         ) : tab === "boards" ? (
