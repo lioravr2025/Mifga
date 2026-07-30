@@ -1,9 +1,10 @@
-import { CircleMarker, MapContainer, Popup, TileLayer } from "react-leaflet";
+import { useState } from "react";
+import { CircleMarker, MapContainer, Marker, Popup, TileLayer } from "react-leaflet";
 import type { ProfileRow, HazardRow } from "../lib/types";
 import { Card } from "./Card";
-import { Map as MapIcon } from "lucide-react";
+import { Map as MapIcon, RefreshCw } from "lucide-react";
 import { supabase } from "../lib/supabaseClient";
-import { HAZARD_TYPE_LABELS } from "../lib/hazardTypes";
+import { HAZARD_TYPE_LABELS, hazardMapIcon } from "../lib/hazardTypes";
 
 const TILES = "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
 const ISRAEL_CENTER: [number, number] = [31.5, 34.9];
@@ -13,16 +14,71 @@ function isRecentlyActive(lastActiveAt: string | null) {
   return Date.now() - new Date(lastActiveAt).getTime() < 5 * 60_000;
 }
 
-export default function UsersMap({ profiles, hazards, onHazardRemoved }: { profiles: ProfileRow[]; hazards: HazardRow[]; onHazardRemoved?: () => void }) {
-  const located = profiles.filter((p) => p.live_lat != null && p.live_lng != null);
+function RemoveHazardButton({ id, onRemoved }: { id: string; onRemoved?: () => void }) {
+  const [state, setState] = useState<"idle" | "removing" | "error">("idle");
 
-  const removeHazard = async (id: string) => {
+  const remove = async () => {
+    setState("removing");
     const { error } = await supabase.rpc("admin_remove_hazard", { p_hazard_id: id });
-    if (!error) onHazardRemoved?.();
+    if (error) {
+      setState("error");
+      return;
+    }
+    onRemoved?.();
   };
 
   return (
-    <Card title="מפת משתמשים ומפגעים" icon={<MapIcon size={16} className="text-brand-light" />}>
+    <button
+      onClick={remove}
+      disabled={state === "removing"}
+      style={{
+        marginTop: 8,
+        width: "100%",
+        padding: "6px 10px",
+        borderRadius: 8,
+        background: "rgba(220,38,38,0.12)",
+        border: "1px solid rgba(220,38,38,0.4)",
+        color: "#dc2626",
+        fontWeight: 700,
+        fontSize: 12,
+        cursor: state === "removing" ? "default" : "pointer",
+      }}
+    >
+      {state === "removing" ? "מסיר..." : state === "error" ? "שגיאה - נסו שוב" : "הסרת מפגע"}
+    </button>
+  );
+}
+
+export default function UsersMap({
+  profiles,
+  hazards,
+  onHazardRemoved,
+}: {
+  profiles: ProfileRow[];
+  hazards: HazardRow[];
+  onHazardRemoved?: () => void;
+}) {
+  const located = profiles.filter((p) => p.live_lat != null && p.live_lng != null);
+
+  return (
+    <Card
+      title="מפת משתמשים ומפגעים"
+      icon={<MapIcon size={16} className="text-brand-light" />}
+      action={
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] text-neutral-400">
+            מספר מפגעים כעת: <span className="text-neutral-200 font-semibold">{hazards.length}</span>
+          </span>
+          <button
+            onClick={() => onHazardRemoved?.()}
+            className="w-6 h-6 rounded-lg bg-bg-panel border border-bg-border flex items-center justify-center active:scale-95 transition"
+            title="רענון"
+          >
+            <RefreshCw size={11} className="text-neutral-400" />
+          </button>
+        </div>
+      }
+    >
       <div className="h-[420px] rounded-xl overflow-hidden border border-bg-border">
         <MapContainer center={ISRAEL_CENTER} zoom={8} className="w-full h-full">
           <TileLayer url={TILES} />
@@ -48,26 +104,15 @@ export default function UsersMap({ profiles, hazards, onHazardRemoved }: { profi
             </CircleMarker>
           ))}
           {hazards.map((h) => (
-            <CircleMarker
-              key={h.id}
-              center={[h.lat, h.lng]}
-              radius={5}
-              pathOptions={{ color: "#f59e0b", fillColor: "#f59e0b", fillOpacity: 0.6, weight: 1 }}
-            >
+            <Marker key={h.id} position={[h.lat, h.lng]} icon={hazardMapIcon(h.type)}>
               <Popup>
-                <div style={{ direction: "rtl" }}>
-                  {HAZARD_TYPE_LABELS[h.type] ?? h.type} - {h.reporter_name}
+                <div style={{ direction: "rtl", minWidth: 140 }}>
+                  <strong>{HAZARD_TYPE_LABELS[h.type] ?? h.type}</strong> - {h.reporter_name}
                   <br />+{h.confirmations} / -{h.denials}
-                  <br />
-                  <button
-                    onClick={() => removeHazard(h.id)}
-                    style={{ marginTop: 6, color: "#dc2626", fontWeight: 600, fontSize: 12, cursor: "pointer" }}
-                  >
-                    הסרת מפגע
-                  </button>
+                  <RemoveHazardButton id={h.id} onRemoved={onHazardRemoved} />
                 </div>
               </Popup>
-            </CircleMarker>
+            </Marker>
           ))}
         </MapContainer>
       </div>

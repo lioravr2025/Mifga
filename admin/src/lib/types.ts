@@ -2,11 +2,15 @@ export interface ProfileRow {
   id: string;
   name: string;
   username: string;
+  avatar_emoji: string;
+  avatar_photo_url: string | null;
   points: number;
   reports_count: number;
   reports_with_photo: number;
   vehicle_type: "scooter" | "ebike" | "emotorcycle" | null;
+  vehicle_model: string | null;
   phone: string | null;
+  platform: string | null;
   created_at: string;
   live_lat: number | null;
   live_lng: number | null;

@@ -1,3 +1,4 @@
+import { Capacitor } from "@capacitor/core";
 import { supabase } from "../supabaseClient";
 import { profileFromRow, type ProfileRow } from "./types";
 import { uploadDataUrl } from "./storage";
@@ -34,6 +35,7 @@ export async function insertProfile(input: NewProfileInput): Promise<UserProfile
       vehicle_model: input.vehicleModel ?? null,
       avatar_photo_url: avatarUrl ?? null,
       recovery_code: input.recoveryCode ?? null,
+      platform: Capacitor.getPlatform(),
     })
     .select("*")
     .single();

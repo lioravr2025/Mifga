@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { LogOut, RefreshCw, ShieldCheck, Users, Zap, Route as RouteIcon, LayoutGrid, Shuffle } from "lucide-react";
+import { LogOut, RefreshCw, ShieldCheck, Users, Zap, Route as RouteIcon, LayoutGrid, Shuffle, Bike } from "lucide-react";
 import { supabase } from "../lib/supabaseClient";
 import type { FeedbackRow, HazardRow, ProfileRow, RideLogRow } from "../lib/types";
 import { isHazardExpired } from "../lib/hazardTypes";
@@ -14,6 +14,7 @@ import SupportTicketsPanel from "../components/SupportTicketsPanel";
 import BroadcastPanel from "../components/BroadcastPanel";
 import VersionConfigPanel from "../components/VersionConfigPanel";
 import SeedPanel from "../components/SeedPanel";
+import RidersPanel from "../components/RidersPanel";
 
 function isRecentlyActive(lastActiveAt: string | null) {
   if (!lastActiveAt) return false;
@@ -21,7 +22,7 @@ function isRecentlyActive(lastActiveAt: string | null) {
 }
 
 export default function Dashboard({ onSignOut }: { onSignOut: () => void }) {
-  const [tab, setTab] = useState<"overview" | "seed">("overview");
+  const [tab, setTab] = useState<"overview" | "riders" | "seed">("overview");
   const [profiles, setProfiles] = useState<ProfileRow[]>([]);
   const [hazards, setHazards] = useState<HazardRow[]>([]);
   const [rides, setRides] = useState<RideLogRow[]>([]);
@@ -119,6 +120,15 @@ export default function Dashboard({ onSignOut }: { onSignOut: () => void }) {
           סקירה
         </button>
         <button
+          onClick={() => setTab("riders")}
+          className={`flex items-center gap-1.5 px-4 py-2 rounded-xl border text-sm font-semibold transition ${
+            tab === "riders" ? "bg-brand/15 border-brand text-brand-light" : "bg-bg-panel2 border-bg-border text-neutral-400"
+          }`}
+        >
+          <Bike size={14} />
+          רוכבים
+        </button>
+        <button
           onClick={() => setTab("seed")}
           className={`flex items-center gap-1.5 px-4 py-2 rounded-xl border text-sm font-semibold transition ${
             tab === "seed" ? "bg-brand/15 border-brand text-brand-light" : "bg-bg-panel2 border-bg-border text-neutral-400"
@@ -162,6 +172,8 @@ export default function Dashboard({ onSignOut }: { onSignOut: () => void }) {
 
             <BroadcastPanel />
           </>
+        ) : tab === "riders" ? (
+          <RidersPanel profiles={profiles} rides={rides} />
         ) : (
           <SeedPanel />
         )}

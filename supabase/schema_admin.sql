@@ -563,3 +563,10 @@ end;
 $$;
 
 grant execute on function public.admin_remove_all_hazards() to authenticated;
+
+-- ============================================================================
+-- profiles.platform - captured once at signup (Capacitor.getPlatform():
+-- "android" / "ios" / "web") for the admin dashboard's "רוכבים" tab. Covered
+-- by the existing "users can update their own profile" policy in schema.sql.
+-- ============================================================================
+alter table public.profiles add column if not exists platform text;
