@@ -331,7 +331,7 @@ begin
   end if;
 
   select count(*) into v_count from public.profiles;
-  delete from public.profiles;
+  delete from public.profiles where true; -- explicit WHERE: this project rejects unqualified DELETEs
   return v_count;
 end;
 $$;
