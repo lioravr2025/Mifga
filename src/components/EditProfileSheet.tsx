@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect } from "react";
-import { Camera, X } from "lucide-react";
+import { Camera, Instagram, KeyRound, Music2, X } from "lucide-react";
 import BottomSheet from "./BottomSheet";
 import VehicleModelInput from "./VehicleModelInput";
 import UsernameField from "./UsernameField";
@@ -15,6 +15,8 @@ export default function EditProfileSheet({ open, onClose }: { open: boolean; onC
   const [photo, setPhoto] = useState<string | undefined>(user.avatarPhoto);
   const [vehicleType, setVehicleType] = useState<VehicleTypeId | undefined>(user.vehicleType);
   const [vehicleModel, setVehicleModel] = useState(user.vehicleModel ?? "");
+  const [instagram, setInstagram] = useState(user.instagram ?? "");
+  const [tiktok, setTiktok] = useState(user.tiktok ?? "");
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -24,8 +26,10 @@ export default function EditProfileSheet({ open, onClose }: { open: boolean; onC
       setPhoto(user.avatarPhoto);
       setVehicleType(user.vehicleType);
       setVehicleModel(user.vehicleModel ?? "");
+      setInstagram(user.instagram ?? "");
+      setTiktok(user.tiktok ?? "");
     }
-  }, [open, user.name, user.username, user.avatarPhoto, user.vehicleType, user.vehicleModel]);
+  }, [open, user.name, user.username, user.avatarPhoto, user.vehicleType, user.vehicleModel, user.instagram, user.tiktok]);
 
   // an empty field is fine here (username is optional post-onboarding in local mode); a non-empty one must pass UsernameField's live check
   const usernameOk = !username.trim() || usernameFieldOk;
@@ -42,6 +46,9 @@ export default function EditProfileSheet({ open, onClose }: { open: boolean; onC
     setVehicleType((prev) => (prev === id ? undefined : id));
   };
 
+  // Accepts a bare handle, "@handle", or a full profile URL and reduces it to just the handle - whatever people paste in, this is what gets shown and linked.
+  const cleanHandle = (raw: string) => raw.trim().replace(/^https?:\/\/(www\.)?(instagram|tiktok)\.com\/@?/i, "").replace(/^@/, "");
+
   const save = () => {
     if (!name.trim() || !usernameOk) return;
     updateProfile({
@@ -50,6 +57,8 @@ export default function EditProfileSheet({ open, onClose }: { open: boolean; onC
       avatarPhoto: photo ?? null,
       vehicleType: vehicleType ?? null,
       vehicleModel: vehicleType ? vehicleModel.trim() || null : null,
+      instagram: cleanHandle(instagram) || null,
+      tiktok: cleanHandle(tiktok) || null,
     });
     onClose();
   };
@@ -124,6 +133,48 @@ export default function EditProfileSheet({ open, onClose }: { open: boolean; onC
       {vehicleType && (
         <div className="mb-5">
           <VehicleModelInput type={vehicleType} value={vehicleModel} onChange={setVehicleModel} />
+        </div>
+      )}
+
+      <label className="text-xs text-neutral-400 mb-1.5 block">רשתות חברתיות (אופציונלי)</label>
+      <p className="text-[11px] text-neutral-500 mb-2">מי שיצפה בפרופיל שלכם יראה קישור ישיר לחשבונות שתמלאו כאן</p>
+      <div className="space-y-2.5 mb-5">
+        <div className="flex items-center gap-2 px-4 py-3 rounded-2xl bg-bg-panel2 border border-bg-border">
+          <Instagram size={16} className="text-neutral-400 shrink-0" />
+          <input
+            value={instagram}
+            onChange={(e) => setInstagram(e.target.value)}
+            placeholder="שם משתמש באינסטגרם"
+            dir="ltr"
+            className="flex-1 bg-transparent outline-none text-sm text-neutral-100 placeholder:text-neutral-500"
+          />
+        </div>
+        <div className="flex items-center gap-2 px-4 py-3 rounded-2xl bg-bg-panel2 border border-bg-border">
+          <Music2 size={16} className="text-neutral-400 shrink-0" />
+          <input
+            value={tiktok}
+            onChange={(e) => setTiktok(e.target.value)}
+            placeholder="שם משתמש בטיקטוק"
+            dir="ltr"
+            className="flex-1 bg-transparent outline-none text-sm text-neutral-100 placeholder:text-neutral-500"
+          />
+        </div>
+      </div>
+
+      {user.recoveryCode && (
+        <div className="p-4 rounded-2xl bg-bg-panel2 border border-bg-border mb-5">
+          <div className="flex items-center gap-3 mb-2">
+            <span className="w-9 h-9 rounded-full bg-bg-panel flex items-center justify-center">
+              <KeyRound size={17} className="text-brand-light" />
+            </span>
+            <div>
+              <div className="text-sm font-semibold text-neutral-50">קוד שחזור חשבון</div>
+              <div className="text-xs text-neutral-400">להתחברות מחדש אם תתקינו את האפליקציה מחדש</div>
+            </div>
+          </div>
+          <div className="text-2xl font-extrabold tracking-[0.3em] text-brand-light text-center bg-bg-panel rounded-xl py-2.5" dir="ltr">
+            {user.recoveryCode}
+          </div>
         </div>
       )}
 

@@ -28,6 +28,7 @@ export default function MapScreen({
   onGoFriends,
   onGoProfile,
   onOpenSettings,
+  onOpenMenu,
   focusFriendId,
   onConsumeFocusFriend,
 }: {
@@ -37,6 +38,7 @@ export default function MapScreen({
   onGoFriends: () => void;
   onGoProfile: () => void;
   onOpenSettings: () => void;
+  onOpenMenu: () => void;
   focusFriendId: string | null;
   onConsumeFocusFriend: () => void;
 }) {
@@ -137,7 +139,7 @@ export default function MapScreen({
         )}
 
         <TopBar
-          onMenu={onOpenSettings}
+          onMenu={onOpenMenu}
           onBell={onOpenSettings}
           onFriendsInMotion={onGoFriends}
           friendsInMotionCount={friendsInMotionCount}

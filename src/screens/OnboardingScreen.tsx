@@ -11,6 +11,7 @@ import {
   ShieldCheck,
   Siren,
   TriangleAlert,
+  Users,
   Zap,
 } from "lucide-react";
 import { useApp } from "../context/AppContext";
@@ -33,6 +34,7 @@ const NOTIFY_ROWS: { key: keyof NotifyTypePrefs; label: string; icon: typeof Sir
   { key: "police", label: "שוטר", icon: Siren, color: HAZARD_COLOR_HEX.police },
   { key: "inspector", label: "פקח", icon: Shield, color: HAZARD_COLOR_HEX.inspector },
   { key: "other", label: "מפגע אחר", icon: TriangleAlert, color: HAZARD_COLOR_HEX.pothole },
+  { key: "meetups", label: "מפגשים", icon: Users, color: "#a78bfa" },
 ];
 
 type Mode = "signup" | "login" | "support";

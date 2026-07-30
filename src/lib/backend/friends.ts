@@ -107,6 +107,8 @@ export async function fetchFriends(uid: string): Promise<Friend[]> {
       lastSeenAt: lastActive,
       favorite,
       friendshipId: f.id,
+      instagram: p?.instagram ?? undefined,
+      tiktok: p?.tiktok ?? undefined,
     };
   });
 }

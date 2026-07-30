@@ -45,6 +45,14 @@ export default {
           "0%": { transform: "scale(0.85)", opacity: "0" },
           "100%": { transform: "scale(1)", opacity: "1" },
         },
+        fadeIn: {
+          "0%": { opacity: "0" },
+          "100%": { opacity: "1" },
+        },
+        slideInRight: {
+          "0%": { transform: "translateX(100%)" },
+          "100%": { transform: "translateX(0)" },
+        },
         scooterMoveX: {
           "0%": { left: "-12%" },
           "38%": { left: "38%" },
@@ -68,6 +76,8 @@ export default {
         pulseRing: "pulseRing 1.8s ease-out infinite",
         slideUp: "slideUp 0.22s ease-out",
         popIn: "popIn 0.18s ease-out",
+        fadeIn: "fadeIn 0.18s ease-out",
+        slideInRight: "slideInRight 0.22s ease-out",
         scooterMoveX: "scooterMoveX 4.5s cubic-bezier(0.45,0,0.55,1) infinite",
         scooterMotion: "scooterMotion 4.5s ease-in-out infinite",
       },

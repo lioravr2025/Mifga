@@ -90,7 +90,7 @@ export default function UsernameField({
         {!pending && trimmed && (!formatValid || taken) && <X size={15} className="text-red-400 shrink-0" />}
       </div>
       {trimmed && !formatValid && (
-        <p className="text-[11px] text-red-400 mt-1">3-20 תווים: אותיות באנגלית, ספרות, קו תחתון או נקודה, מתחיל באות</p>
+        <p className="text-[11px] text-red-400 mt-1">6-20 תווים: אותיות באנגלית, ספרות, קו תחתון או נקודה, מתחיל באות</p>
       )}
       {trimmed && formatValid && !pending && taken && <p className="text-[11px] text-red-400 mt-1">שם המשתמש הזה כבר תפוס</p>}
       {available && <p className="text-[11px] text-green-400 mt-1">שם המשתמש פנוי</p>}

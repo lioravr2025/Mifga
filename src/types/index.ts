@@ -61,6 +61,42 @@ export interface Prize {
   position: LatLng;
 }
 
+export interface Meetup {
+  id: string;
+  hostId: string;
+  hostName: string;
+  hostAvatarEmoji: string;
+  hostAvatarPhoto?: string;
+  title: string;
+  description?: string;
+  locationText: string;
+  position?: LatLng;
+  coverPhotoUrl?: string;
+  startsAt: number;
+  endsAt?: number;
+  privacy: "public" | "private";
+  capacity?: number;
+  attendeeCount: number;
+  isAttending: boolean;
+  createdAt: number;
+}
+
+export interface MarketplaceListing {
+  id: string;
+  sellerId: string;
+  sellerName: string;
+  sellerAvatarEmoji: string;
+  sellerAvatarPhoto?: string;
+  title: string;
+  description?: string;
+  price?: number;
+  vehicleType?: VehicleTypeId | "other";
+  photoUrl?: string;
+  phone: string;
+  locationText?: string;
+  createdAt: number;
+}
+
 export type VehicleTypeId = "scooter" | "ebike" | "emotorcycle";
 
 export interface UserProfile {
@@ -80,6 +116,9 @@ export interface UserProfile {
   username?: string;
   /** 6-digit code the rider picks for themselves at signup - lets them recover this account (phone + code) after a reinstall */
   recoveryCode?: string;
+  /** handle only (no @, no URL) - shown as a link on the profile to whoever views it */
+  instagram?: string;
+  tiktok?: string;
 }
 
 export interface Friend {
@@ -100,6 +139,8 @@ export interface Friend {
   favorite?: boolean;
   /** id of the underlying `friendships` row - only set in backend mode, needed to call the favorite/respond RPCs */
   friendshipId?: string;
+  instagram?: string;
+  tiktok?: string;
 }
 
 /** A pending friend request someone else sent me - backend mode only. */
@@ -152,6 +193,7 @@ export interface NotifyTypePrefs {
   police: boolean;
   inspector: boolean;
   other: boolean;
+  meetups: boolean;
 }
 
 export type NotifyDailyLimit = "limited" | "unlimited";

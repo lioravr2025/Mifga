@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, Clock, MapPin, Mic, Navigation, Plus, Radio, Settings2, Square, Star, Users, X } from "lucide-react";
+import { Check, Clock, Instagram, MapPin, Mic, Music2, Navigation, Plus, Radio, Settings2, Square, Star, Users, X } from "lucide-react";
 import { useApp, MAX_FAVORITE_FRIENDS } from "../context/AppContext";
 import { isBackendConfigured } from "../lib/supabaseClient";
 import { formatDistance, distanceMeters } from "../lib/geo";
@@ -185,6 +185,30 @@ export default function FriendsScreen({ onLocateFriend }: { onLocateFriend: (fri
                   <span className="text-[11px] text-neutral-500" dir="ltr">
                     @{f.username}
                   </span>
+                  {f.instagram && (
+                    <a
+                      href={`https://instagram.com/${f.instagram}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-neutral-400 active:text-brand-light"
+                      title={`@${f.instagram} באינסטגרם`}
+                    >
+                      <Instagram size={13} />
+                    </a>
+                  )}
+                  {f.tiktok && (
+                    <a
+                      href={`https://tiktok.com/@${f.tiktok}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-neutral-400 active:text-brand-light"
+                      title={`@${f.tiktok} בטיקטוק`}
+                    >
+                      <Music2 size={13} />
+                    </a>
+                  )}
                 </div>
                 <div className="flex items-center gap-1 text-[11px] text-neutral-400">
                   {f.shareLocation ? (

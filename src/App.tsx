@@ -4,6 +4,7 @@ import BottomNav from "./components/BottomNav";
 import LoadingScreen from "./components/LoadingScreen";
 import FeedbackButton from "./components/FeedbackButton";
 import SettingsSheet from "./components/SettingsSheet";
+import SideMenu from "./components/SideMenu";
 import BroadcastPopup from "./components/BroadcastPopup";
 import UpdateRequiredScreen from "./components/UpdateRequiredScreen";
 import UpdateNudge from "./components/UpdateNudge";
@@ -11,6 +12,8 @@ import MapScreen from "./screens/MapScreen";
 import ProfileScreen from "./screens/ProfileScreen";
 import FriendsScreen from "./screens/FriendsScreen";
 import RouteScreen from "./screens/RouteScreen";
+import MeetupsScreen from "./screens/MeetupsScreen";
+import MarketplaceScreen from "./screens/MarketplaceScreen";
 import OnboardingScreen from "./screens/OnboardingScreen";
 import { useGeolocation } from "./hooks/useGeolocation";
 import { useRideMonitor } from "./hooks/useRideMonitor";
@@ -23,6 +26,10 @@ export type TabId = "profile" | "friends" | "map" | "route";
 export default function App() {
   const [tab, setTab] = useState<TabId>("map");
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [sideMenuOpen, setSideMenuOpen] = useState(false);
+  const [marketplaceOpen, setMarketplaceOpen] = useState(false);
+  const [meetupsOpen, setMeetupsOpen] = useState(false);
+  const [editProfileSignal, setEditProfileSignal] = useState(0);
   const [focusFriendId, setFocusFriendId] = useState<string | null>(null);
   const { position } = useGeolocation();
   const { onboardingComplete, backendReady, lastIncomingVoiceLabel, incomingFriendRequests, incomingGroupInvites } = useApp();
@@ -56,6 +63,7 @@ export default function App() {
                 onGoFriends={() => setTab("friends")}
                 onGoProfile={() => setTab("profile")}
                 onOpenSettings={() => setSettingsOpen(true)}
+                onOpenMenu={() => setSideMenuOpen(true)}
                 focusFriendId={focusFriendId}
                 onConsumeFocusFriend={() => setFocusFriendId(null)}
               />
@@ -63,7 +71,11 @@ export default function App() {
 
             {tab === "profile" && (
               <div className="flex-1 min-h-0 flex flex-col">
-                <ProfileScreen onOpenSettings={() => setSettingsOpen(true)} />
+                <ProfileScreen
+                  onOpenSettings={() => setSettingsOpen(true)}
+                  openEditSignal={editProfileSignal}
+                  onOpenEditConsumed={() => setEditProfileSignal(0)}
+                />
               </div>
             )}
             {tab === "friends" && (
@@ -93,6 +105,19 @@ export default function App() {
             )}
 
             <SettingsSheet open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+            <SideMenu
+              open={sideMenuOpen}
+              onClose={() => setSideMenuOpen(false)}
+              onEditProfile={() => {
+                setTab("profile");
+                setEditProfileSignal((s) => s + 1);
+              }}
+              onOpenMarketplace={() => setMarketplaceOpen(true)}
+              onOpenMeetups={() => setMeetupsOpen(true)}
+              onOpenSettings={() => setSettingsOpen(true)}
+            />
+            {marketplaceOpen && <MarketplaceScreen onClose={() => setMarketplaceOpen(false)} />}
+            {meetupsOpen && <MeetupsScreen onClose={() => setMeetupsOpen(false)} />}
             <BroadcastPopup />
             {optionalUpdateAvailable && <UpdateNudge latestVersion={appConfig.latestVersion!} message={appConfig.updateMessage} />}
           </>

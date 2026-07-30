@@ -1,4 +1,4 @@
-import { Bell, KeyRound, Map, Shield, Siren, TriangleAlert, X } from "lucide-react";
+import { Bell, Map, Shield, Siren, TriangleAlert, Users, X } from "lucide-react";
 import BottomSheet from "./BottomSheet";
 import { useApp } from "../context/AppContext";
 import { HAZARD_COLOR_HEX } from "../lib/colors";
@@ -8,10 +8,11 @@ const NOTIFY_TYPE_ROWS: { key: keyof NotifyTypePrefs; label: string; icon: typeo
   { key: "police", label: "שוטר", icon: Siren, color: HAZARD_COLOR_HEX.police },
   { key: "inspector", label: "פקח", icon: Shield, color: HAZARD_COLOR_HEX.inspector },
   { key: "other", label: "מפגע אחר", icon: TriangleAlert, color: HAZARD_COLOR_HEX.pothole },
+  { key: "meetups", label: "מפגשים", icon: Users, color: "#a78bfa" },
 ];
 
 export default function SettingsSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { user, settings, updateSettings, updateNotifyTypes } = useApp();
+  const { settings, updateSettings, updateNotifyTypes } = useApp();
 
   const toggleNotifications = async () => {
     if (!settings.notificationsEnabled) {
@@ -123,23 +124,6 @@ export default function SettingsSheet({ open, onClose }: { open: boolean; onClos
                 </div>
               );
             })}
-          </div>
-        </div>
-      )}
-
-      {user.recoveryCode && (
-        <div className="p-4 rounded-2xl bg-bg-panel2 border border-bg-border mt-3">
-          <div className="flex items-center gap-3 mb-2">
-            <span className="w-9 h-9 rounded-full bg-bg-panel flex items-center justify-center">
-              <KeyRound size={17} className="text-brand-light" />
-            </span>
-            <div>
-              <div className="text-sm font-semibold text-neutral-50">קוד שחזור חשבון</div>
-              <div className="text-xs text-neutral-400">להתחברות מחדש אם תתקינו את האפליקציה מחדש</div>
-            </div>
-          </div>
-          <div className="text-2xl font-extrabold tracking-[0.3em] text-brand-light text-center bg-bg-panel rounded-xl py-2.5" dir="ltr">
-            {user.recoveryCode}
           </div>
         </div>
       )}

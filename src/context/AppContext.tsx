@@ -85,6 +85,8 @@ interface ProfileUpdate {
   vehicleModel?: string | null;
   phone?: string | null;
   username?: string | null;
+  instagram?: string | null;
+  tiktok?: string | null;
 }
 
 export interface OnboardingInput {
@@ -152,7 +154,7 @@ const AppContext = createContext<AppContextValue | null>(null);
 const DEFAULT_SETTINGS: AppSettings = {
   theme: "dark",
   notificationsEnabled: true,
-  notifyTypes: { police: true, inspector: true, other: false },
+  notifyTypes: { police: true, inspector: true, other: false, meetups: true },
   notifyDailyLimit: "limited",
   rideAlertRadiusM: 100,
   walkieTipDismissed: false,
@@ -586,6 +588,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       ...(patch.vehicleModel !== undefined ? { vehicleModel: patch.vehicleModel ?? undefined } : {}),
       ...(patch.phone !== undefined ? { phone: patch.phone ?? undefined } : {}),
       ...(patch.username !== undefined ? { username: patch.username ?? undefined } : {}),
+      ...(patch.instagram !== undefined ? { instagram: patch.instagram ?? undefined } : {}),
+      ...(patch.tiktok !== undefined ? { tiktok: patch.tiktok ?? undefined } : {}),
     }));
   };
 

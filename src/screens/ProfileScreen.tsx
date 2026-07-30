@@ -1,5 +1,5 @@
 import { Award, Camera, FileText, History, Pencil, Settings, ShieldCheck, Star, Trophy } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useApp } from "../context/AppContext";
 import { levelForPoints } from "../lib/levels";
 import { timeAgo } from "../lib/geo";
@@ -12,10 +12,26 @@ import type { RideLogEntry } from "../types";
 
 const RECENT_RIDES_SHOWN = 3;
 
-export default function ProfileScreen({ onOpenSettings }: { onOpenSettings: () => void }) {
+export default function ProfileScreen({
+  onOpenSettings,
+  openEditSignal,
+  onOpenEditConsumed,
+}: {
+  onOpenSettings: () => void;
+  /** bumped by the side menu's "עריכת פרופיל" to open the edit sheet from outside this screen - see the same pattern as MapScreen's focusFriendId */
+  openEditSignal?: number;
+  onOpenEditConsumed?: () => void;
+}) {
   const { user, friends, rideLog } = useApp();
   const { level, title, progress, pointsToNext, isMax } = levelForPoints(user.points);
   const [editOpen, setEditOpen] = useState(false);
+
+  useEffect(() => {
+    if (!openEditSignal) return;
+    setEditOpen(true);
+    onOpenEditConsumed?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openEditSignal]);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [selectedRide, setSelectedRide] = useState<RideLogEntry | null>(null);
   const [reportsOpen, setReportsOpen] = useState(false);

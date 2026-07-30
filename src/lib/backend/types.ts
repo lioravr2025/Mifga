@@ -76,6 +76,8 @@ export interface ProfileRow {
   live_lng?: number | null;
   last_active_at?: string | null;
   recovery_code?: string | null;
+  instagram?: string | null;
+  tiktok?: string | null;
 }
 
 export function profileFromRow(row: ProfileRow): UserProfile {
@@ -93,6 +95,8 @@ export function profileFromRow(row: ProfileRow): UserProfile {
     vehicleModel: row.vehicle_model ?? undefined,
     phone: row.phone ?? undefined,
     recoveryCode: row.recovery_code ?? undefined,
+    instagram: row.instagram ?? undefined,
+    tiktok: row.tiktok ?? undefined,
   };
 }
 
@@ -150,4 +154,34 @@ export function rideLogFromRow(row: RideLogRow): RideLogEntry {
     hazardsAvoided: row.hazards_avoided,
     path: row.path ?? undefined,
   };
+}
+
+export interface MeetupRow {
+  id: string;
+  host_id: string;
+  title: string;
+  description: string | null;
+  location_text: string;
+  lat: number | null;
+  lng: number | null;
+  cover_photo_url: string | null;
+  starts_at: string;
+  ends_at: string | null;
+  privacy: string;
+  capacity: number | null;
+  created_at: string;
+}
+
+export interface MarketplaceListingRow {
+  id: string;
+  seller_id: string;
+  title: string;
+  description: string | null;
+  price: number | null;
+  vehicle_type: string | null;
+  photo_url: string | null;
+  phone: string;
+  location_text: string | null;
+  active: boolean;
+  created_at: string;
 }

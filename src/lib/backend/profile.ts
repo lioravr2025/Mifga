@@ -50,6 +50,8 @@ export interface ProfilePatch {
   vehicleModel?: string | null;
   phone?: string | null;
   username?: string | null;
+  instagram?: string | null;
+  tiktok?: string | null;
 }
 
 export async function updateProfileRemote(uid: string, patch: ProfilePatch): Promise<void> {
@@ -61,6 +63,8 @@ export async function updateProfileRemote(uid: string, patch: ProfilePatch): Pro
   if (patch.vehicleModel !== undefined) row.vehicle_model = patch.vehicleModel;
   if (patch.phone !== undefined) row.phone = patch.phone;
   if (patch.username !== undefined) row.username = patch.username;
+  if (patch.instagram !== undefined) row.instagram = patch.instagram;
+  if (patch.tiktok !== undefined) row.tiktok = patch.tiktok;
   if (Object.keys(row).length === 0) return;
   const { error } = await supabase.from("profiles").update(row).eq("id", uid);
   if (error) throw error;
