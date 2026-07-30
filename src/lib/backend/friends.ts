@@ -70,6 +70,19 @@ export async function toggleFriendFavoriteRemote(friendshipId: string): Promise<
   if (error) throw error;
 }
 
+export async function removeFriendRemote(friendshipId: string): Promise<void> {
+  if (!supabase) throw new Error("Supabase not configured");
+  const { error } = await supabase.rpc("remove_friend", { p_friendship_id: friendshipId });
+  if (error) throw error;
+}
+
+export async function fetchFriendRideCount(uid: string): Promise<number> {
+  if (!supabase) throw new Error("Supabase not configured");
+  const { data, error } = await supabase.rpc("friend_ride_count", { p_uid: uid });
+  if (error) throw error;
+  return (data as number) ?? 0;
+}
+
 export async function fetchFriends(uid: string): Promise<Friend[]> {
   if (!supabase) throw new Error("Supabase not configured");
   const { data: rows, error } = await supabase
@@ -109,6 +122,8 @@ export async function fetchFriends(uid: string): Promise<Friend[]> {
       friendshipId: f.id,
       instagram: p?.instagram ?? undefined,
       tiktok: p?.tiktok ?? undefined,
+      vehicleType: (p?.vehicle_type as Friend["vehicleType"]) ?? undefined,
+      vehicleModel: p?.vehicle_model ?? undefined,
     };
   });
 }

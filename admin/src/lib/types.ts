@@ -90,6 +90,40 @@ export interface PrizeRow {
   collected_at: string | null;
 }
 
+export interface MeetupRow {
+  id: string;
+  host_id: string;
+  title: string;
+  description: string | null;
+  location_text: string;
+  lat: number | null;
+  lng: number | null;
+  cover_photo_url: string | null;
+  starts_at: string;
+  ends_at: string | null;
+  privacy: string;
+  capacity: number | null;
+  views: number;
+  removed: boolean;
+  created_at: string;
+}
+
+export interface MarketplaceListingRow {
+  id: string;
+  seller_id: string;
+  title: string;
+  description: string | null;
+  price: number | null;
+  vehicle_type: string | null;
+  photo_url: string | null;
+  photo_urls: string[] | null;
+  phone: string;
+  location_text: string | null;
+  views: number;
+  active: boolean;
+  created_at: string;
+}
+
 export interface AppConfigRow {
   min_required_version: string | null;
   latest_version: string | null;

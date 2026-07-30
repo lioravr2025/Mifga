@@ -6,6 +6,7 @@ import FeedbackButton from "./components/FeedbackButton";
 import SettingsSheet from "./components/SettingsSheet";
 import SideMenu from "./components/SideMenu";
 import BroadcastPopup from "./components/BroadcastPopup";
+import RideHazardConfirmPopup from "./components/RideHazardConfirmPopup";
 import UpdateRequiredScreen from "./components/UpdateRequiredScreen";
 import UpdateNudge from "./components/UpdateNudge";
 import MapScreen from "./screens/MapScreen";
@@ -119,6 +120,7 @@ export default function App() {
             {marketplaceOpen && <MarketplaceScreen onClose={() => setMarketplaceOpen(false)} />}
             {meetupsOpen && <MeetupsScreen onClose={() => setMeetupsOpen(false)} />}
             <BroadcastPopup />
+            <RideHazardConfirmPopup hazard={ride.pendingConfirmHazard} onResolve={ride.resolvePendingConfirm} />
             {optionalUpdateAvailable && <UpdateNudge latestVersion={appConfig.latestVersion!} message={appConfig.updateMessage} />}
           </>
         )}

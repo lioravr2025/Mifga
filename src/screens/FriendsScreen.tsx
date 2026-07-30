@@ -10,7 +10,8 @@ import GroupManageSheet from "../components/GroupManageSheet";
 import AddFriendInline from "../components/AddFriendInline";
 import InviteFriendButton from "../components/InviteFriendButton";
 import Avatar from "../components/Avatar";
-import type { WalkieGroup } from "../types";
+import FriendProfileSheet from "../components/FriendProfileSheet";
+import type { Friend, WalkieGroup } from "../types";
 
 export default function FriendsScreen({ onLocateFriend }: { onLocateFriend: (friendId: string) => void }) {
   const {
@@ -31,6 +32,7 @@ export default function FriendsScreen({ onLocateFriend }: { onLocateFriend: (fri
   const [favoriteNotice, setFavoriteNotice] = useState<string | null>(null);
   const [createGroupOpen, setCreateGroupOpen] = useState(false);
   const [manageGroup, setManageGroup] = useState<WalkieGroup | null>(null);
+  const [viewingFriend, setViewingFriend] = useState<Friend | null>(null);
 
   const [recError, setRecError] = useState<string | null>(null);
 
@@ -173,12 +175,12 @@ export default function FriendsScreen({ onLocateFriend }: { onLocateFriend: (fri
           const recording = recordingFor === f.id;
           return (
             <div key={f.id} className="flex items-center gap-2.5 p-3.5 rounded-2xl bg-bg-panel2 border border-bg-border">
-              <div className="relative shrink-0">
+              <button onClick={() => setViewingFriend(f)} className="relative shrink-0 active:scale-95 transition">
                 <Avatar emoji={f.avatarEmoji} photoUrl={f.avatarPhoto} size={48} className="border border-bg-border" />
                 <span
                   className={`absolute bottom-0 left-0 w-3.5 h-3.5 rounded-full border-2 border-bg-panel2 ${f.online ? "bg-green-500" : "bg-neutral-600"}`}
                 />
-              </div>
+              </button>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5">
                   <span className="text-sm font-semibold text-neutral-50">{f.name}</span>
@@ -381,6 +383,7 @@ export default function FriendsScreen({ onLocateFriend }: { onLocateFriend: (fri
 
       <CreateGroupSheet open={createGroupOpen} onClose={() => setCreateGroupOpen(false)} />
       <GroupManageSheet group={liveManageGroup} onClose={() => setManageGroup(null)} />
+      <FriendProfileSheet friend={viewingFriend} onClose={() => setViewingFriend(null)} />
     </div>
   );
 }

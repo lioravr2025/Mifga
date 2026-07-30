@@ -27,7 +27,11 @@ export default function UsernameField({
 }) {
   const { friends, user } = useApp();
   const trimmed = value.trim();
-  const formatValid = trimmed === "" || isValidUsernameFormat(trimmed);
+  // Grandfather in the rider's own current username even if it predates a
+  // format rule (e.g. the 3->6 char minimum) - otherwise editing anything
+  // else on the profile gets silently blocked by a field they never touched.
+  const isUnchanged = excludeUsername !== undefined && trimmed.toLowerCase() === excludeUsername.toLowerCase();
+  const formatValid = trimmed === "" || isUnchanged || isValidUsernameFormat(trimmed);
   const [remoteTaken, setRemoteTaken] = useState(false);
   const [checking, setChecking] = useState(false);
 

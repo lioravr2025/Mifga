@@ -28,7 +28,7 @@ function meetupFromRow(row: MeetupRow, host: ProfileRow | undefined, attendeeCou
 /** Fetches every meetup visible to `uid` (RLS already scopes private ones to the host + existing RSVPs) along with attendee counts and whether `uid` itself is going. */
 export async function fetchMeetups(uid: string): Promise<Meetup[]> {
   if (!supabase) throw new Error("Supabase not configured");
-  const { data: rows, error } = await supabase.from("meetups").select("*").order("starts_at", { ascending: true });
+  const { data: rows, error } = await supabase.from("meetups").select("*").eq("removed", false).order("starts_at", { ascending: true });
   if (error) throw error;
   const meetups = rows as MeetupRow[];
   if (meetups.length === 0) return [];
@@ -54,15 +54,39 @@ export async function fetchMeetups(uid: string): Promise<Meetup[]> {
   return meetups.map((m) => meetupFromRow(m, hostById.get(m.host_id), countByMeetup.get(m.id) ?? 0, attendingSet.has(m.id)));
 }
 
-export async function fetchMeetupAttendees(meetupId: string): Promise<{ id: string; name: string; avatarEmoji: string; avatarPhoto?: string }[]> {
+export interface MeetupAttendee {
+  id: string;
+  name: string;
+  username: string;
+  avatarEmoji: string;
+  avatarPhoto?: string;
+  points: number;
+  vehicleType?: string;
+  vehicleModel?: string;
+  instagram?: string;
+  tiktok?: string;
+}
+
+export async function fetchMeetupAttendees(meetupId: string): Promise<MeetupAttendee[]> {
   if (!supabase) throw new Error("Supabase not configured");
   const { data: rsvps, error } = await supabase.from("meetup_rsvps").select("user_id").eq("meetup_id", meetupId);
   if (error) throw error;
   const ids = (rsvps as { user_id: string }[]).map((r) => r.user_id);
   if (ids.length === 0) return [];
-  const { data: profiles, error: pErr } = await supabase.from("profiles").select("id, name, avatar_emoji, avatar_photo_url").in("id", ids);
+  const { data: profiles, error: pErr } = await supabase.from("profiles").select("*").in("id", ids);
   if (pErr) throw pErr;
-  return (profiles as ProfileRow[]).map((p) => ({ id: p.id, name: p.name, avatarEmoji: p.avatar_emoji, avatarPhoto: p.avatar_photo_url ?? undefined }));
+  return (profiles as ProfileRow[]).map((p) => ({
+    id: p.id,
+    name: p.name,
+    username: p.username,
+    avatarEmoji: p.avatar_emoji,
+    avatarPhoto: p.avatar_photo_url ?? undefined,
+    points: p.points,
+    vehicleType: p.vehicle_type ?? undefined,
+    vehicleModel: p.vehicle_model ?? undefined,
+    instagram: p.instagram ?? undefined,
+    tiktok: p.tiktok ?? undefined,
+  }));
 }
 
 export interface NewMeetupInput {
@@ -112,5 +136,11 @@ export async function rsvpToMeetup(meetupId: string, uid: string): Promise<void>
 export async function cancelMeetupRsvp(meetupId: string, uid: string): Promise<void> {
   if (!supabase) throw new Error("Supabase not configured");
   const { error } = await supabase.from("meetup_rsvps").delete().eq("meetup_id", meetupId).eq("user_id", uid);
+  if (error) throw error;
+}
+
+export async function incrementMeetupViews(id: string): Promise<void> {
+  if (!supabase) throw new Error("Supabase not configured");
+  const { error } = await supabase.rpc("increment_meetup_views", { p_meetup_id: id });
   if (error) throw error;
 }

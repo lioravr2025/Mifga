@@ -58,10 +58,13 @@ export default function AddressAutocomplete({
   biasNear,
   placeholder,
   onSelect,
+  onQueryChange,
 }: {
   biasNear: LatLng;
   placeholder?: string;
   onSelect: (s: { label: string; position: LatLng }) => void;
+  /** fired on every keystroke, not just on picking a suggestion - lets a search box filter live while still offering the dropdown for a precise pick */
+  onQueryChange?: (q: string) => void;
 }) {
   const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
@@ -119,6 +122,7 @@ export default function AddressAutocomplete({
   const pick = (s: Suggestion) => {
     onSelect(s);
     setQuery(s.label);
+    onQueryChange?.(s.label);
     setOpen(false);
   };
 
@@ -130,6 +134,7 @@ export default function AddressAutocomplete({
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);
+            onQueryChange?.(e.target.value);
             setOpen(true);
           }}
           onFocus={() => setOpen(true)}

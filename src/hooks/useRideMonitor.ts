@@ -6,7 +6,7 @@ import { playRideAlert, primeRideAudio } from "../lib/sound";
 import { isBackendConfigured } from "../lib/supabaseClient";
 import { setRidingStatus } from "../lib/backend/friends";
 import { startBackgroundRide, stopBackgroundRide } from "../lib/backgroundRide";
-import type { LatLng } from "../types";
+import type { HazardReport, LatLng } from "../types";
 
 // Sample the route sparsely (not on every position update) so a long ride
 // doesn't build a huge array - a point roughly every 15m moved or 8s elapsed
@@ -27,17 +27,32 @@ export interface RideMonitor {
   rideActive: boolean;
   startRide: () => void;
   stopRide: () => void;
+  /** the hazard currently up for a Waze-style "is it still there?" prompt, one at a time even if several triggered close together */
+  pendingConfirmHazard: HazardReport | null;
+  resolvePendingConfirm: () => void;
 }
+
+// Only police/inspector are worth interrupting the rider to ask "still
+// there?" - the app already treats these two as the ones people actually
+// route around, matching HAZARD_EXPIRY_TYPES' own reasoning.
+const CONFIRM_PROMPT_TYPES = ["police", "inspector"];
 
 export function useRideMonitor(position: LatLng): RideMonitor {
   const { hazards, settings, addRideLogEntry, user } = useApp();
   const [rideActive, setRideActive] = useState(false);
+  const [pendingConfirmHazard, setPendingConfirmHazard] = useState<HazardReport | null>(null);
   const alertedRef = useRef<Set<string>>(new Set());
+  const confirmQueueRef = useRef<HazardReport[]>([]);
   // null (not 0) so "no ride running" is unambiguous - 0 is a valid (if
   // absurd) timestamp and using it as the sentinel risked a falsy-check bug.
   const startedAtRef = useRef<number | null>(null);
   const pathRef = useRef<LatLng[]>([]);
   const lastSampleRef = useRef<{ pos: LatLng; at: number } | null>(null);
+
+  const resolvePendingConfirm = () => {
+    confirmQueueRef.current.shift();
+    setPendingConfirmHazard(confirmQueueRef.current[0] ?? null);
+  };
 
   useEffect(() => {
     if (!rideActive) return;
@@ -46,6 +61,10 @@ export function useRideMonitor(position: LatLng): RideMonitor {
       if (distanceMeters(position, h.position) <= settings.rideAlertRadiusM) {
         alertedRef.current.add(h.id);
         playRideAlert(rideAlertKind(h.type));
+        if (CONFIRM_PROMPT_TYPES.includes(h.type)) {
+          confirmQueueRef.current.push(h);
+          setPendingConfirmHazard((cur) => cur ?? h);
+        }
       }
     }
 
@@ -62,6 +81,8 @@ export function useRideMonitor(position: LatLng): RideMonitor {
     if (startedAtRef.current !== null) return; // already running - ignore a duplicate start
     primeRideAudio(); // called from the click handler - a real user gesture
     alertedRef.current.clear();
+    confirmQueueRef.current = [];
+    setPendingConfirmHazard(null);
     pathRef.current = [position];
     lastSampleRef.current = { pos: position, at: Date.now() };
     startedAtRef.current = Date.now();
@@ -81,7 +102,9 @@ export function useRideMonitor(position: LatLng): RideMonitor {
     addRideLogEntry({ startedAt, endedAt: Date.now(), hazardsAvoided: alertedRef.current.size, path: pathRef.current });
     if (isBackendConfigured && user.id) setRidingStatus(user.id, false).catch(() => {});
     stopBackgroundRide();
+    confirmQueueRef.current = [];
+    setPendingConfirmHazard(null);
   };
 
-  return { rideActive, startRide, stopRide };
+  return { rideActive, startRide, stopRide, pendingConfirmHazard, resolvePendingConfirm };
 }

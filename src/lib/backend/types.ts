@@ -180,8 +180,12 @@ export interface MarketplaceListingRow {
   price: number | null;
   vehicle_type: string | null;
   photo_url: string | null;
+  photo_urls: string[] | null;
   phone: string;
   location_text: string | null;
+  lat: number | null;
+  lng: number | null;
+  views: number;
   active: boolean;
   created_at: string;
 }

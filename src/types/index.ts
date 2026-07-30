@@ -91,9 +91,11 @@ export interface MarketplaceListing {
   description?: string;
   price?: number;
   vehicleType?: VehicleTypeId | "other";
-  photoUrl?: string;
+  photoUrls: string[];
   phone: string;
   locationText?: string;
+  locationPosition?: LatLng;
+  views: number;
   createdAt: number;
 }
 
@@ -141,6 +143,8 @@ export interface Friend {
   friendshipId?: string;
   instagram?: string;
   tiktok?: string;
+  vehicleType?: VehicleTypeId;
+  vehicleModel?: string;
 }
 
 /** A pending friend request someone else sent me - backend mode only. */

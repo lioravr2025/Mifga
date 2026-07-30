@@ -44,6 +44,7 @@ import {
   sendFriendRequest,
   subscribeFriendships,
   toggleFriendFavoriteRemote,
+  removeFriendRemote,
   updatePresence,
   type ProfileSearchResult,
 } from "../lib/backend/friends";
@@ -128,6 +129,7 @@ interface AppContextValue {
   updateProfile: (patch: ProfileUpdate) => void;
   toggleFriendShare: (id: string) => void;
   toggleFavorite: (id: string) => boolean;
+  removeFriend: (id: string) => Promise<void>;
   createGroup: (name: string, memberFriendIds: string[]) => string;
   addMembersToGroup: (groupId: string, memberFriendIds: string[]) => void;
   removeMemberFromGroup: (groupId: string, friendId: string) => void;
@@ -685,6 +687,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return true;
   };
 
+  const removeFriend = async (id: string): Promise<void> => {
+    const target = friends.find((f) => f.id === id);
+    if (!target) return;
+    setFriends((prev) => prev.filter((f) => f.id !== id));
+    if (isBackendConfigured && target.friendshipId) {
+      await removeFriendRemote(target.friendshipId).catch((err) => console.error("Mifga: removeFriend failed", err));
+    }
+  };
+
   const acceptGroupMember = (groupId: string, friendId: string) => {
     setGroups((prev) =>
       prev.map((g) =>
@@ -870,6 +881,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     updateProfile,
     toggleFriendShare,
     toggleFavorite,
+    removeFriend,
     createGroup,
     addMembersToGroup,
     removeMemberFromGroup,

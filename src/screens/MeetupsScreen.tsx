@@ -6,27 +6,32 @@ import {
   Camera,
   Check,
   ChevronLeft,
-  Image as ImageIcon,
-  Lock,
+  Compass,
   Loader2,
+  Lock,
   MapPin,
   Plus,
-  Search,
   Trash2,
+  UserPlus,
   Users,
   X,
 } from "lucide-react";
 import { useApp } from "../context/AppContext";
 import { isBackendConfigured } from "../lib/supabaseClient";
+import { useGeolocation } from "../hooks/useGeolocation";
+import AddressAutocomplete from "../components/AddressAutocomplete";
+import FriendProfileSheet, { type ProfileCardData } from "../components/FriendProfileSheet";
 import {
   cancelMeetupRsvp,
   createMeetup,
   deleteMeetupRemote,
   fetchMeetupAttendees,
   fetchMeetups,
+  incrementMeetupViews,
   rsvpToMeetup,
+  type MeetupAttendee,
 } from "../lib/backend/meetups";
-import type { Meetup } from "../types";
+import type { LatLng, Meetup } from "../types";
 
 function fmtDateTime(ms: number): string {
   return new Date(ms).toLocaleString("he-IL", { weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
@@ -39,8 +44,13 @@ function toLocalInputValue(ms: number | null): string {
   return d.toISOString().slice(0, 16);
 }
 
+function navigateUrl(position: LatLng): string {
+  return `https://www.google.com/maps/dir/?api=1&destination=${position.lat},${position.lng}`;
+}
+
 export default function MeetupsScreen({ onClose }: { onClose: () => void }) {
   const { user } = useApp();
+  const { position } = useGeolocation();
   const [meetups, setMeetups] = useState<Meetup[]>([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<"list" | "create">("list");
@@ -64,7 +74,9 @@ export default function MeetupsScreen({ onClose }: { onClose: () => void }) {
   useEffect(load, [user.id]);
 
   const filtered = useMemo(() => {
+    const now = Date.now();
     return meetups.filter((m) => {
+      if ((m.endsAt ?? m.startsAt) < now) return false; // past meetups drop off the board
       if (cityQuery.trim() && !m.locationText.toLowerCase().includes(cityQuery.trim().toLowerCase())) return false;
       if (dateFilter) {
         const d = new Date(m.startsAt).toISOString().slice(0, 10);
@@ -94,6 +106,7 @@ export default function MeetupsScreen({ onClose }: { onClose: () => void }) {
   if (view === "create") {
     return (
       <CreateMeetupView
+        biasNear={position}
         onClose={() => setView("list")}
         onCreated={() => {
           setView("list");
@@ -125,31 +138,37 @@ export default function MeetupsScreen({ onClose }: { onClose: () => void }) {
           <ArrowRight size={22} />
         </button>
         <h1 className="text-lg font-bold text-neutral-50">מפגשים</h1>
+        <span className="w-9" />
+      </div>
+
+      <div className="px-5 pt-4">
         <button
           onClick={() => setView("create")}
-          className="w-9 h-9 rounded-full bg-brand flex items-center justify-center active:scale-95 transition"
-          title="יצירת מפגש"
+          className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-brand text-white font-bold text-sm active:scale-95 transition mb-3"
         >
-          <Plus size={18} className="text-white" />
+          <Plus size={18} />
+          מפגש חדש
         </button>
       </div>
 
-      <div className="px-5 pt-4 pb-2 flex gap-2">
-        <div className="flex-1 flex items-center gap-2 px-3 py-2.5 rounded-2xl bg-bg-panel2 border border-bg-border">
-          <Search size={15} className="text-neutral-500 shrink-0" />
-          <input
-            value={cityQuery}
-            onChange={(e) => setCityQuery(e.target.value)}
+      <div className="px-5 pb-2 flex gap-2">
+        <div className="flex-1">
+          <AddressAutocomplete
+            biasNear={position}
             placeholder="חיפוש לפי עיר..."
-            className="flex-1 bg-transparent outline-none text-sm text-neutral-100 placeholder:text-neutral-500"
+            onQueryChange={setCityQuery}
+            onSelect={(s) => setCityQuery(s.label)}
           />
         </div>
-        <input
-          type="date"
-          value={dateFilter}
-          onChange={(e) => setDateFilter(e.target.value)}
-          className="px-3 py-2.5 rounded-2xl bg-bg-panel2 border border-bg-border text-sm text-neutral-100 outline-none"
-        />
+        <div className="flex items-center gap-1.5 px-3 py-2.5 rounded-2xl bg-bg-panel2 border border-bg-border shrink-0">
+          <Calendar size={15} className="text-neutral-400 shrink-0" />
+          <input
+            type="date"
+            value={dateFilter}
+            onChange={(e) => setDateFilter(e.target.value)}
+            className="bg-transparent outline-none text-sm text-neutral-100 [color-scheme:dark] w-[104px]"
+          />
+        </div>
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar px-5 py-3 space-y-3">
@@ -204,11 +223,12 @@ export default function MeetupsScreen({ onClose }: { onClose: () => void }) {
   );
 }
 
-function CreateMeetupView({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+function CreateMeetupView({ biasNear, onClose, onCreated }: { biasNear: LatLng; onClose: () => void; onCreated: () => void }) {
   const { user } = useApp();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [locationText, setLocationText] = useState("");
+  const [locationPos, setLocationPos] = useState<LatLng | undefined>(undefined);
   const [startsAt, setStartsAt] = useState("");
   const [endsAt, setEndsAt] = useState("");
   const [privacy, setPrivacy] = useState<"public" | "private">("public");
@@ -238,6 +258,7 @@ function CreateMeetupView({ onClose, onCreated }: { onClose: () => void; onCreat
         title: title.trim(),
         description: description.trim() || undefined,
         locationText: locationText.trim(),
+        position: locationPos,
         coverPhotoDataUrl: coverPhoto,
         startsAt: new Date(startsAt).getTime(),
         endsAt: endsAt ? new Date(endsAt).getTime() : undefined,
@@ -285,12 +306,17 @@ function CreateMeetupView({ onClose, onCreated }: { onClose: () => void; onCreat
         />
 
         <label className="text-xs text-neutral-400 mb-1.5 block">מיקום *</label>
-        <input
-          value={locationText}
-          onChange={(e) => setLocationText(e.target.value)}
-          placeholder="עיר או כתובת"
-          className="w-full px-4 py-3 rounded-2xl bg-bg-panel2 border border-bg-border text-sm text-neutral-100 outline-none focus:border-brand mb-4"
-        />
+        <div className="mb-4">
+          <AddressAutocomplete
+            biasNear={biasNear}
+            placeholder="עיר או כתובת"
+            onQueryChange={setLocationText}
+            onSelect={(s) => {
+              setLocationText(s.label);
+              setLocationPos(s.position);
+            }}
+          />
+        </div>
 
         <div className="grid grid-cols-2 gap-3 mb-4">
           <div>
@@ -300,7 +326,7 @@ function CreateMeetupView({ onClose, onCreated }: { onClose: () => void; onCreat
               value={startsAt}
               onChange={(e) => setStartsAt(e.target.value)}
               min={toLocalInputValue(Date.now())}
-              className="w-full px-3 py-2.5 rounded-2xl bg-bg-panel2 border border-bg-border text-xs text-neutral-100 outline-none focus:border-brand"
+              className="w-full px-3 py-2.5 rounded-2xl bg-bg-panel2 border border-bg-border text-xs text-neutral-100 outline-none focus:border-brand [color-scheme:dark]"
             />
           </div>
           <div>
@@ -310,7 +336,7 @@ function CreateMeetupView({ onClose, onCreated }: { onClose: () => void; onCreat
               value={endsAt}
               onChange={(e) => setEndsAt(e.target.value)}
               min={startsAt || undefined}
-              className="w-full px-3 py-2.5 rounded-2xl bg-bg-panel2 border border-bg-border text-xs text-neutral-100 outline-none focus:border-brand"
+              className="w-full px-3 py-2.5 rounded-2xl bg-bg-panel2 border border-bg-border text-xs text-neutral-100 outline-none focus:border-brand [color-scheme:dark]"
             />
           </div>
         </div>
@@ -374,6 +400,22 @@ function CreateMeetupView({ onClose, onCreated }: { onClose: () => void; onCreat
   );
 }
 
+function attendeeToProfileCard(a: MeetupAttendee, friendshipId?: string): ProfileCardData {
+  return {
+    id: a.id,
+    name: a.name,
+    username: a.username,
+    avatarEmoji: a.avatarEmoji,
+    avatarPhoto: a.avatarPhoto,
+    points: a.points,
+    vehicleType: a.vehicleType,
+    vehicleModel: a.vehicleModel,
+    instagram: a.instagram,
+    tiktok: a.tiktok,
+    friendshipId,
+  };
+}
+
 function MeetupDetailView({
   meetup,
   isHost,
@@ -387,15 +429,21 @@ function MeetupDetailView({
   onToggleRsvp: () => void;
   onDeleted: () => void;
 }) {
-  const [attendees, setAttendees] = useState<{ id: string; name: string; avatarEmoji: string; avatarPhoto?: string }[]>([]);
+  const { friends, addFriendByUid } = useApp();
+  const [attendees, setAttendees] = useState<MeetupAttendee[]>([]);
   const [showAttendees, setShowAttendees] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [viewingAttendee, setViewingAttendee] = useState<ProfileCardData | null>(null);
+  const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetchMeetupAttendees(meetup.id)
       .then(setAttendees)
       .catch((err) => console.error("Mifga: fetchMeetupAttendees failed", err));
+    incrementMeetupViews(meetup.id).catch(() => {});
   }, [meetup.id]);
+
+  const friendIdSet = useMemo(() => new Map(friends.map((f) => [f.id, f.friendshipId])), [friends]);
 
   const remove = async () => {
     setDeleting(true);
@@ -405,6 +453,15 @@ function MeetupDetailView({
     } catch (err) {
       console.error("Mifga: deleteMeetup failed", err);
       setDeleting(false);
+    }
+  };
+
+  const addFriend = async (id: string) => {
+    try {
+      await addFriendByUid(id);
+      setAddedIds((prev) => new Set(prev).add(id));
+    } catch (err) {
+      console.error("Mifga: addFriendByUid failed", err);
     }
   };
 
@@ -445,15 +502,25 @@ function MeetupDetailView({
             {fmtDateTime(meetup.startsAt)}
             {meetup.endsAt ? ` - ${fmtDateTime(meetup.endsAt)}` : ""}
           </div>
-          <div className="flex items-center gap-2 mb-4 text-sm text-neutral-300">
-            <MapPin size={15} className="text-brand-light shrink-0" />
-            {meetup.locationText}
+          <div className="flex items-center justify-between gap-2 mb-4">
+            <div className="flex items-center gap-2 text-sm text-neutral-300 min-w-0">
+              <MapPin size={15} className="text-brand-light shrink-0" />
+              <span className="truncate">{meetup.locationText}</span>
+            </div>
+            {meetup.position && (
+              <a
+                href={navigateUrl(meetup.position)}
+                target="_blank"
+                rel="noreferrer"
+                className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-brand/15 border border-brand/40 text-brand-light text-xs font-semibold active:scale-95 transition"
+              >
+                <Compass size={13} />
+                ניווט
+              </a>
+            )}
           </div>
 
-          <div className="flex items-center gap-2 mb-1 text-xs text-neutral-500">
-            <ImageIcon size={12} />
-            מארח/ת: {meetup.hostName}
-          </div>
+          <div className="flex items-center gap-2 mb-1 text-xs text-neutral-500">מארח/ת: {meetup.hostName}</div>
 
           {meetup.description && <p className="text-sm text-neutral-300 leading-relaxed mt-3 mb-4">{meetup.description}</p>}
 
@@ -473,14 +540,34 @@ function MeetupDetailView({
               {attendees.length === 0 ? (
                 <p className="text-xs text-neutral-500 text-center py-2">אף אחד עוד לא אישר הגעה</p>
               ) : (
-                attendees.map((a) => (
-                  <div key={a.id} className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-bg-panel border border-bg-border">
-                    <span className="w-8 h-8 rounded-full bg-bg-panel2 flex items-center justify-center overflow-hidden text-sm shrink-0">
-                      {a.avatarPhoto ? <img src={a.avatarPhoto} alt="" className="w-full h-full object-cover" /> : a.avatarEmoji}
-                    </span>
-                    <span className="text-sm text-neutral-200">{a.name}</span>
-                  </div>
-                ))
+                attendees.map((a) => {
+                  const friendshipId = friendIdSet.get(a.id);
+                  const isFriend = !!friendshipId;
+                  const justAdded = addedIds.has(a.id);
+                  return (
+                    <div key={a.id} className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-bg-panel border border-bg-border">
+                      <button
+                        onClick={() => setViewingAttendee(attendeeToProfileCard(a, friendshipId))}
+                        className="flex items-center gap-2.5 flex-1 min-w-0 text-right"
+                      >
+                        <span className="w-8 h-8 rounded-full bg-bg-panel2 flex items-center justify-center overflow-hidden text-sm shrink-0">
+                          {a.avatarPhoto ? <img src={a.avatarPhoto} alt="" className="w-full h-full object-cover" /> : a.avatarEmoji}
+                        </span>
+                        <span className="text-sm text-neutral-200 truncate">{a.name}</span>
+                      </button>
+                      {!isFriend && (
+                        <button
+                          onClick={() => addFriend(a.id)}
+                          disabled={justAdded}
+                          className="shrink-0 w-8 h-8 rounded-full bg-brand/15 border border-brand/40 flex items-center justify-center active:scale-95 transition disabled:opacity-50"
+                          title="הוספת חבר"
+                        >
+                          <UserPlus size={13} className="text-brand-light" />
+                        </button>
+                      )}
+                    </div>
+                  );
+                })
               )}
             </div>
           )}
@@ -499,6 +586,8 @@ function MeetupDetailView({
           {full ? "המפגש מלא" : meetup.isAttending ? "מגיעים - לחצו לביטול" : "אישור הגעה"}
         </button>
       </div>
+
+      <FriendProfileSheet friend={viewingAttendee} onClose={() => setViewingAttendee(null)} />
     </div>
   );
 }
