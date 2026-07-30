@@ -14,6 +14,16 @@ create table if not exists public.admin_users (
   created_at timestamptz not null default now()
 );
 
+-- RLS defaults to enabled with zero policies on new tables in this project,
+-- which silently filters every row rather than erroring - useAdminAuth's own
+-- "am I an admin" check needs to see its own row to actually work.
+alter table public.admin_users enable row level security;
+
+drop policy if exists "users can check their own admin membership" on public.admin_users;
+create policy "users can check their own admin membership"
+  on public.admin_users for select
+  using (auth.uid() = user_id);
+
 create or replace function public.is_admin(p_uid uuid)
 returns boolean
 language sql
