@@ -184,7 +184,12 @@ export default function MapView({
             ))}
 
         {prizes.map((p) => (
-          <Marker key={p.id} position={[p.position.lat, p.position.lng]} icon={prizeDivIcon(p.icon)} eventHandlers={{ click: () => onCollectPrize?.(p.id) }} />
+          <Marker
+            key={p.id}
+            position={[p.position.lat, p.position.lng]}
+            icon={prizeDivIcon(p.icon, p.iconImageUrl)}
+            eventHandlers={{ click: () => onCollectPrize?.(p.id) }}
+          />
         ))}
 
         {hazards.map((h) => {

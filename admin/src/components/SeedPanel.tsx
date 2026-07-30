@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Gift, Shuffle, Siren } from "lucide-react";
+import { useRef, useState } from "react";
+import { Gift, ImagePlus, Shuffle, Siren, X } from "lucide-react";
 import { supabase } from "../lib/supabaseClient";
 import { HAZARD_TYPE_OPTIONS } from "../lib/hazardTypes";
 import { ISRAELI_CITIES } from "../lib/cities";
@@ -18,13 +18,23 @@ export default function SeedPanel() {
 
   // prize mode
   const [prizeIcon, setPrizeIcon] = useState(PRIZE_EMOJIS[0]);
+  const [prizeImage, setPrizeImage] = useState<string | null>(null);
   const [prizePoints, setPrizePoints] = useState(10);
   const [prizeCount, setPrizeCount] = useState(5);
   const [prizeCities, setPrizeCities] = useState<string[]>([ISRAELI_CITIES[0].name]);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const handleImageFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => setPrizeImage(reader.result as string);
+    reader.readAsDataURL(file);
+  };
 
   const togglePrizeCity = (name: string) => {
     setPrizeCities((prev) => (prev.includes(name) ? prev.filter((c) => c !== name) : [...prev, name]));
@@ -70,6 +80,7 @@ export default function SeedPanel() {
         p_lng: city.lng,
         p_radius_m: SCATTER_RADIUS_M,
         p_count: prizeCount,
+        p_icon_image_url: prizeImage,
       });
       if (err) {
         setRunning(false);
@@ -183,6 +194,35 @@ export default function SeedPanel() {
               />
             </div>
           </div>
+
+          <div>
+            <label className="text-xs text-neutral-400 mb-1.5 block">או תמונה משלכם (עדיפות על האיקון למעלה)</label>
+            <input ref={fileRef} type="file" accept="image/*" onChange={handleImageFile} className="hidden" />
+            {prizeImage ? (
+              <div className="flex items-center gap-3">
+                <img src={prizeImage} alt="" className="w-14 h-14 rounded-xl object-cover border border-bg-border" />
+                <button
+                  onClick={() => {
+                    setPrizeImage(null);
+                    if (fileRef.current) fileRef.current.value = "";
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-bg-panel border border-bg-border text-xs text-neutral-300 active:scale-95 transition"
+                >
+                  <X size={13} />
+                  הסרת תמונה
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => fileRef.current?.click()}
+                className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-bg-panel border border-dashed border-bg-border text-xs text-neutral-400 active:scale-95 transition"
+              >
+                <ImagePlus size={14} />
+                העלאת תמונה
+              </button>
+            )}
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs text-neutral-400 mb-1 block">נקודות לפרס</label>

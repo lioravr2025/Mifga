@@ -166,6 +166,11 @@ create policy "admins can update broadcasts"
   on public.broadcast_messages for update
   using (public.is_admin(auth.uid()));
 
+drop policy if exists "admins can delete broadcasts" on public.broadcast_messages;
+create policy "admins can delete broadcasts"
+  on public.broadcast_messages for delete
+  using (public.is_admin(auth.uid()));
+
 select public.ensure_realtime('public', 'broadcast_messages');
 
 -- ============================================================================
@@ -358,6 +363,10 @@ grant execute on function public.admin_reset_all_profiles() to authenticated;
 create table if not exists public.prizes (
   id uuid primary key default gen_random_uuid(),
   icon text not null,
+  -- base64 data URI (same "no Storage bucket wired up yet" tradeoff as
+  -- hazards.photo_url) - when set, the mobile app shows this image on the
+  -- marker instead of the `icon` emoji.
+  icon_image_url text,
   points integer not null,
   lat double precision not null,
   lng double precision not null,
@@ -365,6 +374,9 @@ create table if not exists public.prizes (
   collected_at timestamptz,
   created_at timestamptz not null default now()
 );
+
+-- the table may already exist from before this column was added
+alter table public.prizes add column if not exists icon_image_url text;
 
 create index if not exists prizes_uncollected_idx on public.prizes (collected_at);
 
@@ -445,7 +457,20 @@ $$;
 
 grant execute on function public.admin_seed_hazards(text, double precision, double precision, integer, integer) to authenticated;
 
-create or replace function public.admin_seed_prizes(p_icon text, p_points integer, p_lat double precision, p_lng double precision, p_radius_m integer, p_count integer)
+-- dropped and recreated (not just "or replace") because a p_icon_image_url
+-- parameter was added later - PostgREST needs exactly one overload to exist
+-- or it can't disambiguate calls by parameter names.
+drop function if exists public.admin_seed_prizes(text, integer, double precision, double precision, integer, integer);
+
+create or replace function public.admin_seed_prizes(
+  p_icon text,
+  p_points integer,
+  p_lat double precision,
+  p_lng double precision,
+  p_radius_m integer,
+  p_count integer,
+  p_icon_image_url text default null
+)
 returns integer
 language plpgsql
 security definer set search_path = public
@@ -472,13 +497,13 @@ begin
     v_dist := random() * p_radius_m;
     v_lat := p_lat + (v_dist * cos(v_angle)) / 111320.0;
     v_lng := p_lng + (v_dist * sin(v_angle)) / (111320.0 * cos(radians(p_lat)));
-    insert into public.prizes (icon, points, lat, lng) values (p_icon, p_points, v_lat, v_lng);
+    insert into public.prizes (icon, icon_image_url, points, lat, lng) values (p_icon, p_icon_image_url, p_points, v_lat, v_lng);
   end loop;
   return p_count;
 end;
 $$;
 
-grant execute on function public.admin_seed_prizes(text, integer, double precision, double precision, integer, integer) to authenticated;
+grant execute on function public.admin_seed_prizes(text, integer, double precision, double precision, integer, integer, text) to authenticated;
 
 -- admin_remove_hazard - manual takedown of ANY hazard (seeded or genuinely
 -- reported) from the admin dashboard, soft-deleted the same way denial-voting
@@ -497,3 +522,44 @@ end;
 $$;
 
 grant execute on function public.admin_remove_hazard(uuid) to authenticated;
+
+-- admin_remove_hazards - bulk version (e.g. "remove every hazard in this
+-- city") so the client doesn't have to make one round trip per id.
+create or replace function public.admin_remove_hazards(p_ids uuid[])
+returns integer
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  v_count integer;
+begin
+  if not public.is_admin(auth.uid()) then
+    raise exception 'not an admin';
+  end if;
+  update public.hazards set removed = true where id = any(p_ids) and removed = false;
+  get diagnostics v_count = row_count;
+  return v_count;
+end;
+$$;
+
+grant execute on function public.admin_remove_hazards(uuid[]) to authenticated;
+
+-- admin_remove_all_hazards - the "מחיקת כל המפגעים" danger button.
+create or replace function public.admin_remove_all_hazards()
+returns integer
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  v_count integer;
+begin
+  if not public.is_admin(auth.uid()) then
+    raise exception 'not an admin';
+  end if;
+  update public.hazards set removed = true where removed = false;
+  get diagnostics v_count = row_count;
+  return v_count;
+end;
+$$;
+
+grant execute on function public.admin_remove_all_hazards() to authenticated;

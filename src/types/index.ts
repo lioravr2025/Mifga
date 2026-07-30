@@ -55,6 +55,8 @@ export interface HazardReport {
 export interface Prize {
   id: string;
   icon: string;
+  /** when set, shown on the marker instead of the `icon` emoji */
+  iconImageUrl?: string;
   points: number;
   position: LatLng;
 }

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Megaphone, Send, X } from "lucide-react";
+import { Megaphone, Send, Trash2, X } from "lucide-react";
 import { supabase } from "../lib/supabaseClient";
 import type { BroadcastRow } from "../lib/types";
 import { Card } from "./Card";
@@ -35,6 +35,11 @@ export default function BroadcastPanel() {
     load();
   };
 
+  const remove = async (id: string) => {
+    await supabase.from("broadcast_messages").delete().eq("id", id);
+    load();
+  };
+
   return (
     <Card title="הודעה לכל המשתמשים" icon={<Megaphone size={16} className="text-brand-light" />}>
       <div className="flex items-center gap-2 mb-3">
@@ -67,10 +72,13 @@ export default function BroadcastPanel() {
               <span className="flex-1 text-neutral-200">{b.message}</span>
               <span className="text-[10px] text-neutral-500 shrink-0">{new Date(b.created_at).toLocaleDateString("he-IL")}</span>
               {b.active && (
-                <button onClick={() => deactivate(b.id)} className="shrink-0 text-neutral-400" title="ביטול">
+                <button onClick={() => deactivate(b.id)} className="shrink-0 text-neutral-400" title="הפסקת הצגה למשתמשים">
                   <X size={13} />
                 </button>
               )}
+              <button onClick={() => remove(b.id)} className="shrink-0 text-red-400" title="מחיקה מהרשימה">
+                <Trash2 size={13} />
+              </button>
             </div>
           ))}
         </div>

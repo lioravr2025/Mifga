@@ -30,7 +30,11 @@ export default function FeedbackPanel({ feedback, profiles }: { feedback: Feedba
                   <span className="text-[10px] text-neutral-500">{new Date(f.submitted_at).toLocaleDateString("he-IL")}</span>
                 </div>
               </div>
-              {f.note && <p className="text-xs text-neutral-400 leading-relaxed">{f.note}</p>}
+              {f.note ? (
+                <p className="text-xs text-neutral-200 leading-relaxed whitespace-pre-wrap border-r-2 border-brand/40 pr-2 mt-1.5">{f.note}</p>
+              ) : (
+                <p className="text-[11px] text-neutral-600 italic mt-1">ללא הערה כתובה</p>
+              )}
             </div>
           ))}
         </div>

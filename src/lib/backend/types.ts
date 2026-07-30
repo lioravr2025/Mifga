@@ -42,6 +42,7 @@ export function hazardFromRow(row: HazardRow): HazardReport {
 export interface PrizeRow {
   id: string;
   icon: string;
+  icon_image_url: string | null;
   points: number;
   lat: number;
   lng: number;
@@ -49,7 +50,13 @@ export interface PrizeRow {
 }
 
 export function prizeFromRow(row: PrizeRow): Prize {
-  return { id: row.id, icon: row.icon, points: row.points, position: { lat: row.lat, lng: row.lng } };
+  return {
+    id: row.id,
+    icon: row.icon,
+    iconImageUrl: row.icon_image_url ?? undefined,
+    points: row.points,
+    position: { lat: row.lat, lng: row.lng },
+  };
 }
 
 export interface ProfileRow {

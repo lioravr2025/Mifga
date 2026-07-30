@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { LogOut, RefreshCw, ShieldCheck, Users, Zap, Route as RouteIcon, LayoutGrid, Shuffle } from "lucide-react";
 import { supabase } from "../lib/supabaseClient";
 import type { FeedbackRow, HazardRow, ProfileRow, RideLogRow } from "../lib/types";
+import { isHazardExpired } from "../lib/hazardTypes";
 import { StatCard } from "../components/Card";
 import UsersMap from "../components/UsersMap";
 import HazardsPanel from "../components/HazardsPanel";
@@ -65,6 +66,15 @@ export default function Dashboard({ onSignOut }: { onSignOut: () => void }) {
     };
   }, []);
 
+  // Re-evaluate every 30s so a police/inspector hazard actually drops off once
+  // its 20-minute silent window elapses, not only on the next unrelated refetch.
+  const [expiryTick, setExpiryTick] = useState(0);
+  useEffect(() => {
+    const interval = setInterval(() => setExpiryTick((t) => t + 1), 30_000);
+    return () => clearInterval(interval);
+  }, []);
+  const visibleHazards = useMemo(() => hazards.filter((h) => !h.removed && !isHazardExpired(h)), [hazards, expiryTick]);
+
   const activeCount = profiles.filter((p) => isRecentlyActive(p.last_active_at)).length;
   // riding_since alone isn't enough - if a ride is abandoned (app killed/crashed,
   // uninstalled) without ever calling stopRide(), it stays set forever. Requiring
@@ -126,13 +136,13 @@ export default function Dashboard({ onSignOut }: { onSignOut: () => void }) {
               <StatCard label="חשבונות שנרשמו" value={profiles.length} icon={<Users size={17} className="text-brand-light" />} />
               <StatCard label="פעילים כרגע (5 דק')" value={activeCount} icon={<Zap size={17} className="text-sky-400" />} accent="#38bdf8" />
               <StatCard label="בנסיעה כרגע" value={ridingCount} icon={<RouteIcon size={17} className="text-green-400" />} accent="#22c55e" />
-              <StatCard label="דיווחי מפגעים" value={hazards.length} icon={<ShieldCheck size={17} className="text-amber-400" />} accent="#f59e0b" />
+              <StatCard label="דיווחי מפגעים" value={visibleHazards.length} icon={<ShieldCheck size={17} className="text-amber-400" />} accent="#f59e0b" />
             </div>
 
-            <UsersMap profiles={profiles} hazards={hazards} onHazardRemoved={loadAll} />
+            <UsersMap profiles={profiles} hazards={visibleHazards} onHazardRemoved={loadAll} />
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <HazardsPanel hazards={hazards} onChanged={loadAll} />
+              <HazardsPanel hazards={visibleHazards} onChanged={loadAll} />
               <FeedbackPanel feedback={feedback} profiles={profiles} />
             </div>
 

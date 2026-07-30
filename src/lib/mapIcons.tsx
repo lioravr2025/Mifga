@@ -103,8 +103,8 @@ export function selfDivIcon(vehicleType?: VehicleTypeId): L.DivIcon {
   return L.divIcon({ html, className: "mifga-user-marker", iconSize: [size, size], iconAnchor: [size / 2, size / 2] });
 }
 
-/** Admin-seeded collectible reward - a pulsing gold glow so it reads as "grab me" distinctly from hazard markers. */
-export function prizeDivIcon(icon: string): L.DivIcon {
+/** Admin-seeded collectible reward - a pulsing gold glow so it reads as "grab me" distinctly from hazard markers. Shows a custom uploaded image when set, the emoji otherwise. */
+export function prizeDivIcon(icon: string, imageUrl?: string): L.DivIcon {
   const size = 40;
   const html = renderToStaticMarkup(
     <div style={{ position: "relative", width: size, height: size }}>
@@ -124,9 +124,10 @@ export function prizeDivIcon(icon: string): L.DivIcon {
           alignItems: "center",
           justifyContent: "center",
           fontSize: 20,
+          overflow: "hidden",
         }}
       >
-        {icon}
+        {imageUrl ? <img src={imageUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "9999px" }} /> : icon}
       </div>
     </div>
   );

@@ -26,6 +26,7 @@ export interface HazardRow {
   denials: number;
   removed: boolean;
   created_at: string;
+  last_vote_at: string | null;
 }
 
 export interface FeedbackRow {
