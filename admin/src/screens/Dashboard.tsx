@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { LogOut, RefreshCw, ShieldCheck, Users, Zap, Route as RouteIcon, LayoutGrid, Shuffle, Bike } from "lucide-react";
 import { supabase } from "../lib/supabaseClient";
-import type { FeedbackRow, HazardRow, ProfileRow, RideLogRow } from "../lib/types";
+import type { FeedbackRow, HazardRow, PrizeRow, ProfileRow, RideLogRow } from "../lib/types";
 import { isHazardExpired } from "../lib/hazardTypes";
 import { StatCard } from "../components/Card";
 import UsersMap from "../components/UsersMap";
@@ -27,20 +27,23 @@ export default function Dashboard({ onSignOut }: { onSignOut: () => void }) {
   const [hazards, setHazards] = useState<HazardRow[]>([]);
   const [rides, setRides] = useState<RideLogRow[]>([]);
   const [feedback, setFeedback] = useState<FeedbackRow[]>([]);
+  const [prizes, setPrizes] = useState<PrizeRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   const loadAll = async () => {
     setLoading(true);
-    const [profilesRes, hazardsRes, ridesRes, feedbackRes] = await Promise.all([
+    const [profilesRes, hazardsRes, ridesRes, feedbackRes, prizesRes] = await Promise.all([
       supabase.from("profiles").select("*"),
       supabase.from("hazards").select("*").order("created_at", { ascending: false }),
       supabase.from("ride_log").select("*").order("started_at", { ascending: false }).limit(500),
       supabase.from("feedback").select("*"),
+      supabase.from("prizes").select("*").is("collected_at", null),
     ]);
     setProfiles((profilesRes.data as ProfileRow[]) ?? []);
     setHazards((hazardsRes.data as HazardRow[]) ?? []);
     setRides((ridesRes.data as RideLogRow[]) ?? []);
     setFeedback((feedbackRes.data as FeedbackRow[]) ?? []);
+    setPrizes((prizesRes.data as PrizeRow[]) ?? []);
     setLoading(false);
   };
 
@@ -59,6 +62,7 @@ export default function Dashboard({ onSignOut }: { onSignOut: () => void }) {
       .channel("dashboard-live")
       .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, scheduleReload)
       .on("postgres_changes", { event: "*", schema: "public", table: "hazards" }, scheduleReload)
+      .on("postgres_changes", { event: "*", schema: "public", table: "prizes" }, scheduleReload)
       .subscribe();
 
     return () => {
@@ -149,7 +153,7 @@ export default function Dashboard({ onSignOut }: { onSignOut: () => void }) {
               <StatCard label="דיווחי מפגעים" value={visibleHazards.length} icon={<ShieldCheck size={17} className="text-amber-400" />} accent="#f59e0b" />
             </div>
 
-            <UsersMap profiles={profiles} hazards={visibleHazards} onHazardRemoved={loadAll} />
+            <UsersMap profiles={profiles} hazards={visibleHazards} prizes={prizes} onHazardRemoved={loadAll} />
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <HazardsPanel hazards={visibleHazards} onChanged={loadAll} />
@@ -170,7 +174,7 @@ export default function Dashboard({ onSignOut }: { onSignOut: () => void }) {
               <VersionConfigPanel />
             </div>
 
-            <BroadcastPanel />
+            <BroadcastPanel totalRiders={profiles.length} />
           </>
         ) : tab === "riders" ? (
           <RidersPanel profiles={profiles} rides={rides} />

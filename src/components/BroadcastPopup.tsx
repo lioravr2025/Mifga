@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Megaphone, X } from "lucide-react";
 import { isBackendConfigured, supabase } from "../lib/supabaseClient";
 import { loadJSON, saveJSON } from "../lib/storage";
+import { useApp } from "../context/AppContext";
 
 interface Broadcast {
   id: string;
@@ -10,6 +11,7 @@ interface Broadcast {
 
 /** Admin -> all-users popup announcement (sent from the admin dashboard's BroadcastPanel). Persists dismissal per broadcast id so it doesn't reappear once closed. */
 export default function BroadcastPopup() {
+  const { user } = useApp();
   const [broadcast, setBroadcast] = useState<Broadcast | null>(null);
 
   useEffect(() => {
@@ -43,6 +45,12 @@ export default function BroadcastPopup() {
   const dismiss = () => {
     const dismissed = loadJSON<string[]>("dismissedBroadcasts", []);
     saveJSON("dismissedBroadcasts", [...dismissed, broadcast.id].slice(-50));
+    if (isBackendConfigured && supabase && user.id) {
+      supabase
+        .from("broadcast_reads")
+        .insert({ broadcast_id: broadcast.id, user_id: user.id })
+        .then(() => {}); // best-effort - dismissal already persisted locally either way
+    }
     setBroadcast(null);
   };
 

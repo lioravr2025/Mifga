@@ -4,10 +4,11 @@ import { supabase } from "../lib/supabaseClient";
 import type { BroadcastRow } from "../lib/types";
 import { Card } from "./Card";
 
-export default function BroadcastPanel() {
+export default function BroadcastPanel({ totalRiders }: { totalRiders: number }) {
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
   const [broadcasts, setBroadcasts] = useState<BroadcastRow[]>([]);
+  const [readCounts, setReadCounts] = useState<Record<string, number>>({});
 
   const load = () => {
     supabase
@@ -15,7 +16,23 @@ export default function BroadcastPanel() {
       .select("*")
       .order("created_at", { ascending: false })
       .limit(10)
-      .then(({ data }) => setBroadcasts((data as BroadcastRow[]) ?? []));
+      .then(({ data }) => {
+        const rows = (data as BroadcastRow[]) ?? [];
+        setBroadcasts(rows);
+        if (rows.length === 0) return;
+        supabase
+          .from("broadcast_reads")
+          .select("broadcast_id")
+          .in(
+            "broadcast_id",
+            rows.map((b) => b.id)
+          )
+          .then(({ data: reads }) => {
+            const tally: Record<string, number> = {};
+            for (const r of (reads as { broadcast_id: string }[]) ?? []) tally[r.broadcast_id] = (tally[r.broadcast_id] ?? 0) + 1;
+            setReadCounts(tally);
+          });
+      });
   };
 
   useEffect(load, []);
@@ -65,20 +82,25 @@ export default function BroadcastPanel() {
           {broadcasts.map((b) => (
             <div
               key={b.id}
-              className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-xs ${
+              className={`px-3 py-2 rounded-xl border text-xs ${
                 b.active ? "bg-brand/10 border-brand/30" : "bg-bg-panel border-bg-border opacity-50"
               }`}
             >
-              <span className="flex-1 text-neutral-200">{b.message}</span>
-              <span className="text-[10px] text-neutral-500 shrink-0">{new Date(b.created_at).toLocaleDateString("he-IL")}</span>
-              {b.active && (
-                <button onClick={() => deactivate(b.id)} className="shrink-0 text-neutral-400" title="הפסקת הצגה למשתמשים">
-                  <X size={13} />
+              <div className="flex items-center gap-2">
+                <span className="flex-1 text-neutral-200">{b.message}</span>
+                <span className="text-[10px] text-neutral-500 shrink-0">{new Date(b.created_at).toLocaleDateString("he-IL")}</span>
+                {b.active && (
+                  <button onClick={() => deactivate(b.id)} className="shrink-0 text-neutral-400" title="הפסקת הצגה למשתמשים">
+                    <X size={13} />
+                  </button>
+                )}
+                <button onClick={() => remove(b.id)} className="shrink-0 text-red-400" title="מחיקה מהרשימה">
+                  <Trash2 size={13} />
                 </button>
-              )}
-              <button onClick={() => remove(b.id)} className="shrink-0 text-red-400" title="מחיקה מהרשימה">
-                <Trash2 size={13} />
-              </button>
+              </div>
+              <div className="text-[10px] text-neutral-500 mt-1">
+                נקראה על ידי <span className="text-neutral-300 font-semibold">{readCounts[b.id] ?? 0}</span> מתוך {totalRiders} רוכבים רשומים
+              </div>
             </div>
           ))}
         </div>

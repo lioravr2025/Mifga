@@ -79,6 +79,17 @@ export interface BroadcastRow {
   active: boolean;
 }
 
+export interface PrizeRow {
+  id: string;
+  icon: string;
+  icon_image_url: string | null;
+  points: number;
+  lat: number;
+  lng: number;
+  collected_by: string | null;
+  collected_at: string | null;
+}
+
 export interface AppConfigRow {
   min_required_version: string | null;
   latest_version: string | null;

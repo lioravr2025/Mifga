@@ -570,3 +570,47 @@ grant execute on function public.admin_remove_all_hazards() to authenticated;
 -- by the existing "users can update their own profile" policy in schema.sql.
 -- ============================================================================
 alter table public.profiles add column if not exists platform text;
+
+-- ============================================================================
+-- broadcast_reads - one row per (broadcast, rider) once they dismiss the
+-- popup ("הבנתי" or the X), so the admin dashboard can show a real read
+-- count instead of just "sent". "Reached" is approximated as the current
+-- total registered rider count, shown alongside the read count rather than
+-- a separate tracked "delivered" event.
+-- ============================================================================
+create table if not exists public.broadcast_reads (
+  broadcast_id uuid not null references public.broadcast_messages(id) on delete cascade,
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  read_at timestamptz not null default now(),
+  primary key (broadcast_id, user_id)
+);
+
+alter table public.broadcast_reads enable row level security;
+
+drop policy if exists "users can mark a broadcast as read for themselves" on public.broadcast_reads;
+create policy "users can mark a broadcast as read for themselves"
+  on public.broadcast_reads for insert
+  with check (auth.uid() = user_id);
+
+drop policy if exists "admins can read broadcast read receipts" on public.broadcast_reads;
+create policy "admins can read broadcast read receipts"
+  on public.broadcast_reads for select
+  using (public.is_admin(auth.uid()));
+
+-- admin_remove_prize - manual takedown of an uncollected prize from the map,
+-- same idea as admin_remove_hazard (hard delete here since an uncollected
+-- prize has no history worth keeping, unlike a hazard's vote counts).
+create or replace function public.admin_remove_prize(p_prize_id uuid)
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+  if not public.is_admin(auth.uid()) then
+    raise exception 'not an admin';
+  end if;
+  delete from public.prizes where id = p_prize_id;
+end;
+$$;
+
+grant execute on function public.admin_remove_prize(uuid) to authenticated;

@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { CircleMarker, MapContainer, Marker, Popup, TileLayer } from "react-leaflet";
-import type { ProfileRow, HazardRow } from "../lib/types";
+import type { ProfileRow, HazardRow, PrizeRow } from "../lib/types";
 import { Card } from "./Card";
 import { Map as MapIcon, RefreshCw } from "lucide-react";
 import { supabase } from "../lib/supabaseClient";
 import { HAZARD_TYPE_LABELS, hazardMapIcon } from "../lib/hazardTypes";
+import { prizeMapIcon } from "../lib/prizeIcon";
 
 const TILES = "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
 const ISRAEL_CENTER: [number, number] = [31.5, 34.9];
@@ -49,13 +50,50 @@ function RemoveHazardButton({ id, onRemoved }: { id: string; onRemoved?: () => v
   );
 }
 
+function RemovePrizeButton({ id, onRemoved }: { id: string; onRemoved?: () => void }) {
+  const [state, setState] = useState<"idle" | "removing" | "error">("idle");
+
+  const remove = async () => {
+    setState("removing");
+    const { error } = await supabase.rpc("admin_remove_prize", { p_prize_id: id });
+    if (error) {
+      setState("error");
+      return;
+    }
+    onRemoved?.();
+  };
+
+  return (
+    <button
+      onClick={remove}
+      disabled={state === "removing"}
+      style={{
+        marginTop: 8,
+        width: "100%",
+        padding: "6px 10px",
+        borderRadius: 8,
+        background: "rgba(220,38,38,0.12)",
+        border: "1px solid rgba(220,38,38,0.4)",
+        color: "#dc2626",
+        fontWeight: 700,
+        fontSize: 12,
+        cursor: state === "removing" ? "default" : "pointer",
+      }}
+    >
+      {state === "removing" ? "מסיר..." : state === "error" ? "שגיאה - נסו שוב" : "הסרת פרס"}
+    </button>
+  );
+}
+
 export default function UsersMap({
   profiles,
   hazards,
+  prizes = [],
   onHazardRemoved,
 }: {
   profiles: ProfileRow[];
   hazards: HazardRow[];
+  prizes?: PrizeRow[];
   onHazardRemoved?: () => void;
 }) {
   const located = profiles.filter((p) => p.live_lat != null && p.live_lng != null);
@@ -68,6 +106,9 @@ export default function UsersMap({
         <div className="flex items-center gap-2">
           <span className="text-[11px] text-neutral-400">
             מספר מפגעים כעת: <span className="text-neutral-200 font-semibold">{hazards.length}</span>
+          </span>
+          <span className="text-[11px] text-neutral-400">
+            פרסים פעילים: <span className="text-neutral-200 font-semibold">{prizes.length}</span>
           </span>
           <button
             onClick={() => onHazardRemoved?.()}
@@ -114,6 +155,16 @@ export default function UsersMap({
               </Popup>
             </Marker>
           ))}
+          {prizes.map((p) => (
+            <Marker key={p.id} position={[p.lat, p.lng]} icon={prizeMapIcon(p.icon, p.icon_image_url)}>
+              <Popup>
+                <div style={{ direction: "rtl", minWidth: 140 }}>
+                  <strong>פרס · {p.points} נק'</strong>
+                  <RemovePrizeButton id={p.id} onRemoved={onHazardRemoved} />
+                </div>
+              </Popup>
+            </Marker>
+          ))}
         </MapContainer>
       </div>
       <div className="flex items-center gap-4 mt-3 text-[11px] text-neutral-400">
@@ -132,6 +183,10 @@ export default function UsersMap({
         <span className="flex items-center gap-1.5">
           <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
           מפגע
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="w-2.5 h-2.5 rounded-full border-2 border-amber-500" />
+          פרס
         </span>
       </div>
     </Card>

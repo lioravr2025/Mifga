@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Bug, ChevronDown, ChevronUp } from "lucide-react";
+import { Bug, Check, ChevronDown, ChevronUp, Copy } from "lucide-react";
 import { supabase } from "../lib/supabaseClient";
 import type { ClientErrorRow } from "../lib/types";
 import { Card } from "./Card";
@@ -41,6 +41,27 @@ export default function ErrorLogsPanel() {
   const [errors, setErrors] = useState<ClientErrorRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const copyError = async (e: ClientErrorRow, evt: React.MouseEvent) => {
+    evt.stopPropagation();
+    const text = [
+      `זמן: ${new Date(e.created_at).toLocaleString("he-IL")}`,
+      e.app_version ? `גרסה: ${e.app_version}` : null,
+      e.platform ? `פלטפורמה: ${e.platform}` : null,
+      `הודעה: ${e.message}`,
+      e.stack ? `Stack:\n${e.stack}` : null,
+    ]
+      .filter(Boolean)
+      .join("\n");
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedId(e.id);
+      setTimeout(() => setCopiedId((cur) => (cur === e.id ? null : cur)), 1800);
+    } catch {
+      // clipboard permission denied - nothing else to fall back to here
+    }
+  };
 
   useEffect(() => {
     supabase
@@ -70,6 +91,14 @@ export default function ErrorLogsPanel() {
                   <div className="flex items-center justify-between mb-0.5">
                     <span className="text-red-300 font-semibold truncate flex-1">{e.message}</span>
                     <span className="text-[10px] text-neutral-500 shrink-0 ms-2">{new Date(e.created_at).toLocaleString("he-IL")}</span>
+                    <span
+                      role="button"
+                      onClick={(evt) => copyError(e, evt)}
+                      className="shrink-0 ms-1.5 w-5 h-5 rounded-md bg-bg-panel2 border border-bg-border flex items-center justify-center active:scale-95 transition"
+                      title="העתקת השגיאה"
+                    >
+                      {copiedId === e.id ? <Check size={10} className="text-green-400" /> : <Copy size={10} className="text-neutral-400" />}
+                    </span>
                     {expanded ? (
                       <ChevronUp size={13} className="text-neutral-500 shrink-0 ms-1.5" />
                     ) : (
