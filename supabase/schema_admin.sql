@@ -614,3 +614,44 @@ end;
 $$;
 
 grant execute on function public.admin_remove_prize(uuid) to authenticated;
+
+-- admin_remove_prizes - bulk version (e.g. "remove every prize in this
+-- city"), same rationale as admin_remove_hazards.
+create or replace function public.admin_remove_prizes(p_ids uuid[])
+returns integer
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  v_count integer;
+begin
+  if not public.is_admin(auth.uid()) then
+    raise exception 'not an admin';
+  end if;
+  delete from public.prizes where id = any(p_ids);
+  get diagnostics v_count = row_count;
+  return v_count;
+end;
+$$;
+
+grant execute on function public.admin_remove_prizes(uuid[]) to authenticated;
+
+-- admin_remove_all_prizes - the "מחיקת כל הפרסים" danger button.
+create or replace function public.admin_remove_all_prizes()
+returns integer
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  v_count integer;
+begin
+  if not public.is_admin(auth.uid()) then
+    raise exception 'not an admin';
+  end if;
+  delete from public.prizes where collected_at is null;
+  get diagnostics v_count = row_count;
+  return v_count;
+end;
+$$;
+
+grant execute on function public.admin_remove_all_prizes() to authenticated;

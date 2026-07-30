@@ -1,34 +1,25 @@
 import { useEffect, useState } from "react";
-import { AlertTriangle, ThumbsDown, ThumbsUp, Trash2, X } from "lucide-react";
+import { AlertTriangle, Gift, ThumbsDown, ThumbsUp, Trash2, X } from "lucide-react";
 import { supabase } from "../lib/supabaseClient";
 import { HAZARD_TYPE_LABELS } from "../lib/hazardTypes";
-import type { HazardRow } from "../lib/types";
+import type { HazardRow, PrizeRow } from "../lib/types";
 import { Card } from "./Card";
 
-// Groups by rounded coordinate (~1.1km buckets) so a cluster of hazards in
-// the same area shares one Nominatim lookup instead of one per hazard -
-// same tradeoff RideAnalyticsPanel's "popular areas" makes, and for the same
-// reason (Nominatim's free tier is ~1 request/sec).
+// Groups by rounded coordinate (~1.1km buckets) so a cluster in the same
+// area shares one Nominatim lookup instead of one per row - same tradeoff
+// RideAnalyticsPanel's "popular areas" makes, and for the same reason
+// (Nominatim's free tier is ~1 request/sec).
 function bucketKey(lat: number, lng: number): string {
   return `${lat.toFixed(2)},${lng.toFixed(2)}`;
 }
 
-export default function HazardsPanel({ hazards, onChanged }: { hazards: HazardRow[]; onChanged?: () => void }) {
-  const [removingId, setRemovingId] = useState<string | null>(null);
-  const [bulkRunning, setBulkRunning] = useState(false);
-  const [confirmingAll, setConfirmingAll] = useState(false);
+function useCityLookup(points: { lat: number; lng: number }[]) {
   const [cityByBucket, setCityByBucket] = useState<Record<string, string>>({});
-  const [cityFilter, setCityFilter] = useState<string | null>(null);
+  const bucketsKey = [...new Set(points.map((p) => bucketKey(p.lat, p.lng)))].join(",");
 
-  const byType = hazards.reduce<Record<string, number>>((acc, h) => {
-    acc[h.type] = (acc[h.type] ?? 0) + 1;
-    return acc;
-  }, {});
-
-  const bucketsKey = [...new Set(hazards.map((h) => bucketKey(h.lat, h.lng)))].join(",");
   useEffect(() => {
     let cancelled = false;
-    const buckets = [...new Set(hazards.map((h) => bucketKey(h.lat, h.lng)))];
+    const buckets = [...new Set(points.map((p) => bucketKey(p.lat, p.lng)))];
     (async () => {
       for (const key of buckets) {
         if (cancelled || cityByBucket[key]) continue;
@@ -53,11 +44,40 @@ export default function HazardsPanel({ hazards, onChanged }: { hazards: HazardRo
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bucketsKey]);
 
-  const cityFor = (h: HazardRow) => cityByBucket[bucketKey(h.lat, h.lng)] ?? null;
-  const availableCities = [...new Set(hazards.map(cityFor).filter((c): c is string => !!c))].sort();
+  return (lat: number, lng: number) => cityByBucket[bucketKey(lat, lng)] ?? null;
+}
 
-  const filtered = cityFilter ? hazards.filter((h) => cityFor(h) === cityFilter) : hazards;
+export default function HazardsPanel({
+  hazards,
+  prizes,
+  onChanged,
+}: {
+  hazards: HazardRow[];
+  prizes: PrizeRow[];
+  onChanged?: () => void;
+}) {
+  const [removingId, setRemovingId] = useState<string | null>(null);
+  const [bulkRunning, setBulkRunning] = useState(false);
+  const [confirmingAll, setConfirmingAll] = useState(false);
+  const [cityFilter, setCityFilter] = useState<string | null>(null);
+  const cityFor = useCityLookup(hazards.map((h) => ({ lat: h.lat, lng: h.lng })));
+
+  const [prizeBulkRunning, setPrizeBulkRunning] = useState(false);
+  const [confirmingAllPrizes, setConfirmingAllPrizes] = useState(false);
+  const [prizeCityFilter, setPrizeCityFilter] = useState<string | null>(null);
+  const prizeCityFor = useCityLookup(prizes.map((p) => ({ lat: p.lat, lng: p.lng })));
+
+  const byType = hazards.reduce<Record<string, number>>((acc, h) => {
+    acc[h.type] = (acc[h.type] ?? 0) + 1;
+    return acc;
+  }, {});
+
+  const availableCities = [...new Set(hazards.map((h) => cityFor(h.lat, h.lng)).filter((c): c is string => !!c))].sort();
+  const filtered = cityFilter ? hazards.filter((h) => cityFor(h.lat, h.lng) === cityFilter) : hazards;
   const sorted = [...filtered].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 25);
+
+  const availablePrizeCities = [...new Set(prizes.map((p) => prizeCityFor(p.lat, p.lng)).filter((c): c is string => !!c))].sort();
+  const filteredPrizes = prizeCityFilter ? prizes.filter((p) => prizeCityFor(p.lat, p.lng) === prizeCityFilter) : prizes;
 
   const remove = async (id: string) => {
     setRemovingId(id);
@@ -68,7 +88,7 @@ export default function HazardsPanel({ hazards, onChanged }: { hazards: HazardRo
 
   const removeCity = async () => {
     if (!cityFilter) return;
-    const ids = hazards.filter((h) => cityFor(h) === cityFilter).map((h) => h.id);
+    const ids = hazards.filter((h) => cityFor(h.lat, h.lng) === cityFilter).map((h) => h.id);
     if (ids.length === 0) return;
     setBulkRunning(true);
     const { error } = await supabase.rpc("admin_remove_hazards", { p_ids: ids });
@@ -84,6 +104,27 @@ export default function HazardsPanel({ hazards, onChanged }: { hazards: HazardRo
     const { error } = await supabase.rpc("admin_remove_all_hazards");
     setBulkRunning(false);
     setConfirmingAll(false);
+    if (!error) onChanged?.();
+  };
+
+  const removePrizeCity = async () => {
+    if (!prizeCityFilter) return;
+    const ids = prizes.filter((p) => prizeCityFor(p.lat, p.lng) === prizeCityFilter).map((p) => p.id);
+    if (ids.length === 0) return;
+    setPrizeBulkRunning(true);
+    const { error } = await supabase.rpc("admin_remove_prizes", { p_ids: ids });
+    setPrizeBulkRunning(false);
+    if (!error) {
+      setPrizeCityFilter(null);
+      onChanged?.();
+    }
+  };
+
+  const removeAllPrizes = async () => {
+    setPrizeBulkRunning(true);
+    const { error } = await supabase.rpc("admin_remove_all_prizes");
+    setPrizeBulkRunning(false);
+    setConfirmingAllPrizes(false);
     if (!error) onChanged?.();
   };
 
@@ -131,7 +172,7 @@ export default function HazardsPanel({ hazards, onChanged }: { hazards: HazardRo
           <div key={h.id} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-bg-panel border border-bg-border text-xs">
             <span className="flex-1 text-neutral-200 truncate">
               {HAZARD_TYPE_LABELS[h.type] ?? h.type} · {h.reporter_name}
-              {cityFor(h) && <span className="text-neutral-500"> · {cityFor(h)}</span>}
+              {cityFor(h.lat, h.lng) && <span className="text-neutral-500"> · {cityFor(h.lat, h.lng)}</span>}
             </span>
             <span className="flex items-center gap-1 text-green-400 shrink-0">
               <ThumbsUp size={11} />
@@ -154,7 +195,8 @@ export default function HazardsPanel({ hazards, onChanged }: { hazards: HazardRo
         ))}
       </div>
 
-      <div className="pt-3 border-t border-bg-border">
+      <div className="pt-3 border-t border-bg-border mb-4">
+        <div className="text-[11px] text-neutral-500 mb-2">מפגעים</div>
         {!confirmingAll ? (
           <button
             onClick={() => setConfirmingAll(true)}
@@ -177,6 +219,69 @@ export default function HazardsPanel({ hazards, onChanged }: { hazards: HazardRo
             <button
               onClick={() => setConfirmingAll(false)}
               disabled={bulkRunning}
+              className="px-3 py-1.5 rounded-lg bg-bg-panel border border-bg-border text-neutral-300 text-xs font-semibold active:scale-95 transition"
+            >
+              ביטול
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div className="pt-3 border-t border-bg-border">
+        <div className="flex items-center gap-1.5 text-[11px] text-neutral-500 mb-2">
+          <Gift size={12} />
+          פרסים ({prizes.length})
+        </div>
+
+        {availablePrizeCities.length > 0 && (
+          <div className="flex items-center gap-2 mb-2.5">
+            <select
+              value={prizeCityFilter ?? ""}
+              onChange={(e) => setPrizeCityFilter(e.target.value || null)}
+              className="flex-1 px-3 py-2 rounded-xl bg-bg-panel border border-bg-border text-xs text-neutral-100 outline-none focus:border-brand"
+            >
+              <option value="">כל הערים</option>
+              {availablePrizeCities.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+            {prizeCityFilter && (
+              <button
+                onClick={removePrizeCity}
+                disabled={prizeBulkRunning}
+                className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-500/10 border border-red-500/40 text-red-300 text-xs font-semibold active:scale-95 transition disabled:opacity-40"
+              >
+                <Trash2 size={12} />
+                מחיקת כל {filteredPrizes.length} מ{prizeCityFilter}
+              </button>
+            )}
+          </div>
+        )}
+
+        {!confirmingAllPrizes ? (
+          <button
+            onClick={() => setConfirmingAllPrizes(true)}
+            disabled={prizes.length === 0}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-500/10 border border-red-500/40 text-red-300 text-xs font-semibold active:scale-95 transition disabled:opacity-40"
+          >
+            <Trash2 size={12} />
+            מחיקת כל הפרסים
+          </button>
+        ) : (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-red-300 font-semibold">בטוחים? זה ימחק את כל {prizes.length} הפרסים.</span>
+            <button
+              onClick={removeAllPrizes}
+              disabled={prizeBulkRunning}
+              className="px-3 py-1.5 rounded-lg bg-red-500 text-white text-xs font-bold active:scale-95 transition disabled:opacity-40"
+            >
+              {prizeBulkRunning ? "מוחק..." : "כן, מחיקה"}
+            </button>
+            <button
+              onClick={() => setConfirmingAllPrizes(false)}
+              disabled={prizeBulkRunning}
               className="px-3 py-1.5 rounded-lg bg-bg-panel border border-bg-border text-neutral-300 text-xs font-semibold active:scale-95 transition"
             >
               ביטול

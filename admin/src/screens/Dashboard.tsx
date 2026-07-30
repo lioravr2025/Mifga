@@ -156,7 +156,7 @@ export default function Dashboard({ onSignOut }: { onSignOut: () => void }) {
             <UsersMap profiles={profiles} hazards={visibleHazards} prizes={prizes} onHazardRemoved={loadAll} />
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <HazardsPanel hazards={visibleHazards} onChanged={loadAll} />
+              <HazardsPanel hazards={visibleHazards} prizes={prizes} onChanged={loadAll} />
               <FeedbackPanel feedback={feedback} profiles={profiles} />
             </div>
 
