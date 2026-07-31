@@ -32,17 +32,21 @@ export default function RidersPanel({ profiles, rides, onChanged }: { profiles: 
   const [rangeTo, setRangeTo] = useState("");
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const rideCountFor = (uid: string) => rides.filter((r) => r.user_id === uid).length;
 
   const deleteRider = async (id: string) => {
     setDeleting(true);
+    setDeleteError(null);
     const { error } = await supabase.rpc("admin_delete_profile", { p_uid: id });
     setDeleting(false);
-    setConfirmingDelete(false);
     if (!error) {
+      setConfirmingDelete(false);
       setSelected(null);
       onChanged?.();
+    } else {
+      setDeleteError(error.message);
     }
   };
 
@@ -204,7 +208,11 @@ export default function RidersPanel({ profiles, rides, onChanged }: { profiles: 
             {filtered.map((p) => (
               <button
                 key={p.id}
-                onClick={() => setSelected(p)}
+                onClick={() => {
+                  setSelected(p);
+                  setConfirmingDelete(false);
+                  setDeleteError(null);
+                }}
                 className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl bg-bg-panel border border-bg-border text-right active:scale-[0.99] transition"
               >
                 <span className="relative shrink-0">
@@ -238,6 +246,7 @@ export default function RidersPanel({ profiles, rides, onChanged }: { profiles: 
           onClick={() => {
             setSelected(null);
             setConfirmingDelete(false);
+            setDeleteError(null);
           }}
         >
           <div
@@ -309,22 +318,32 @@ export default function RidersPanel({ profiles, rides, onChanged }: { profiles: 
                   מחיקת המשתמש
                 </button>
               ) : (
-                <div className="flex items-center gap-2">
-                  <span className="flex-1 text-xs text-red-300 font-semibold">למחוק את {selected.name} לצמיתות?</span>
-                  <button
-                    onClick={() => deleteRider(selected.id)}
-                    disabled={deleting}
-                    className="px-3 py-2 rounded-xl bg-red-500 text-white text-xs font-bold active:scale-95 transition disabled:opacity-40"
-                  >
-                    {deleting ? "מוחק..." : "כן, מחיקה"}
-                  </button>
-                  <button
-                    onClick={() => setConfirmingDelete(false)}
-                    disabled={deleting}
-                    className="px-3 py-2 rounded-xl bg-bg-panel border border-bg-border text-neutral-300 text-xs font-semibold active:scale-95 transition"
-                  >
-                    ביטול
-                  </button>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="flex-1 text-xs text-red-300 font-semibold">למחוק את {selected.name} לצמיתות?</span>
+                    <button
+                      onClick={() => deleteRider(selected.id)}
+                      disabled={deleting}
+                      className="px-3 py-2 rounded-xl bg-red-500 text-white text-xs font-bold active:scale-95 transition disabled:opacity-40"
+                    >
+                      {deleting ? "מוחק..." : "כן, מחיקה"}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setConfirmingDelete(false);
+                        setDeleteError(null);
+                      }}
+                      disabled={deleting}
+                      className="px-3 py-2 rounded-xl bg-bg-panel border border-bg-border text-neutral-300 text-xs font-semibold active:scale-95 transition"
+                    >
+                      ביטול
+                    </button>
+                  </div>
+                  {deleteError && (
+                    <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2">
+                      שגיאה במחיקה: {deleteError}
+                    </p>
+                  )}
                 </div>
               )}
             </div>

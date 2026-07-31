@@ -148,7 +148,12 @@ export default function AddressAutocomplete({
         createPortal(
           <div
             style={{ position: "fixed", top: dropdownRect.top, left: dropdownRect.left, width: dropdownRect.width }}
-            className="z-[2000] rounded-2xl bg-bg-panel2 border border-bg-border shadow-2xl overflow-hidden max-h-56 overflow-y-auto no-scrollbar"
+            // Higher than every current full-screen overlay (meetups/marketplace
+            // at z-2500, the side menu at z-2600) - picked defensively high so a
+            // future overlay added above those doesn't silently re-hide this
+            // dropdown again the same way, since this component gets embedded
+            // in whatever screen happens to need a location field.
+            className="z-[3500] rounded-2xl bg-bg-panel2 border border-bg-border shadow-2xl overflow-hidden max-h-56 overflow-y-auto no-scrollbar"
           >
             {suggestions.map((s, i) => (
               <button

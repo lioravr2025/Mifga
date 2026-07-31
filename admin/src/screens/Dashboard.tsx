@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { LogOut, RefreshCw, ShieldCheck, Users, Zap, Route as RouteIcon, LayoutGrid, Shuffle, Bike, Calendar, ShoppingBag } from "lucide-react";
+import { LogOut, RefreshCw, ShieldCheck, Users, Zap, Route as RouteIcon, LayoutGrid, Shuffle, Bike, Calendar, ShoppingBag, Wrench } from "lucide-react";
 import { supabase } from "../lib/supabaseClient";
 import type { FeedbackRow, HazardRow, PrizeRow, ProfileRow, RideLogRow } from "../lib/types";
 import { isHazardExpired } from "../lib/hazardTypes";
@@ -24,7 +24,7 @@ function isRecentlyActive(lastActiveAt: string | null) {
 }
 
 export default function Dashboard({ onSignOut }: { onSignOut: () => void }) {
-  const [tab, setTab] = useState<"overview" | "riders" | "seed" | "meetups" | "boards">("overview");
+  const [tab, setTab] = useState<"overview" | "riders" | "seed" | "meetups" | "boards" | "maintenance">("overview");
   const [profiles, setProfiles] = useState<ProfileRow[]>([]);
   const [hazards, setHazards] = useState<HazardRow[]>([]);
   const [rides, setRides] = useState<RideLogRow[]>([]);
@@ -161,6 +161,15 @@ export default function Dashboard({ onSignOut }: { onSignOut: () => void }) {
           <Shuffle size={14} />
           פיזור
         </button>
+        <button
+          onClick={() => setTab("maintenance")}
+          className={`flex items-center gap-1.5 px-4 py-2 rounded-xl border text-sm font-semibold transition ${
+            tab === "maintenance" ? "bg-brand/15 border-brand text-brand-light" : "bg-bg-panel2 border-bg-border text-neutral-400"
+          }`}
+        >
+          <Wrench size={14} />
+          תחזוקה
+        </button>
       </div>
 
       <main className="max-w-5xl mx-auto px-5 py-5 space-y-4">
@@ -184,16 +193,6 @@ export default function Dashboard({ onSignOut }: { onSignOut: () => void }) {
               <RideAnalyticsPanel rides={rides} profiles={profiles} />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <ClickAnalyticsPanel />
-              <ErrorLogsPanel />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <SupportTicketsPanel />
-              <VersionConfigPanel />
-            </div>
-
             <BroadcastPanel totalRiders={profiles.length} />
           </>
         ) : tab === "riders" ? (
@@ -202,6 +201,17 @@ export default function Dashboard({ onSignOut }: { onSignOut: () => void }) {
           <MeetupsAdminPanel />
         ) : tab === "boards" ? (
           <MarketplaceAdminPanel />
+        ) : tab === "maintenance" ? (
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <ClickAnalyticsPanel />
+              <ErrorLogsPanel />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <SupportTicketsPanel />
+              <VersionConfigPanel />
+            </div>
+          </div>
         ) : (
           <SeedPanel />
         )}
