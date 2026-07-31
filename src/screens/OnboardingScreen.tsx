@@ -25,10 +25,14 @@ import { HAZARD_COLOR_HEX } from "../lib/colors";
 import { submitSupportTicket } from "../lib/backend/auth";
 import type { NotifyTypePrefs, VehicleTypeId } from "../types";
 
-function isValidIsraeliPhone(raw: string): boolean {
+/** Strips dashes/spaces/+972 prefix down to the canonical 05XXXXXXXX form that's actually stored - recover_account() does an exact string match, so any formatting drift here silently "fails" as a wrong code. */
+function normalizeIsraeliPhone(raw: string): string {
   const digits = raw.replace(/\D/g, "");
-  const normalized = digits.startsWith("972") ? "0" + digits.slice(3) : digits;
-  return /^05\d{8}$/.test(normalized);
+  return digits.startsWith("972") ? "0" + digits.slice(3) : digits;
+}
+
+function isValidIsraeliPhone(raw: string): boolean {
+  return /^05\d{8}$/.test(normalizeIsraeliPhone(raw));
 }
 
 const NOTIFY_ROWS: { key: keyof NotifyTypePrefs; label: string; icon: typeof Siren; color: string }[] = [
@@ -105,7 +109,7 @@ export default function OnboardingScreen() {
       await completeOnboarding({
         name: name.trim(),
         username: username.trim(),
-        phone: phone.trim(),
+        phone: normalizeIsraeliPhone(phone),
         avatarPhoto: photo ?? null,
         vehicleType: vehicleType ?? null,
         vehicleModel: vehicleType ? vehicleModel.trim() || null : null,
@@ -131,7 +135,7 @@ export default function OnboardingScreen() {
   const submitLogin = async () => {
     setLoginSubmitting(true);
     setLoginError(null);
-    const ok = await recoverAccount(loginPhone, loginCode);
+    const ok = await recoverAccount(normalizeIsraeliPhone(loginPhone), loginCode);
     setLoginSubmitting(false);
     if (!ok) setLoginError("מספר טלפון או קוד שגויים.");
   };
@@ -140,7 +144,7 @@ export default function OnboardingScreen() {
     if (!supportMessage.trim()) return;
     setSupportSubmitting(true);
     try {
-      await submitSupportTicket(loginPhone.trim() || null, supportMessage.trim());
+      await submitSupportTicket(normalizeIsraeliPhone(loginPhone) || null, supportMessage.trim());
       setSupportSent(true);
     } catch (err) {
       console.error("Mifga: submitSupportTicket failed", err);
