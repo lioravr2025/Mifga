@@ -24,12 +24,20 @@ export default function RideAnalyticsPanel({ rides, profiles }: { rides: RideLog
   const speedByVehicle = useMemo(() => {
     const sums: Record<string, { totalKmh: number; count: number }> = {};
     for (const r of rides) {
-      const path = r.path ?? [];
-      if (path.length < 2) continue;
-      const hours = (new Date(r.ended_at).getTime() - new Date(r.started_at).getTime()) / 3_600_000;
-      if (hours <= 0) continue;
-      const km = pathDistanceMeters(path) / 1000;
-      const kmh = km / hours;
+      // Prefer the speed computed client-side from real GPS deltas during the
+      // ride (schema_v4+) - only reconstruct it from the path/duration for
+      // older rows that predate that column.
+      let kmh: number;
+      if (r.avg_speed_kmh != null) {
+        kmh = r.avg_speed_kmh;
+      } else {
+        const path = r.path ?? [];
+        if (path.length < 2) continue;
+        const hours = (new Date(r.ended_at).getTime() - new Date(r.started_at).getTime()) / 3_600_000;
+        if (hours <= 0) continue;
+        const km = pathDistanceMeters(path) / 1000;
+        kmh = km / hours;
+      }
       if (!isFinite(kmh) || kmh <= 0 || kmh > 80) continue; // discard bad GPS outliers
       const vt = vehicleFor(r.user_id) ?? "unknown";
       sums[vt] ??= { totalKmh: 0, count: 0 };

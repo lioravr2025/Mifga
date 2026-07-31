@@ -48,6 +48,8 @@ export interface RideLogRow {
   ended_at: string;
   hazards_avoided: number;
   path: { lat: number; lng: number }[] | null;
+  avg_speed_kmh: number | null;
+  max_speed_kmh: number | null;
 }
 
 export interface ClientErrorRow {

@@ -228,6 +228,9 @@ export interface RideLogEntry {
   hazardsAvoided: number;
   /** sparse breadcrumb trail sampled during the ride, for redrawing the route afterward - may be empty for very short rides */
   path?: LatLng[];
+  /** computed from consecutive GPS fixes (distance/time), not the device's own coords.speed - that field is unreliable/null on plenty of real phones */
+  avgSpeedKmh?: number;
+  maxSpeedKmh?: number;
 }
 
 export interface FeedbackEntry {

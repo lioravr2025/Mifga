@@ -24,6 +24,12 @@ const PATH_MIN_INTERVAL_MS = 8000;
 const MOTION_WINDOW_MS = 12_000;
 const MOTION_MIN_DISPLACEMENT_M = 20;
 
+// A single GPS jump implying a wildly unrealistic speed (signal bouncing off
+// a building, a cold-fix snap) shouldn't count toward the average or spike
+// the max - same outlier bar the admin dashboard already applies when it
+// derives speed from a path after the fact.
+const SPEED_OUTLIER_KMH = 80;
+
 // Both of these are passive "just walk/ride up to it" rewards, independent
 // of whether a ride is active - a fixed radius regardless of the (much
 // wider, user-configurable) ride hazard alert radius, as close as GPS
@@ -69,6 +75,18 @@ export function useRideMonitor(position: LatLng): RideMonitor {
   const pathRef = useRef<LatLng[]>([]);
   const lastSampleRef = useRef<{ pos: LatLng; at: number } | null>(null);
   const motionSamplesRef = useRef<{ pos: LatLng; at: number }[]>([]);
+  // Set the first moment motion is actually confirmed this ride (not the
+  // button-press moment) - null means "pressed start but never moved", which
+  // stopRide() treats as nothing to log at all, so a rider who starts the
+  // timer standing in their driveway doesn't pollute "popular riding hours"
+  // or average-speed analytics with dead time.
+  const realRideStartedAtRef = useRef<number | null>(null);
+  const lastRawPositionRef = useRef<{ pos: LatLng; at: number } | null>(null);
+  const speedStatsRef = useRef<{ totalDistanceM: number; totalTimeMs: number; maxKmh: number }>({
+    totalDistanceM: 0,
+    totalTimeMs: 0,
+    maxKmh: 0,
+  });
   const collectedPrizeIdsRef = useRef<Set<string>>(new Set());
   const goingMeetupsRef = useRef<GoingMeetup[]>([]);
   const arrivedMeetupIdsRef = useRef<Set<string>>(new Set());
@@ -109,7 +127,37 @@ export function useRideMonitor(position: LatLng): RideMonitor {
     const samples = motionSamplesRef.current;
     samples.push({ pos: position, at: now });
     while (samples.length > 1 && now - samples[0].at > MOTION_WINDOW_MS) samples.shift();
-    setIsMoving(samples.length > 1 && distanceMeters(samples[0].pos, position) >= MOTION_MIN_DISPLACEMENT_M);
+    const moving = samples.length > 1 && distanceMeters(samples[0].pos, position) >= MOTION_MIN_DISPLACEMENT_M;
+    setIsMoving(moving);
+    if (moving && realRideStartedAtRef.current === null) {
+      realRideStartedAtRef.current = now;
+      lastRawPositionRef.current = { pos: position, at: now };
+    }
+  }, [position, rideActive]);
+
+  // Speed, computed from consecutive raw GPS samples (distance/time) rather
+  // than relying on the device's own coords.speed - that field is null on
+  // plenty of real phones/webviews, while a plain delta between two fixes
+  // works identically everywhere. Only accumulates once motion is actually
+  // confirmed, for the same reason the logged start time waits for it too.
+  useEffect(() => {
+    if (!rideActive || realRideStartedAtRef.current === null) return;
+    const last = lastRawPositionRef.current;
+    const now = Date.now();
+    if (last) {
+      const dtMs = now - last.at;
+      const dM = distanceMeters(last.pos, position);
+      if (dtMs > 0) {
+        const kmh = dM / 1000 / (dtMs / 3_600_000);
+        if (isFinite(kmh) && kmh > 0 && kmh <= SPEED_OUTLIER_KMH) {
+          const stats = speedStatsRef.current;
+          stats.totalDistanceM += dM;
+          stats.totalTimeMs += dtMs;
+          stats.maxKmh = Math.max(stats.maxKmh, kmh);
+        }
+      }
+    }
+    lastRawPositionRef.current = { pos: position, at: now };
   }, [position, rideActive]);
 
   // Prize auto-collect: passive, works anytime (not just while riding) -
@@ -170,6 +218,9 @@ export function useRideMonitor(position: LatLng): RideMonitor {
     lastSampleRef.current = { pos: position, at: Date.now() };
     motionSamplesRef.current = [];
     setIsMoving(false);
+    realRideStartedAtRef.current = null;
+    lastRawPositionRef.current = null;
+    speedStatsRef.current = { totalDistanceM: 0, totalTimeMs: 0, maxKmh: 0 };
     startedAtRef.current = Date.now();
     setRideActive(true);
     if (isBackendConfigured && user.id) {
@@ -180,11 +231,28 @@ export function useRideMonitor(position: LatLng): RideMonitor {
 
   const stopRide = () => {
     if (startedAtRef.current === null) return; // nothing running - ignore a duplicate stop
-    const startedAt = startedAtRef.current;
     startedAtRef.current = null;
     setRideActive(false);
     if (pathRef.current[pathRef.current.length - 1] !== position) pathRef.current.push(position);
-    addRideLogEntry({ startedAt, endedAt: Date.now(), hazardsAvoided: alertedRef.current.size, path: pathRef.current });
+
+    // Only log a ride at all if motion was actually confirmed at some point -
+    // start-then-immediately-stop with zero movement (e.g. pressed at home)
+    // isn't a real ride and shouldn't show up in the rider's history or the
+    // admin "popular hours"/speed analytics.
+    const realStartedAt = realRideStartedAtRef.current;
+    if (realStartedAt !== null) {
+      const stats = speedStatsRef.current;
+      const avgSpeedKmh = stats.totalTimeMs > 0 ? stats.totalDistanceM / 1000 / (stats.totalTimeMs / 3_600_000) : undefined;
+      addRideLogEntry({
+        startedAt: realStartedAt,
+        endedAt: Date.now(),
+        hazardsAvoided: alertedRef.current.size,
+        path: pathRef.current,
+        avgSpeedKmh,
+        maxSpeedKmh: stats.maxKmh > 0 ? stats.maxKmh : undefined,
+      });
+    }
+
     if (isBackendConfigured && user.id) setRidingStatus(user.id, false).catch(() => {});
     stopBackgroundRide();
     confirmQueueRef.current = [];

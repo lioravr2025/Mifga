@@ -219,3 +219,16 @@ end;
 $$;
 
 grant execute on function public.toggle_group_pin(uuid) to authenticated;
+
+-- ============================================================================
+-- ride_log.avg_speed_kmh / max_speed_kmh - computed client-side from
+-- consecutive GPS fixes (distance/time), not the device's own coords.speed
+-- (unreliable/null on plenty of real phones). Also: the client now only logs
+-- a ride at all once real motion was confirmed, and started_at reflects that
+-- moment rather than the "start ride" button press - a rider who presses
+-- start standing still no longer skews "popular riding hours" or average
+-- speed with dead time. Nullable since older rows predate this and a very
+-- short ride may never accumulate a valid speed sample.
+-- ============================================================================
+alter table public.ride_log add column if not exists avg_speed_kmh double precision;
+alter table public.ride_log add column if not exists max_speed_kmh double precision;

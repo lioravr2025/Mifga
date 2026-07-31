@@ -30,6 +30,8 @@ export async function insertRideLogEntry(uid: string, entry: Omit<RideLogEntry, 
     ended_at: new Date(entry.endedAt).toISOString(),
     hazards_avoided: entry.hazardsAvoided,
     path: entry.path ?? [],
+    avg_speed_kmh: entry.avgSpeedKmh ?? null,
+    max_speed_kmh: entry.maxSpeedKmh ?? null,
   });
   if (error) throw error;
 }

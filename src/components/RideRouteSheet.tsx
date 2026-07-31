@@ -56,6 +56,7 @@ export default function RideRouteSheet({ ride, onClose }: { ride: RideLogEntry |
           <h2 className="text-lg font-bold text-neutral-50">נסיעה {timeAgo(ride.startedAt)}</h2>
           <p className="text-xs text-neutral-400">
             {minutes} דק' · {formatDistance(distance)} · {ride.hazardsAvoided} מפגעים נחסכו
+            {ride.avgSpeedKmh != null && <> · {Math.round(ride.avgSpeedKmh)} קמ"ש בממוצע</>}
           </p>
         </div>
         <button onClick={onClose} className="text-neutral-400">

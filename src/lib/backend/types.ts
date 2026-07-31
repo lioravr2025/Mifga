@@ -147,6 +147,8 @@ export interface RideLogRow {
   ended_at: string;
   hazards_avoided: number;
   path: { lat: number; lng: number }[] | null;
+  avg_speed_kmh: number | null;
+  max_speed_kmh: number | null;
 }
 
 export function rideLogFromRow(row: RideLogRow): RideLogEntry {
@@ -156,6 +158,8 @@ export function rideLogFromRow(row: RideLogRow): RideLogEntry {
     endedAt: new Date(row.ended_at).getTime(),
     hazardsAvoided: row.hazards_avoided,
     path: row.path ?? undefined,
+    avgSpeedKmh: row.avg_speed_kmh ?? undefined,
+    maxSpeedKmh: row.max_speed_kmh ?? undefined,
   };
 }
 
