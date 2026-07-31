@@ -86,8 +86,6 @@ interface MapViewProps {
   recenterSignal: number;
   hazards: HazardReport[];
   prizes?: Prize[];
-  /** tapping a prize marker collects it immediately - no confirmation sheet, matching the "grab it" feel of a game pickup */
-  onCollectPrize?: (id: string) => void;
   friends?: Friend[];
   showFriends?: boolean;
   theme: "dark" | "light";
@@ -116,7 +114,6 @@ export default function MapView({
   recenterSignal,
   hazards,
   prizes = [],
-  onCollectPrize,
   friends = [],
   showFriends = false,
   theme,
@@ -183,13 +180,12 @@ export default function MapView({
               </Marker>
             ))}
 
+        {/* Not tappable-to-collect on purpose - prizes are only ever
+            collected by physically arriving within range (see the
+            proximity check in useRideMonitor), so a marker visible from
+            across the map can't be grabbed without actually going there. */}
         {prizes.map((p) => (
-          <Marker
-            key={p.id}
-            position={[p.position.lat, p.position.lng]}
-            icon={prizeDivIcon(p.icon, p.iconImageUrl)}
-            eventHandlers={{ click: () => onCollectPrize?.(p.id) }}
-          />
+          <Marker key={p.id} position={[p.position.lat, p.position.lng]} icon={prizeDivIcon(p.icon, p.iconImageUrl)} />
         ))}
 
         {hazards.map((h) => {

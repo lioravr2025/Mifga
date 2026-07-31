@@ -38,7 +38,7 @@ export default function MapScreen({
   focusFriendId: string | null;
   onConsumeFocusFriend: () => void;
 }) {
-  const { hazards, prizes, collectPrize, friends, settings, lastAwardedPoints, clearLastAwarded, addReport } = useApp();
+  const { hazards, prizes, friends, settings, lastAwardedPoints, clearLastAwarded, addReport } = useApp();
   const friendsInMotionCount = friends.filter((f) => f.online && f.shareLocation).length;
 
   const [reportOpen, setReportOpen] = useState(false);
@@ -107,10 +107,6 @@ export default function MapScreen({
           recenterSignal={recenterSignal}
           hazards={hazards}
           prizes={prizes}
-          onCollectPrize={(id) => {
-            trackClick("prize_collect", "map");
-            collectPrize(id);
-          }}
           friends={friends}
           showFriends
           theme={settings.theme}
