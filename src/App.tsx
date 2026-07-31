@@ -5,6 +5,7 @@ import LoadingScreen from "./components/LoadingScreen";
 import FeedbackButton from "./components/FeedbackButton";
 import SettingsSheet from "./components/SettingsSheet";
 import SideMenu from "./components/SideMenu";
+import MyPointsScreen from "./components/MyPointsScreen";
 import BroadcastPopup from "./components/BroadcastPopup";
 import RideHazardConfirmPopup from "./components/RideHazardConfirmPopup";
 import UpdateRequiredScreen from "./components/UpdateRequiredScreen";
@@ -30,6 +31,7 @@ export default function App() {
   const [sideMenuOpen, setSideMenuOpen] = useState(false);
   const [marketplaceOpen, setMarketplaceOpen] = useState(false);
   const [meetupsOpen, setMeetupsOpen] = useState(false);
+  const [myPointsOpen, setMyPointsOpen] = useState(false);
   const [editProfileSignal, setEditProfileSignal] = useState(0);
   const [focusFriendId, setFocusFriendId] = useState<string | null>(null);
   const { position } = useGeolocation();
@@ -116,9 +118,11 @@ export default function App() {
               onOpenMarketplace={() => setMarketplaceOpen(true)}
               onOpenMeetups={() => setMeetupsOpen(true)}
               onOpenSettings={() => setSettingsOpen(true)}
+              onOpenMyPoints={() => setMyPointsOpen(true)}
             />
             {marketplaceOpen && <MarketplaceScreen onClose={() => setMarketplaceOpen(false)} />}
             {meetupsOpen && <MeetupsScreen onClose={() => setMeetupsOpen(false)} />}
+            <MyPointsScreen open={myPointsOpen} onClose={() => setMyPointsOpen(false)} />
             <BroadcastPopup />
             <RideHazardConfirmPopup hazard={ride.pendingConfirmHazard} onResolve={ride.resolvePendingConfirm} />
             {optionalUpdateAvailable && <UpdateNudge latestVersion={appConfig.latestVersion!} message={appConfig.updateMessage} />}

@@ -104,3 +104,25 @@ export function playRideAlert(kind: RideAlertKind): void {
   else if (kind === "inspector") inspectorAlarm(ctx);
   else otherHazardBeeps(ctx);
 }
+
+/** Prize pickup chime: a bright ascending major arpeggio - the classic "coin get" feel, unmistakably a reward rather than a warning. */
+export function playPrizeCollected(): void {
+  const ctx = getContext();
+  if (!ctx) return;
+  const t0 = ctx.currentTime;
+  const notes = [880, 1108.73, 1318.51, 1760]; // A5, C#6, E6, A6 - a bright major triad + octave
+  notes.forEach((freq, i) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "triangle";
+    osc.frequency.value = freq;
+    const t = t0 + i * 0.07;
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(0.35, t + 0.015);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.35);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(t);
+    osc.stop(t + 0.37);
+  });
+}

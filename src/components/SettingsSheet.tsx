@@ -1,4 +1,4 @@
-import { Bell, Map, Shield, Siren, TriangleAlert, Users, X } from "lucide-react";
+import { Bell, Gift, Map, Shield, Siren, TriangleAlert, Users, X } from "lucide-react";
 import BottomSheet from "./BottomSheet";
 import { useApp } from "../context/AppContext";
 import { HAZARD_COLOR_HEX } from "../lib/colors";
@@ -9,6 +9,7 @@ const NOTIFY_TYPE_ROWS: { key: keyof NotifyTypePrefs; label: string; icon: typeo
   { key: "inspector", label: "פקח", icon: Shield, color: HAZARD_COLOR_HEX.inspector },
   { key: "other", label: "מפגע אחר", icon: TriangleAlert, color: HAZARD_COLOR_HEX.pothole },
   { key: "meetups", label: "מפגשים", icon: Users, color: "#a78bfa" },
+  { key: "prizes", label: "פרסים", icon: Gift, color: "#f59e0b" },
 ];
 
 export default function SettingsSheet({ open, onClose }: { open: boolean; onClose: () => void }) {

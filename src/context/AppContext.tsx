@@ -35,7 +35,9 @@ import { insertProfile, updateProfileRemote } from "../lib/backend/profile";
 import { awardPointsRemote, awardVotePointsRemote } from "../lib/backend/profile";
 import { confirmHazardRemote, denyHazardRemote, fetchHazards, insertHazard, subscribeHazards } from "../lib/backend/hazards";
 import { collectPrizeRemote, fetchPrizes, subscribePrizes } from "../lib/backend/prizes";
+import { awardMeetupArrival } from "../lib/backend/meetups";
 import { uploadBlob } from "../lib/backend/storage";
+import { playPrizeCollected } from "../lib/sound";
 import {
   fetchFriends,
   fetchIncomingFriendRequests,
@@ -61,6 +63,7 @@ import {
   subscribeGroupMessages,
   subscribeGroups,
   subscribeMessageReceipts,
+  toggleGroupPinRemote,
 } from "../lib/backend/groups";
 import {
   markFriendMessageDeliveredRemote,
@@ -101,6 +104,7 @@ export interface OnboardingInput {
 }
 
 export const MAX_FAVORITE_FRIENDS = 3;
+export const MAX_PINNED_GROUPS = 3;
 
 interface AppContextValue {
   user: UserProfile;
@@ -124,11 +128,13 @@ interface AppContextValue {
   confirmHazard: (id: string) => void;
   denyHazard: (id: string) => void;
   collectPrize: (id: string) => void;
+  awardMeetupArrivalPoints: (meetupId: string) => void;
   updateSettings: (patch: Partial<AppSettings>) => void;
   updateNotifyTypes: (patch: Partial<NotifyTypePrefs>) => void;
   updateProfile: (patch: ProfileUpdate) => void;
   toggleFriendShare: (id: string) => void;
   toggleFavorite: (id: string) => boolean;
+  toggleGroupPin: (id: string) => boolean;
   removeFriend: (id: string) => Promise<void>;
   createGroup: (name: string, memberFriendIds: string[]) => string;
   addMembersToGroup: (groupId: string, memberFriendIds: string[]) => void;
@@ -156,7 +162,7 @@ const AppContext = createContext<AppContextValue | null>(null);
 const DEFAULT_SETTINGS: AppSettings = {
   theme: "dark",
   notificationsEnabled: true,
-  notifyTypes: { police: true, inspector: true, other: false, meetups: true },
+  notifyTypes: { police: true, inspector: true, other: false, meetups: true, prizes: true },
   notifyDailyLimit: "limited",
   rideAlertRadiusM: 100,
   walkieTipDismissed: false,
@@ -207,7 +213,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     // backfill `messages` for groups created before that field existed - otherwise
     // GroupManageSheet crashes reading .length off an undefined array
     const stored = loadJSON<WalkieGroup[]>("groups", []);
-    return stored.map((g) => ({ ...g, messages: g.messages ?? [] }));
+    return stored.map((g) => ({ ...g, messages: g.messages ?? [], pinned: g.pinned ?? false }));
   });
   const [settings, setSettings] = useState<AppSettings>(() => {
     const stored = loadJSON("settings", DEFAULT_SETTINGS);
@@ -547,14 +553,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (!isBackendConfigured) return; // no local-mode equivalent - admin-seeded only
     // Optimistic removal - the realtime UPDATE would also remove it, but that
     // round trip is what a fast second tap could otherwise sneak past.
-    removePrize(id);
+    // Multi-collect prizes never get removed this way - they stay on the map
+    // for every other rider to collect too, only this user's own copy is done.
+    const isMulti = prizes.find((p) => p.id === id)?.collectMode === "multi";
+    if (!isMulti) removePrize(id);
     collectPrizeRemote(id)
       .then((points) => {
-        if (points === null) return; // someone else got there first
+        if (points === null) return; // already collected (by someone else, or by me already in multi mode)
+        setUser((prev) => ({ ...prev, points: prev.points + points }));
+        setLastAwardedPoints(points);
+        if (settings.notifyTypes.prizes) playPrizeCollected();
+      })
+      .catch((err) => console.error("Mifga: collectPrize failed", err));
+  };
+
+  const awardMeetupArrivalPoints = (meetupId: string) => {
+    if (!isBackendConfigured) return; // no local-mode equivalent
+    awardMeetupArrival(meetupId)
+      .then((points) => {
+        if (points === null) return; // already awarded for this meetup before
         setUser((prev) => ({ ...prev, points: prev.points + points }));
         setLastAwardedPoints(points);
       })
-      .catch((err) => console.error("Mifga: collectPrize failed", err));
+      .catch((err) => console.error("Mifga: awardMeetupArrival failed", err));
   };
 
   const denyHazard = (id: string) => {
@@ -687,6 +708,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return true;
   };
 
+  const toggleGroupPin = (id: string): boolean => {
+    const target = groups.find((g) => g.id === id);
+    if (!target) return false;
+    if (!target.pinned && groups.filter((g) => g.pinned).length >= MAX_PINNED_GROUPS) return false;
+    setGroups((prev) => prev.map((g) => (g.id === id ? { ...g, pinned: !g.pinned } : g)));
+    if (isBackendConfigured) {
+      toggleGroupPinRemote(id).catch((err) => console.error("Mifga: toggleGroupPin failed", err));
+    }
+    return true;
+  };
+
   const removeFriend = async (id: string): Promise<void> => {
     const target = friends.find((f) => f.id === id);
     if (!target) return;
@@ -744,7 +776,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return "";
     }
     const id = `g-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    const group: WalkieGroup = { id, name, createdAt: Date.now(), members: [], messages: [] };
+    const group: WalkieGroup = { id, name, createdAt: Date.now(), members: [], messages: [], pinned: false };
     setGroups((prev) => [...prev, group]);
     addMembersToGroup(id, memberFriendIds);
     return id;
@@ -876,11 +908,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     confirmHazard,
     denyHazard,
     collectPrize,
+    awardMeetupArrivalPoints,
     updateSettings,
     updateNotifyTypes,
     updateProfile,
     toggleFriendShare,
     toggleFavorite,
+    toggleGroupPin,
     removeFriend,
     createGroup,
     addMembersToGroup,

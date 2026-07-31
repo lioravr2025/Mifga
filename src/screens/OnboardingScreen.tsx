@@ -4,6 +4,7 @@ import {
   Bell,
   Camera,
   Gauge,
+  Gift,
   KeyRound,
   Loader2,
   LogIn,
@@ -35,6 +36,7 @@ const NOTIFY_ROWS: { key: keyof NotifyTypePrefs; label: string; icon: typeof Sir
   { key: "inspector", label: "פקח", icon: Shield, color: HAZARD_COLOR_HEX.inspector },
   { key: "other", label: "מפגע אחר", icon: TriangleAlert, color: HAZARD_COLOR_HEX.pothole },
   { key: "meetups", label: "מפגשים", icon: Users, color: "#a78bfa" },
+  { key: "prizes", label: "פרסים", icon: Gift, color: "#f59e0b" },
 ];
 
 type Mode = "signup" | "login" | "support";
@@ -251,15 +253,17 @@ export default function OnboardingScreen() {
   return (
     <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar safe-top">
       <div className="px-6 pt-8 pb-6 bg-gradient-to-br from-brand to-purple-800 rounded-b-[2rem] mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <div className="w-14 h-14 rounded-2xl bg-white/15 flex items-center justify-center">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-14 h-14 rounded-2xl bg-white/15 flex items-center justify-center shrink-0">
             <Gauge size={28} className="text-white" />
           </div>
-          <span className="px-2.5 py-1 rounded-full bg-white/15 border border-white/25 text-[10px] font-semibold text-white/90">
-            גרסת ניסיון מוקדמת
-          </span>
+          <div>
+            <h1 className="text-2xl font-extrabold text-white leading-tight" dir="ltr">
+              Mifga
+            </h1>
+            <p className="text-xs font-semibold text-white/80">האפליקציה של רוכבי הכלים החשמליים</p>
+          </div>
         </div>
-        <h1 className="text-2xl font-extrabold text-white mb-2">ברוכים הבאים ל-Mifga</h1>
         <p className="text-sm text-white/85 leading-relaxed mb-4">
           מפגע נועדה לעזור לכם לנסוע בטוח יותר, להימנע מקנסות ודוחות, ולדעת מראש מה קורה בדרך - שוטרים, פקחים ומפגעים - עוד לפני
           שאתם מגיעים אליהם. הרשמה קצרה ומתחילים.

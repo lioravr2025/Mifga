@@ -45,6 +45,7 @@ async function assembleGroups(uid: string, groupRows: WalkieGroupRow[]): Promise
       createdAt: new Date(g.created_at).getTime(),
       members: groupMembers,
       messages: groupMessages,
+      pinned: members.find((m) => m.group_id === g.id && m.member_id === uid)?.pinned ?? false,
     };
   });
 }
@@ -121,6 +122,12 @@ export async function removeMemberRemote(groupId: string, memberId: string): Pro
 export async function removeGroupRemote(groupId: string): Promise<void> {
   if (!supabase) throw new Error("Supabase not configured");
   const { error } = await supabase.from("walkie_groups").delete().eq("id", groupId);
+  if (error) throw error;
+}
+
+export async function toggleGroupPinRemote(groupId: string): Promise<void> {
+  if (!supabase) throw new Error("Supabase not configured");
+  const { error } = await supabase.rpc("toggle_group_pin", { p_group_id: groupId });
   if (error) throw error;
 }
 

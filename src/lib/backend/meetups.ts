@@ -144,3 +144,54 @@ export async function incrementMeetupViews(id: string): Promise<void> {
   const { error } = await supabase.rpc("increment_meetup_views", { p_meetup_id: id });
   if (error) throw error;
 }
+
+export interface GoingMeetup {
+  id: string;
+  position: LatLng;
+  startsAt: number;
+  endsAt?: number;
+}
+
+/**
+ * Meetups `uid` has RSVP'd to that are happening roughly now - used to drive
+ * the passive "you made it, here's 5 points" GPS check (see useRideMonitor).
+ * A meetup with no lat/lng (host typed a freeform location instead of
+ * picking one) can never be arrived at, so it's filtered out here rather
+ * than pushing a null-position check onto every caller.
+ */
+export async function fetchMyGoingMeetups(uid: string): Promise<GoingMeetup[]> {
+  if (!supabase) throw new Error("Supabase not configured");
+  const nowIso = new Date().toISOString();
+  const windowStartIso = new Date(Date.now() - 6 * 60 * 60_000).toISOString();
+  const { data: rsvps, error: rErr } = await supabase.from("meetup_rsvps").select("meetup_id").eq("user_id", uid);
+  if (rErr) throw rErr;
+  const meetupIds = (rsvps as { meetup_id: string }[]).map((r) => r.meetup_id);
+  if (meetupIds.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from("meetups")
+    .select("id, lat, lng, starts_at, ends_at")
+    .in("id", meetupIds)
+    .eq("removed", false)
+    .gte("starts_at", windowStartIso)
+    .lte("starts_at", nowIso);
+  if (error) throw error;
+
+  return (data as { id: string; lat: number | null; lng: number | null; starts_at: string; ends_at: string | null }[])
+    .filter((m) => m.lat != null && m.lng != null)
+    .map((m) => ({
+      id: m.id,
+      position: { lat: m.lat as number, lng: m.lng as number },
+      startsAt: new Date(m.starts_at).getTime(),
+      endsAt: m.ends_at ? new Date(m.ends_at).getTime() : undefined,
+    }));
+}
+
+/** Returns the points awarded, or null if already awarded for this meetup+rider before. */
+export async function awardMeetupArrival(meetupId: string): Promise<number | null> {
+  if (!supabase) throw new Error("Supabase not configured");
+  const { data, error } = await supabase.rpc("award_meetup_arrival", { p_meetup_id: meetupId });
+  if (error) throw error;
+  const points = data as number;
+  return points >= 0 ? points : null;
+}

@@ -6,6 +6,7 @@ import { playRideAlert, primeRideAudio } from "../lib/sound";
 import { isBackendConfigured } from "../lib/supabaseClient";
 import { setRidingStatus } from "../lib/backend/friends";
 import { startBackgroundRide, stopBackgroundRide } from "../lib/backgroundRide";
+import { fetchMyGoingMeetups, type GoingMeetup } from "../lib/backend/meetups";
 import type { HazardReport, LatLng } from "../types";
 
 // Sample the route sparsely (not on every position update) so a long ride
@@ -22,6 +23,18 @@ const PATH_MIN_INTERVAL_MS = 8000;
 // one-tap police/inspector quick-add (which skips confirmation entirely).
 const MOTION_WINDOW_MS = 12_000;
 const MOTION_MIN_DISPLACEMENT_M = 20;
+
+// Both of these are passive "just walk/ride up to it" rewards, independent
+// of whether a ride is active - a fixed radius regardless of the (much
+// wider, user-configurable) ride hazard alert radius, as close as GPS
+// accuracy reasonably allows.
+const PRIZE_COLLECT_RADIUS_M = 50;
+const MEETUP_ARRIVAL_RADIUS_M = 50;
+// A meetup with no ends_at is treated as "still arrivable" for this long
+// after it started, so a late arrival still counts without needing an
+// explicit end time set by the host.
+const MEETUP_ARRIVAL_FALLBACK_WINDOW_MS = 6 * 60 * 60_000;
+const GOING_MEETUPS_REFRESH_MS = 3 * 60_000;
 
 /**
  * Drives the "active ride" beep-alert loop: while a ride is on, every time
@@ -44,7 +57,7 @@ export interface RideMonitor {
 }
 
 export function useRideMonitor(position: LatLng): RideMonitor {
-  const { hazards, settings, addRideLogEntry, user } = useApp();
+  const { hazards, prizes, collectPrize, settings, addRideLogEntry, user, awardMeetupArrivalPoints } = useApp();
   const [rideActive, setRideActive] = useState(false);
   const [pendingConfirmHazard, setPendingConfirmHazard] = useState<HazardReport | null>(null);
   const [isMoving, setIsMoving] = useState(false);
@@ -56,6 +69,9 @@ export function useRideMonitor(position: LatLng): RideMonitor {
   const pathRef = useRef<LatLng[]>([]);
   const lastSampleRef = useRef<{ pos: LatLng; at: number } | null>(null);
   const motionSamplesRef = useRef<{ pos: LatLng; at: number }[]>([]);
+  const collectedPrizeIdsRef = useRef<Set<string>>(new Set());
+  const goingMeetupsRef = useRef<GoingMeetup[]>([]);
+  const arrivedMeetupIdsRef = useRef<Set<string>>(new Set());
 
   const resolvePendingConfirm = () => {
     confirmQueueRef.current.shift();
@@ -95,6 +111,54 @@ export function useRideMonitor(position: LatLng): RideMonitor {
     while (samples.length > 1 && now - samples[0].at > MOTION_WINDOW_MS) samples.shift();
     setIsMoving(samples.length > 1 && distanceMeters(samples[0].pos, position) >= MOTION_MIN_DISPLACEMENT_M);
   }, [position, rideActive]);
+
+  // Prize auto-collect: passive, works anytime (not just while riding) -
+  // roaming near a prize on foot is just as valid as riding past it.
+  useEffect(() => {
+    for (const p of prizes) {
+      if (collectedPrizeIdsRef.current.has(p.id)) continue;
+      if (distanceMeters(position, p.position) <= PRIZE_COLLECT_RADIUS_M) {
+        collectedPrizeIdsRef.current.add(p.id);
+        collectPrize(p.id);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [position, prizes]);
+
+  // Meetup arrival: periodically refresh which RSVP'd meetups are happening
+  // roughly now, then just watch GPS distance to each - same passive,
+  // ride-independent shape as prize collection above.
+  useEffect(() => {
+    if (!isBackendConfigured || !user.id) return;
+    let cancelled = false;
+    const refresh = () => {
+      fetchMyGoingMeetups(user.id)
+        .then((list) => {
+          if (!cancelled) goingMeetupsRef.current = list;
+        })
+        .catch(() => {});
+    };
+    refresh();
+    const interval = setInterval(refresh, GOING_MEETUPS_REFRESH_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [user.id]);
+
+  useEffect(() => {
+    if (!isBackendConfigured) return;
+    const now = Date.now();
+    for (const m of goingMeetupsRef.current) {
+      if (arrivedMeetupIdsRef.current.has(m.id)) continue;
+      const windowEnd = m.endsAt ?? m.startsAt + MEETUP_ARRIVAL_FALLBACK_WINDOW_MS;
+      if (now < m.startsAt || now > windowEnd) continue;
+      if (distanceMeters(position, m.position) <= MEETUP_ARRIVAL_RADIUS_M) {
+        arrivedMeetupIdsRef.current.add(m.id);
+        awardMeetupArrivalPoints(m.id);
+      }
+    }
+  }, [position, awardMeetupArrivalPoints]);
 
   const startRide = () => {
     if (startedAtRef.current !== null) return; // already running - ignore a duplicate start

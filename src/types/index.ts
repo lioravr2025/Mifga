@@ -59,6 +59,8 @@ export interface Prize {
   iconImageUrl?: string;
   points: number;
   position: LatLng;
+  /** 'single' = first rider to collect it wins, it's then gone for everyone. 'multi' = stays on the map, every rider who passes collects it once for themselves. */
+  collectMode: "single" | "multi";
 }
 
 export interface Meetup {
@@ -189,6 +191,8 @@ export interface WalkieGroup {
   createdAt: number;
   members: { friendId: string; status: GroupMemberStatus }[];
   messages: GroupMessage[];
+  /** whether *I* have pinned this group to the top of my own Groups tab - a per-viewer flag, not a group-wide property */
+  pinned: boolean;
 }
 
 export type ThemeMode = "dark" | "light";
@@ -198,6 +202,8 @@ export interface NotifyTypePrefs {
   inspector: boolean;
   other: boolean;
   meetups: boolean;
+  /** voice/audio pickup chime when a prize is collected (auto or tapped) - on by default */
+  prizes: boolean;
 }
 
 export type NotifyDailyLimit = "limited" | "unlimited";

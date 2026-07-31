@@ -31,11 +31,12 @@ export default function LoadingScreen() {
       </div>
 
       <div className="text-center">
+        <h1 className="text-2xl font-extrabold text-neutral-50 mb-1" dir="ltr">
+          Mifga
+        </h1>
+        <p className="text-xs font-semibold text-brand-light mb-3">האפליקציה של רוכבי הכלים החשמליים</p>
         <p className="text-sm font-semibold text-neutral-200 mb-1">טוען את האפליקציה...</p>
-        <p className="text-xs text-neutral-500 mb-3">תכף מתחילים לנסוע בטוח</p>
-        <span className="inline-block px-2.5 py-1 rounded-full bg-brand/15 border border-brand/40 text-[10px] font-semibold text-brand-light">
-          גרסת ניסיון מוקדמת
-        </span>
+        <p className="text-xs text-neutral-500">תכף מתחילים לנסוע בטוח</p>
       </div>
     </div>
   );

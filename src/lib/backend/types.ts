@@ -47,6 +47,7 @@ export interface PrizeRow {
   lat: number;
   lng: number;
   collected_at: string | null;
+  collect_mode: "single" | "multi";
 }
 
 export function prizeFromRow(row: PrizeRow): Prize {
@@ -56,6 +57,7 @@ export function prizeFromRow(row: PrizeRow): Prize {
     iconImageUrl: row.icon_image_url ?? undefined,
     points: row.points,
     position: { lat: row.lat, lng: row.lng },
+    collectMode: row.collect_mode,
   };
 }
 
@@ -121,6 +123,7 @@ export interface WalkieGroupMemberRow {
   group_id: string;
   member_id: string;
   status: "pending" | "accepted";
+  pinned: boolean;
 }
 
 export interface WalkieGroupMessageRow {

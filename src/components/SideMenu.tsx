@@ -1,4 +1,4 @@
-import { Calendar, ChevronLeft, Settings, ShoppingBag, X } from "lucide-react";
+import { Calendar, ChevronLeft, Settings, ShoppingBag, Star, X } from "lucide-react";
 import { useApp } from "../context/AppContext";
 
 interface SideMenuProps {
@@ -8,9 +8,10 @@ interface SideMenuProps {
   onOpenMarketplace: () => void;
   onOpenMeetups: () => void;
   onOpenSettings: () => void;
+  onOpenMyPoints: () => void;
 }
 
-export default function SideMenu({ open, onClose, onEditProfile, onOpenMarketplace, onOpenMeetups, onOpenSettings }: SideMenuProps) {
+export default function SideMenu({ open, onClose, onEditProfile, onOpenMarketplace, onOpenMeetups, onOpenSettings, onOpenMyPoints }: SideMenuProps) {
   const { user } = useApp();
 
   if (!open) return null;
@@ -49,6 +50,13 @@ export default function SideMenu({ open, onClose, onEditProfile, onOpenMarketpla
         </button>
 
         <div className="flex-1 overflow-y-auto no-scrollbar py-2">
+          <button onClick={() => go(onOpenMyPoints)} className="w-full flex items-center gap-3 px-5 py-3.5 active:bg-bg-panel2 transition">
+            <span className="w-9 h-9 rounded-full bg-bg-panel2 border border-bg-border flex items-center justify-center shrink-0">
+              <Star size={16} className="text-amber-400" />
+            </span>
+            <span className="text-sm font-semibold text-neutral-100">הנקודות שלי</span>
+          </button>
+
           <button onClick={() => go(onOpenMarketplace)} className="w-full flex items-center gap-3 px-5 py-3.5 active:bg-bg-panel2 transition">
             <span className="w-9 h-9 rounded-full bg-bg-panel2 border border-bg-border flex items-center justify-center shrink-0">
               <ShoppingBag size={16} className="text-brand-light" />

@@ -31,6 +31,7 @@ export default function SeedPanel() {
   const [prizePoints, setPrizePoints] = useState(10);
   const [prizeCount, setPrizeCount] = useState(5);
   const [prizeCities, setPrizeCities] = useState<string[]>([ISRAELI_CITIES[0].name]);
+  const [prizeCollectMode, setPrizeCollectMode] = useState<"single" | "multi">("single");
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [running, setRunning] = useState(false);
@@ -96,6 +97,7 @@ export default function SeedPanel() {
         p_radius_m: SCATTER_RADIUS_M,
         p_count: prizeCount,
         p_icon_image_url: prizeImage,
+        p_collect_mode: prizeCollectMode,
       });
       if (err) {
         setRunning(false);
@@ -105,7 +107,8 @@ export default function SeedPanel() {
       total += data as number;
     }
     setRunning(false);
-    setResult(`פוזרו ${total} פרסים (${prizePoints} נק' כל אחד) ב-${prizeCities.length} ערים.`);
+    const modeLabel = prizeCollectMode === "multi" ? "איסוף מרובה" : "איסוף חד-פעמי";
+    setResult(`פוזרו ${total} פרסים (${prizePoints} נק' כל אחד, ${modeLabel}) ב-${prizeCities.length} ערים.`);
   };
 
   return (
@@ -293,6 +296,29 @@ export default function SeedPanel() {
                 onChange={(e) => setPrizeCount(Math.max(1, Math.min(200, Number(e.target.value))))}
                 className="w-full px-3 py-2.5 rounded-xl bg-bg-panel border border-bg-border text-sm text-neutral-100 outline-none focus:border-brand"
               />
+            </div>
+          </div>
+          <div>
+            <label className="text-xs text-neutral-400 mb-1.5 block">אופן איסוף</label>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setPrizeCollectMode("single")}
+                className={`flex-1 flex flex-col items-start gap-0.5 px-3 py-2.5 rounded-xl border text-right transition ${
+                  prizeCollectMode === "single" ? "bg-amber-500/15 border-amber-500" : "bg-bg-panel border-bg-border"
+                }`}
+              >
+                <span className="text-xs font-semibold text-neutral-100">חד-פעמי</span>
+                <span className="text-[10px] text-neutral-500">הראשון שמגיע לוקח - נעלם לכולם</span>
+              </button>
+              <button
+                onClick={() => setPrizeCollectMode("multi")}
+                className={`flex-1 flex flex-col items-start gap-0.5 px-3 py-2.5 rounded-xl border text-right transition ${
+                  prizeCollectMode === "multi" ? "bg-amber-500/15 border-amber-500" : "bg-bg-panel border-bg-border"
+                }`}
+              >
+                <span className="text-xs font-semibold text-neutral-100">מרובה</span>
+                <span className="text-[10px] text-neutral-500">כל מי שעובר בטווח מקבל נקודות</span>
+              </button>
             </div>
           </div>
           <div>
