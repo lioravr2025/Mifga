@@ -14,6 +14,15 @@ import type { HazardReport, LatLng } from "../types";
 const PATH_MIN_DISTANCE_M = 15;
 const PATH_MIN_INTERVAL_MS = 8000;
 
+// "Is the rider actually moving" - net displacement over a rolling window,
+// not a single-sample speed check, since GPS jitter alone (5-15m, even
+// stationary) can look like movement in one hop but cancels out over time.
+// A real ride covers this distance in well under the window even at walking
+// pace, so this stays a cheap, false-positive-resistant gate for the
+// one-tap police/inspector quick-add (which skips confirmation entirely).
+const MOTION_WINDOW_MS = 12_000;
+const MOTION_MIN_DISPLACEMENT_M = 20;
+
 /**
  * Drives the "active ride" beep-alert loop: while a ride is on, every time
  * the live position updates we check distance to every hazard and play a
@@ -30,17 +39,15 @@ export interface RideMonitor {
   /** the hazard currently up for a Waze-style "is it still there?" prompt, one at a time even if several triggered close together */
   pendingConfirmHazard: HazardReport | null;
   resolvePendingConfirm: () => void;
+  /** net GPS displacement over the last few seconds clears a minimum bar - gates the one-tap quick-add so it can't fire while stopped */
+  isMoving: boolean;
 }
-
-// Only police/inspector are worth interrupting the rider to ask "still
-// there?" - the app already treats these two as the ones people actually
-// route around, matching HAZARD_EXPIRY_TYPES' own reasoning.
-const CONFIRM_PROMPT_TYPES = ["police", "inspector"];
 
 export function useRideMonitor(position: LatLng): RideMonitor {
   const { hazards, settings, addRideLogEntry, user } = useApp();
   const [rideActive, setRideActive] = useState(false);
   const [pendingConfirmHazard, setPendingConfirmHazard] = useState<HazardReport | null>(null);
+  const [isMoving, setIsMoving] = useState(false);
   const alertedRef = useRef<Set<string>>(new Set());
   const confirmQueueRef = useRef<HazardReport[]>([]);
   // null (not 0) so "no ride running" is unambiguous - 0 is a valid (if
@@ -48,6 +55,7 @@ export function useRideMonitor(position: LatLng): RideMonitor {
   const startedAtRef = useRef<number | null>(null);
   const pathRef = useRef<LatLng[]>([]);
   const lastSampleRef = useRef<{ pos: LatLng; at: number } | null>(null);
+  const motionSamplesRef = useRef<{ pos: LatLng; at: number }[]>([]);
 
   const resolvePendingConfirm = () => {
     confirmQueueRef.current.shift();
@@ -61,10 +69,8 @@ export function useRideMonitor(position: LatLng): RideMonitor {
       if (distanceMeters(position, h.position) <= settings.rideAlertRadiusM) {
         alertedRef.current.add(h.id);
         playRideAlert(rideAlertKind(h.type));
-        if (CONFIRM_PROMPT_TYPES.includes(h.type)) {
-          confirmQueueRef.current.push(h);
-          setPendingConfirmHazard((cur) => cur ?? h);
-        }
+        confirmQueueRef.current.push(h);
+        setPendingConfirmHazard((cur) => cur ?? h);
       }
     }
 
@@ -77,6 +83,19 @@ export function useRideMonitor(position: LatLng): RideMonitor {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [position, rideActive, hazards, settings.rideAlertRadiusM]);
 
+  useEffect(() => {
+    if (!rideActive) {
+      motionSamplesRef.current = [];
+      setIsMoving(false);
+      return;
+    }
+    const now = Date.now();
+    const samples = motionSamplesRef.current;
+    samples.push({ pos: position, at: now });
+    while (samples.length > 1 && now - samples[0].at > MOTION_WINDOW_MS) samples.shift();
+    setIsMoving(samples.length > 1 && distanceMeters(samples[0].pos, position) >= MOTION_MIN_DISPLACEMENT_M);
+  }, [position, rideActive]);
+
   const startRide = () => {
     if (startedAtRef.current !== null) return; // already running - ignore a duplicate start
     primeRideAudio(); // called from the click handler - a real user gesture
@@ -85,6 +104,8 @@ export function useRideMonitor(position: LatLng): RideMonitor {
     setPendingConfirmHazard(null);
     pathRef.current = [position];
     lastSampleRef.current = { pos: position, at: Date.now() };
+    motionSamplesRef.current = [];
+    setIsMoving(false);
     startedAtRef.current = Date.now();
     setRideActive(true);
     if (isBackendConfigured && user.id) {
@@ -106,5 +127,5 @@ export function useRideMonitor(position: LatLng): RideMonitor {
     setPendingConfirmHazard(null);
   };
 
-  return { rideActive, startRide, stopRide, pendingConfirmHazard, resolvePendingConfirm };
+  return { rideActive, startRide, stopRide, pendingConfirmHazard, resolvePendingConfirm, isMoving };
 }

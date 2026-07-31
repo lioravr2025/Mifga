@@ -42,7 +42,7 @@ export default function MapScreen({
   focusFriendId: string | null;
   onConsumeFocusFriend: () => void;
 }) {
-  const { hazards, prizes, collectPrize, friends, settings, lastAwardedPoints, clearLastAwarded, sendFriendMessage } = useApp();
+  const { hazards, prizes, collectPrize, friends, settings, lastAwardedPoints, clearLastAwarded, sendFriendMessage, addReport } = useApp();
   const friendsInMotionCount = friends.filter((f) => f.online && f.shareLocation).length;
   const favoriteFriends = friends.filter((f) => f.favorite);
 
@@ -73,6 +73,18 @@ export default function MapScreen({
     setTapPosition(pos);
     setReportStep("type");
     setReportOpen(true);
+  };
+
+  /**
+   * Police/inspector quick-report while actually riding: one tap = instant
+   * report at the current GPS position, no nickname/photo/location step.
+   * Gated on ride.isMoving (not just rideActive) so a rider who starts a
+   * ride but hasn't actually pulled away yet still goes through the normal
+   * flow - only real motion unlocks the no-confirmation fast path.
+   */
+  const quickAddWhileRiding = (type: HazardTypeId) => {
+    trackClick(`report_quick_instant_${type}`, "map");
+    addReport({ type, position });
   };
 
   const centerOnFriend = (pos: LatLng) => {
@@ -163,7 +175,10 @@ export default function MapScreen({
             {PRIMARY_HAZARD_TYPES.map((h) => (
               <button
                 key={h.id}
-                onClick={() => openReport(h.id)}
+                onClick={() => {
+                  const instant = ride.rideActive && ride.isMoving && (h.id === "police" || h.id === "inspector");
+                  instant ? quickAddWhileRiding(h.id) : openReport(h.id);
+                }}
                 className="w-12 h-12 rounded-full flex items-center justify-center active:scale-95 transition shadow-lg"
                 style={{ background: "#0f1830", border: `2px solid ${HAZARD_COLOR_HEX[h.color]}`, boxShadow: `0 0 12px -2px ${HAZARD_COLOR_HEX[h.color]}` }}
                 title={h.label}

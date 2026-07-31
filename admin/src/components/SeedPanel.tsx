@@ -1,12 +1,19 @@
 import { useRef, useState } from "react";
-import { Gift, ImagePlus, Shuffle, Siren, X } from "lucide-react";
+import { Gift, ImagePlus, MapPin, Shuffle, Siren, X } from "lucide-react";
 import { supabase } from "../lib/supabaseClient";
 import { HAZARD_TYPE_OPTIONS } from "../lib/hazardTypes";
 import { ISRAELI_CITIES } from "../lib/cities";
 import { Card } from "./Card";
+import AddressPickerMap from "./AddressPickerMap";
 
 const SCATTER_RADIUS_M = 3000;
+// A specific street pick should land right there, not scatter across a
+// whole neighborhood the way the city-wide radius does.
+const ADDRESS_RADIUS_M = 40;
 const PRIZE_EMOJIS = ["🎁", "🏆", "⭐", "💰", "🪙", "💎", "🎉", "🔶"];
+// Only these two are ever placed one at a time at a real, specific spot -
+// every other type is inherently a "somewhere in this area" scatter.
+const ADDRESS_PICKABLE_TYPES = ["police", "inspector"];
 
 export default function SeedPanel() {
   const [mode, setMode] = useState<"hazard" | "prize">("hazard");
@@ -15,6 +22,8 @@ export default function SeedPanel() {
   const [hazardType, setHazardType] = useState(HAZARD_TYPE_OPTIONS[0].id);
   const [hazardCity, setHazardCity] = useState(ISRAELI_CITIES[0].name);
   const [hazardCount, setHazardCount] = useState(5);
+  const [hazardLocationMode, setHazardLocationMode] = useState<"city" | "address">("city");
+  const [hazardAddress, setHazardAddress] = useState<{ lat: number; lng: number } | null>(null);
 
   // prize mode
   const [prizeIcon, setPrizeIcon] = useState(PRIZE_EMOJIS[0]);
@@ -40,17 +49,22 @@ export default function SeedPanel() {
     setPrizeCities((prev) => (prev.includes(name) ? prev.filter((c) => c !== name) : [...prev, name]));
   };
 
+  const useAddressMode = ADDRESS_PICKABLE_TYPES.includes(hazardType) && hazardLocationMode === "address";
+
   const sendHazards = async () => {
-    const city = ISRAELI_CITIES.find((c) => c.name === hazardCity);
-    if (!city) return;
+    const point = useAddressMode ? hazardAddress : ISRAELI_CITIES.find((c) => c.name === hazardCity);
+    if (!point) {
+      if (useAddressMode) setError("בחרו כתובת קודם");
+      return;
+    }
     setRunning(true);
     setError(null);
     setResult(null);
     const { data, error: err } = await supabase.rpc("admin_seed_hazards", {
       p_type: hazardType,
-      p_lat: city.lat,
-      p_lng: city.lng,
-      p_radius_m: SCATTER_RADIUS_M,
+      p_lat: point.lat,
+      p_lng: point.lng,
+      p_radius_m: useAddressMode ? ADDRESS_RADIUS_M : SCATTER_RADIUS_M,
       p_count: hazardCount,
     });
     setRunning(false);
@@ -58,7 +72,8 @@ export default function SeedPanel() {
       setError(err.message);
       return;
     }
-    setResult(`פוזרו ${data} דיווחי "${HAZARD_TYPE_OPTIONS.find((o) => o.id === hazardType)?.label}" באזור ${hazardCity}.`);
+    const label = HAZARD_TYPE_OPTIONS.find((o) => o.id === hazardType)?.label;
+    setResult(useAddressMode ? `פוזרו ${data} דיווחי "${label}" בכתובת שנבחרה.` : `פוזרו ${data} דיווחי "${label}" באזור ${hazardCity}.`);
   };
 
   const sendPrizes = async () => {
@@ -127,7 +142,10 @@ export default function SeedPanel() {
             <label className="text-xs text-neutral-400 mb-1 block">סוג מפגע</label>
             <select
               value={hazardType}
-              onChange={(e) => setHazardType(e.target.value)}
+              onChange={(e) => {
+                setHazardType(e.target.value);
+                if (!ADDRESS_PICKABLE_TYPES.includes(e.target.value)) setHazardLocationMode("city");
+              }}
               className="w-full px-3 py-2.5 rounded-xl bg-bg-panel border border-bg-border text-sm text-neutral-100 outline-none focus:border-brand"
             >
               {HAZARD_TYPE_OPTIONS.map((o) => (
@@ -137,20 +155,51 @@ export default function SeedPanel() {
               ))}
             </select>
           </div>
-          <div>
-            <label className="text-xs text-neutral-400 mb-1 block">עיר</label>
-            <select
-              value={hazardCity}
-              onChange={(e) => setHazardCity(e.target.value)}
-              className="w-full px-3 py-2.5 rounded-xl bg-bg-panel border border-bg-border text-sm text-neutral-100 outline-none focus:border-brand"
-            >
-              {ISRAELI_CITIES.map((c) => (
-                <option key={c.name} value={c.name}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </div>
+
+          {ADDRESS_PICKABLE_TYPES.includes(hazardType) && (
+            <div className="flex gap-2">
+              <button
+                onClick={() => setHazardLocationMode("city")}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border text-xs font-semibold transition ${
+                  hazardLocationMode === "city" ? "bg-brand/15 border-brand text-brand-light" : "bg-bg-panel border-bg-border text-neutral-400"
+                }`}
+              >
+                <Shuffle size={12} />
+                פיזור בעיר
+              </button>
+              <button
+                onClick={() => setHazardLocationMode("address")}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border text-xs font-semibold transition ${
+                  hazardLocationMode === "address" ? "bg-brand/15 border-brand text-brand-light" : "bg-bg-panel border-bg-border text-neutral-400"
+                }`}
+              >
+                <MapPin size={12} />
+                כתובת מדויקת
+              </button>
+            </div>
+          )}
+
+          {useAddressMode ? (
+            <div>
+              <label className="text-xs text-neutral-400 mb-1 block">כתובת</label>
+              <AddressPickerMap hazardType={hazardType} value={hazardAddress} onChange={setHazardAddress} />
+            </div>
+          ) : (
+            <div>
+              <label className="text-xs text-neutral-400 mb-1 block">עיר</label>
+              <select
+                value={hazardCity}
+                onChange={(e) => setHazardCity(e.target.value)}
+                className="w-full px-3 py-2.5 rounded-xl bg-bg-panel border border-bg-border text-sm text-neutral-100 outline-none focus:border-brand"
+              >
+                {ISRAELI_CITIES.map((c) => (
+                  <option key={c.name} value={c.name}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           <div>
             <label className="text-xs text-neutral-400 mb-1 block">כמות (מקסימום 200)</label>
             <input
@@ -164,7 +213,7 @@ export default function SeedPanel() {
           </div>
           <button
             onClick={sendHazards}
-            disabled={running}
+            disabled={running || (useAddressMode && !hazardAddress)}
             className="w-full py-2.5 rounded-xl bg-brand text-white text-sm font-bold active:scale-95 transition disabled:opacity-40"
           >
             {running ? "מפזר..." : "פיזור"}
