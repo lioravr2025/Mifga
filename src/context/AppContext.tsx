@@ -34,7 +34,7 @@ import { ensureSession, fetchOwnProfile, recoverAccount as recoverAccountRemote 
 import { insertProfile, updateProfileRemote } from "../lib/backend/profile";
 import { awardPointsRemote, awardVotePointsRemote } from "../lib/backend/profile";
 import { confirmHazardRemote, denyHazardRemote, fetchHazards, insertHazard, subscribeHazards } from "../lib/backend/hazards";
-import { collectPrizeRemote, fetchPrizes, subscribePrizes } from "../lib/backend/prizes";
+import { collectPrizeRemote, fetchMyCollectedPrizeIds, fetchPrizes, subscribePrizes } from "../lib/backend/prizes";
 import { awardMeetupArrival } from "../lib/backend/meetups";
 import { uploadBlob } from "../lib/backend/storage";
 import { playPrizeCollected } from "../lib/sound";
@@ -208,6 +208,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // Backend-only feature (admin-seeded via the dashboard's "פיזור" tab) - no
   // offline/local-mode equivalent, so it just starts empty there.
   const [prizes, setPrizes] = useState<Prize[]>([]);
+  // Multi-collect prizes this rider already collected - hidden from *their*
+  // map only (the prize row itself stays live for everyone else). Single-
+  // collect prizes never need this: they're removed from `prizes` for
+  // everyone the moment anyone collects them.
+  const [myCollectedPrizeIds, setMyCollectedPrizeIds] = useState<Set<string>>(new Set());
   const [groups, setGroups] = useState<WalkieGroup[]>(() => {
     if (isBackendConfigured) return []; // populated by the bootstrap effect below
     // backfill `messages` for groups created before that field existed - otherwise
@@ -352,6 +357,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
             if (!cancelled) setPrizes(remotePrizes);
           })
           .catch((err) => console.error("Mifga: fetchPrizes failed", err));
+        fetchMyCollectedPrizeIds(uid)
+          .then((ids) => {
+            if (!cancelled) setMyCollectedPrizeIds(new Set(ids));
+          })
+          .catch((err) => console.error("Mifga: fetchMyCollectedPrizeIds failed", err));
       } catch (err) {
         console.error("Mifga: backend bootstrap failed", err);
       } finally {
@@ -563,6 +573,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setUser((prev) => ({ ...prev, points: prev.points + points }));
         setLastAwardedPoints(points);
         if (settings.notifyTypes.prizes) playPrizeCollected();
+        // Multi-collect prizes stay live for everyone else, but this rider
+        // shouldn't keep seeing (or re-triggering proximity collection on)
+        // one they already got - hide it from just their own map.
+        if (isMulti) setMyCollectedPrizeIds((prev) => new Set(prev).add(id));
       })
       .catch((err) => console.error("Mifga: collectPrize failed", err));
   };
@@ -890,11 +904,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hazards, expiryTick]);
 
+  const visiblePrizes = useMemo(
+    () => prizes.filter((p) => !myCollectedPrizeIds.has(p.id)),
+    [prizes, myCollectedPrizeIds]
+  );
+
   const value: AppContextValue = {
     user,
     friends,
     hazards: visibleHazards,
-    prizes,
+    prizes: visiblePrizes,
     groups,
     settings,
     lastAwardedPoints,

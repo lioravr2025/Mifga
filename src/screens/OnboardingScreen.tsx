@@ -35,12 +35,13 @@ function isValidIsraeliPhone(raw: string): boolean {
   return /^05\d{8}$/.test(normalizeIsraeliPhone(raw));
 }
 
+// "other" is last on purpose - it's the only one that's off by default.
 const NOTIFY_ROWS: { key: keyof NotifyTypePrefs; label: string; icon: typeof Siren; color: string }[] = [
   { key: "police", label: "שוטר", icon: Siren, color: HAZARD_COLOR_HEX.police },
   { key: "inspector", label: "פקח", icon: Shield, color: HAZARD_COLOR_HEX.inspector },
-  { key: "other", label: "מפגע אחר", icon: TriangleAlert, color: HAZARD_COLOR_HEX.pothole },
   { key: "meetups", label: "מפגשים", icon: Users, color: "#a78bfa" },
   { key: "prizes", label: "פרסים", icon: Gift, color: "#f59e0b" },
+  { key: "other", label: "מפגע אחר", icon: TriangleAlert, color: HAZARD_COLOR_HEX.pothole },
 ];
 
 type Mode = "signup" | "login" | "support";

@@ -4,12 +4,15 @@ import { useApp } from "../context/AppContext";
 import { HAZARD_COLOR_HEX } from "../lib/colors";
 import type { NotifyTypePrefs } from "../types";
 
+// "other" is last on purpose - it's the only one that's off by default, so
+// it reads as the exception at the bottom rather than breaking up the "all
+// on" group above it.
 const NOTIFY_TYPE_ROWS: { key: keyof NotifyTypePrefs; label: string; icon: typeof Siren; color: string }[] = [
   { key: "police", label: "שוטר", icon: Siren, color: HAZARD_COLOR_HEX.police },
   { key: "inspector", label: "פקח", icon: Shield, color: HAZARD_COLOR_HEX.inspector },
-  { key: "other", label: "מפגע אחר", icon: TriangleAlert, color: HAZARD_COLOR_HEX.pothole },
   { key: "meetups", label: "מפגשים", icon: Users, color: "#a78bfa" },
   { key: "prizes", label: "פרסים", icon: Gift, color: "#f59e0b" },
+  { key: "other", label: "מפגע אחר", icon: TriangleAlert, color: HAZARD_COLOR_HEX.pothole },
 ];
 
 export default function SettingsSheet({ open, onClose }: { open: boolean; onClose: () => void }) {

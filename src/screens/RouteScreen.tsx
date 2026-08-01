@@ -7,7 +7,7 @@ import PulseRing from "../components/PulseRing";
 import AddressAutocomplete from "../components/AddressAutocomplete";
 import { AutoFollow, MapResizeHandler } from "../components/MapView";
 import { trackClick } from "../lib/analytics";
-import { fetchRoute, minDistanceToPath, remainingDistanceAlongPath } from "../lib/routing";
+import { planSafeRoute, minDistanceToPath, remainingDistanceAlongPath } from "../lib/routing";
 import { formatDistance } from "../lib/geo";
 import { getHazardType } from "../data/hazardTypes";
 import { destinationDivIcon, hazardDivIcon, selfDivIcon } from "../lib/mapIcons";
@@ -48,7 +48,11 @@ export default function RouteScreen({ position, ride }: { position: LatLng; ride
     setDestPoint(dest);
     setDestLabel(label);
     try {
-      const r = await fetchRoute(position, dest);
+      const r = await planSafeRoute(
+        position,
+        dest,
+        hazards.map((h) => h.position)
+      );
       if (!r) {
         setError("לא נמצא מסלול נסיעה בין הנקודות.");
         return;
@@ -82,7 +86,7 @@ export default function RouteScreen({ position, ride }: { position: LatLng; ride
         {loading && (
           <div className="mt-2 flex items-center gap-1.5 text-xs text-neutral-400">
             <Loader2 size={13} className="animate-spin" />
-            מחשב מסלול ל{destLabel}...
+            מחשב מסלול בטוח ל{destLabel}...
           </div>
         )}
         {error && <div className="mt-2 text-xs text-red-400">{error}</div>}

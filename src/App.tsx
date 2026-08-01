@@ -20,6 +20,7 @@ import OnboardingScreen from "./screens/OnboardingScreen";
 import { useGeolocation } from "./hooks/useGeolocation";
 import { useRideMonitor } from "./hooks/useRideMonitor";
 import { useAppConfig } from "./hooks/useAppConfig";
+import { useWakeLock } from "./hooks/useWakeLock";
 import { compareVersions, isVersionBelow } from "./lib/versionCheck";
 import { useApp } from "./context/AppContext";
 
@@ -41,6 +42,8 @@ export default function App() {
   // Lives here (not inside a screen) so a ride keeps beeping regardless of
   // which tab is open - Route isn't kept mounted like Map is.
   const ride = useRideMonitor(position);
+  // Screen stays on for the whole ride, same as Waze during turn-by-turn.
+  useWakeLock(ride.rideActive);
   const updateRequired = isVersionBelow(__APP_VERSION__, appConfig.minRequiredVersion);
   const optionalUpdateAvailable =
     !updateRequired && !!appConfig.latestVersion && compareVersions(__APP_VERSION__, appConfig.latestVersion) < 0;

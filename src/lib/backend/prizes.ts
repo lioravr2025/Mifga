@@ -18,6 +18,14 @@ export async function collectPrizeRemote(id: string): Promise<number | null> {
   return points >= 0 ? points : null;
 }
 
+/** Multi-collect prizes this rider already has a prize_collections row for - used to hide them from their own map, even though they're still visible/collectible for everyone else. */
+export async function fetchMyCollectedPrizeIds(uid: string): Promise<string[]> {
+  if (!supabase) throw new Error("Supabase not configured");
+  const { data, error } = await supabase.from("prize_collections").select("prize_id").eq("user_id", uid);
+  if (error) throw error;
+  return (data as { prize_id: string }[]).map((r) => r.prize_id);
+}
+
 /** Live updates for prizes - INSERT for new ones, UPDATE for collected (removed client-side once collected_at is set). */
 export function subscribePrizes(onInsert: (prize: Prize) => void, onCollected: (id: string) => void): () => void {
   if (!supabase) return () => {};

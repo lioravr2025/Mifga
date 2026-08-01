@@ -5,6 +5,13 @@ import ScooterIcon from "./ScooterIcon";
 export default function LoadingScreen() {
   return (
     <div className="flex-1 flex flex-col items-center justify-center gap-6 bg-bg px-6">
+      <div className="text-center">
+        <h1 className="text-3xl font-extrabold text-neutral-50 mb-1" dir="ltr">
+          Mifga
+        </h1>
+        <p className="text-xs font-semibold text-brand-light">האפליקציה של רוכבי הכלים החשמליים</p>
+      </div>
+
       <div className="relative w-full h-28 max-w-xs">
         {/* the road */}
         <div className="absolute bottom-2 inset-x-0 h-0.5 bg-bg-border" />
@@ -31,12 +38,9 @@ export default function LoadingScreen() {
       </div>
 
       <div className="text-center">
-        <h1 className="text-2xl font-extrabold text-neutral-50 mb-1" dir="ltr">
-          Mifga
-        </h1>
-        <p className="text-xs font-semibold text-brand-light mb-3">האפליקציה של רוכבי הכלים החשמליים</p>
         <p className="text-sm font-semibold text-neutral-200 mb-1">טוען את האפליקציה...</p>
-        <p className="text-xs text-neutral-500">תכף מתחילים לנסוע בטוח</p>
+        <p className="text-xs text-neutral-500 mb-1">תכף מתחילים לנסוע בטוח</p>
+        <p className="text-xs text-neutral-500">כמו WAZE, רק לכלים חשמליים</p>
       </div>
     </div>
   );
