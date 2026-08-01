@@ -1,8 +1,10 @@
 import { useState } from "react";
-import { Bell, Gift, LogOut, Map, Shield, Siren, Trash2, TriangleAlert, Users, X } from "lucide-react";
+import { Bell, Gift, LogOut, Map, Shield, Siren, Trash2, TriangleAlert, Users, Volume2, X } from "lucide-react";
 import BottomSheet from "./BottomSheet";
 import { useApp } from "../context/AppContext";
 import { HAZARD_COLOR_HEX } from "../lib/colors";
+import { useHebrewVoices } from "../hooks/useHebrewVoices";
+import { isSpeechSupported } from "../lib/speech";
 import type { NotifyTypePrefs } from "../types";
 
 // "other" is last on purpose - it's the only one that's off by default, so
@@ -18,6 +20,7 @@ const NOTIFY_TYPE_ROWS: { key: keyof NotifyTypePrefs; label: string; icon: typeo
 
 export default function SettingsSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { settings, updateSettings, updateNotifyTypes, logout, deleteAccount } = useApp();
+  const hebrewVoices = useHebrewVoices();
   const [confirmingLogout, setConfirmingLogout] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [working, setWorking] = useState(false);
@@ -137,6 +140,37 @@ export default function SettingsSheet({ open, onClose }: { open: boolean; onClos
           <div className="text-xs text-neutral-400 mt-1">{settings.rideAlertRadiusM} מטר</div>
         </div>
       </div>
+
+      {isSpeechSupported() && (
+        <div className="flex items-center justify-between p-4 rounded-2xl bg-bg-panel2 border border-bg-border mb-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="w-9 h-9 rounded-full bg-bg-panel flex items-center justify-center shrink-0">
+              <Volume2 size={17} className="text-brand-light" />
+            </span>
+            <div className="min-w-0">
+              <div className="text-sm font-semibold text-neutral-50">קול הנחיה בנסיעה</div>
+              {hebrewVoices.length > 0 ? (
+                <div className="text-xs text-neutral-400">בחרו קול עברי להנחיות הניווט</div>
+              ) : (
+                <div className="text-xs text-neutral-400">לא נמצא קול עברי במכשיר - ההנחיה הקולית מושתקת עד שיותקן</div>
+              )}
+            </div>
+          </div>
+          {hebrewVoices.length > 0 && (
+            <select
+              value={settings.voiceURI && hebrewVoices.some((v) => v.voiceURI === settings.voiceURI) ? settings.voiceURI : hebrewVoices[0].voiceURI}
+              onChange={(e) => updateSettings({ voiceURI: e.target.value })}
+              className="shrink-0 max-w-[38%] bg-bg-panel border border-bg-border rounded-lg px-2 py-1.5 text-xs text-neutral-200"
+            >
+              {hebrewVoices.map((v) => (
+                <option key={v.voiceURI} value={v.voiceURI}>
+                  {v.name}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+      )}
 
       {settings.notificationsEnabled && (
         <div className="p-4 rounded-2xl bg-bg-panel2 border border-bg-border mb-3">

@@ -220,6 +220,8 @@ export interface AppSettings {
   rideAlertRadiusM: number;
   /** once the walkie-talkie tip on the Friends screen is dismissed, it stays gone */
   walkieTipDismissed: boolean;
+  /** voiceURI of the chosen Hebrew TTS voice for navigation announcements; null = auto-pick the first Hebrew voice the device reports */
+  voiceURI: string | null;
 }
 
 export interface RideLogEntry {

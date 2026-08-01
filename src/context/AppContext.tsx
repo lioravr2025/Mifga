@@ -175,6 +175,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   notifyDailyLimit: "limited",
   rideAlertRadiusM: 100,
   walkieTipDismissed: false,
+  voiceURI: null,
 };
 
 const EMPTY_USER: UserProfile = {

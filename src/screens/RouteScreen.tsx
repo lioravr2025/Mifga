@@ -57,10 +57,10 @@ export default function RouteScreen({ position, ride }: { position: LatLng; ride
     const instruction = describeManeuver(nav.upcoming);
     if (nav.distanceToUpcomingM <= VOICE_NEAR_M && !announcedNearRef.current.has(idx)) {
       announcedNearRef.current.add(idx);
-      speak(`${instruction}, עכשיו`);
+      speak(`${instruction}, עכשיו`, settings.voiceURI);
     } else if (nav.distanceToUpcomingM <= VOICE_FAR_M && !announcedFarRef.current.has(idx)) {
       announcedFarRef.current.add(idx);
-      speak(`בעוד ${Math.round(nav.distanceToUpcomingM / 10) * 10} מטר, ${instruction}`);
+      speak(`בעוד ${Math.round(nav.distanceToUpcomingM / 10) * 10} מטר, ${instruction}`, settings.voiceURI);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigating, voiceEnabled, nav.activeIndex, nav.distanceToUpcomingM]);
