@@ -6,8 +6,64 @@
 // synced to the backend). Not reachable by a normal client call: gated by a
 // shared secret only the cron job knows, so this can't be abused to mass-
 // notify every rider on demand.
+//
+// Self-contained on purpose (not importing shared/fcm.ts) so this file can
+// be pasted directly into the Supabase Dashboard's Edge Function editor
+// without needing the CLI's multi-file bundling.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { getFcmAccessToken, getServiceAccount, sendFcmMessage } from "../_shared/fcm.ts";
+
+interface ServiceAccount {
+  project_id: string;
+  client_email: string;
+  private_key: string;
+}
+
+function base64url(bytes: ArrayBuffer | Uint8Array | string): string {
+  const raw = typeof bytes === "string" ? new TextEncoder().encode(bytes) : new Uint8Array(bytes);
+  let str = "";
+  raw.forEach((b) => (str += String.fromCharCode(b)));
+  return btoa(str).replace(/=+$/, "").replace(/\+/g, "-").replace(/\//g, "_");
+}
+
+async function signJwt(account: ServiceAccount): Promise<string> {
+  const now = Math.floor(Date.now() / 1000);
+  const header = { alg: "RS256", typ: "JWT" };
+  const claims = {
+    iss: account.client_email,
+    scope: "https://www.googleapis.com/auth/firebase.messaging",
+    aud: "https://oauth2.googleapis.com/token",
+    iat: now,
+    exp: now + 3600,
+  };
+  const unsigned = `${base64url(JSON.stringify(header))}.${base64url(JSON.stringify(claims))}`;
+  const pem = account.private_key.replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\s/g, "");
+  const keyBytes = Uint8Array.from(atob(pem), (c) => c.charCodeAt(0));
+  const cryptoKey = await crypto.subtle.importKey("pkcs8", keyBytes, { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["sign"]);
+  const signature = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", cryptoKey, new TextEncoder().encode(unsigned));
+  return `${unsigned}.${base64url(signature)}`;
+}
+
+async function getFcmAccessToken(account: ServiceAccount): Promise<string> {
+  const jwt = await signJwt(account);
+  const res = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${jwt}`,
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(`FCM auth failed: ${JSON.stringify(data)}`);
+  return data.access_token as string;
+}
+
+async function sendFcmMessage(projectId: string, accessToken: string, token: string, title: string, body: string) {
+  const res = await fetch(`https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ message: { token, notification: { title, body }, android: { priority: "high" } } }),
+  });
+  const invalid = res.status === 404 || res.status === 400;
+  return { token, ok: res.ok, status: res.status, invalid };
+}
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -36,7 +92,7 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ meetups: 0, sent: 0 }), { status: 200 });
     }
 
-    const account = getServiceAccount();
+    const account: ServiceAccount = JSON.parse(Deno.env.get("FCM_SERVICE_ACCOUNT")!);
     const accessToken = await getFcmAccessToken(account);
     let totalSent = 0;
     const deadTokens: string[] = [];
