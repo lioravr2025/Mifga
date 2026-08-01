@@ -17,7 +17,11 @@ import { logClientError } from "./errorLogger";
  */
 export async function registerPush(uid: string): Promise<void> {
   if (!isNative() || !supabase) return;
-  logClientError("push: registerPush started", { context: { uid } });
+  const { data: sessionData } = await supabase.auth.getSession();
+  const liveSessionUid = sessionData.session?.user.id ?? null;
+  logClientError("push: registerPush started", {
+    context: { uid, liveSessionUid, uidMatchesSession: uid === liveSessionUid },
+  });
   try {
     let status = await PushNotifications.checkPermissions();
     if (status.receive === "prompt") {
@@ -29,7 +33,10 @@ export async function registerPush(uid: string): Promise<void> {
     }
 
     await PushNotifications.addListener("registration", async (token) => {
-      logClientError("push: got FCM token, saving", { context: { uid, tokenPrefix: token.value.slice(0, 12) } });
+      const { data: sessionAtSave } = await supabase!.auth.getSession();
+      logClientError("push: got FCM token, saving", {
+        context: { uid, tokenPrefix: token.value.slice(0, 12), liveSessionUidAtSave: sessionAtSave.session?.user.id ?? null },
+      });
       const { error } = await supabase!
         .from("push_tokens")
         .upsert({ user_id: uid, token: token.value, platform: "android", updated_at: new Date().toISOString() }, { onConflict: "user_id,token" });
