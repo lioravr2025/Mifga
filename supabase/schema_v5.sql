@@ -93,3 +93,24 @@ end;
 $$;
 
 grant execute on function public.admin_seed_prizes_at(text, integer, jsonb, text, text, integer) to authenticated;
+
+-- ============================================================================
+-- delete_own_profile - self-service account deletion from the Settings
+-- sheet. Same cascade behavior as admin_delete_profile (ride_log,
+-- hazard_votes, friendships, walkie groups/messages, feedback, meetup_rsvps,
+-- hosted meetups, marketplace listings all cascade-delete via existing FKs;
+-- hazards.reporter_id is set null instead so the report itself survives).
+-- Scoped to auth.uid() only, no target-uid parameter - a caller can only
+-- ever delete themselves, unlike the admin version.
+-- ============================================================================
+create or replace function public.delete_own_profile()
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+  delete from public.profiles where id = auth.uid();
+end;
+$$;
+
+grant execute on function public.delete_own_profile() to authenticated;

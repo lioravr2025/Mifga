@@ -1,4 +1,5 @@
-import { Bell, Gift, Map, Shield, Siren, TriangleAlert, Users, X } from "lucide-react";
+import { useState } from "react";
+import { Bell, Gift, LogOut, Map, Shield, Siren, Trash2, TriangleAlert, Users, X } from "lucide-react";
 import BottomSheet from "./BottomSheet";
 import { useApp } from "../context/AppContext";
 import { HAZARD_COLOR_HEX } from "../lib/colors";
@@ -16,7 +17,39 @@ const NOTIFY_TYPE_ROWS: { key: keyof NotifyTypePrefs; label: string; icon: typeo
 ];
 
 export default function SettingsSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { settings, updateSettings, updateNotifyTypes } = useApp();
+  const { settings, updateSettings, updateNotifyTypes, logout, deleteAccount } = useApp();
+  const [confirmingLogout, setConfirmingLogout] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [working, setWorking] = useState(false);
+  const [accountError, setAccountError] = useState<string | null>(null);
+
+  const handleLogout = async () => {
+    setWorking(true);
+    setAccountError(null);
+    try {
+      await logout();
+      onClose();
+    } catch (err) {
+      setAccountError(err instanceof Error ? err.message : "ההתנתקות נכשלה - נסו שוב");
+    } finally {
+      setWorking(false);
+      setConfirmingLogout(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    setWorking(true);
+    setAccountError(null);
+    try {
+      await deleteAccount();
+      onClose();
+    } catch (err) {
+      setAccountError(err instanceof Error ? err.message : "מחיקת החשבון נכשלה - נסו שוב");
+    } finally {
+      setWorking(false);
+      setConfirmingDelete(false);
+    }
+  };
 
   const toggleNotifications = async () => {
     if (!settings.notificationsEnabled) {
@@ -132,7 +165,71 @@ export default function SettingsSheet({ open, onClose }: { open: boolean; onClos
         </div>
       )}
 
-      <p className="text-[11px] text-neutral-600 text-center mt-5" dir="ltr">
+      <div className="mt-5 pt-4 border-t border-bg-border space-y-2">
+        {!confirmingLogout ? (
+          <button
+            onClick={() => setConfirmingLogout(true)}
+            disabled={working}
+            className="w-full flex items-center justify-center gap-1.5 py-2 text-xs text-neutral-500 active:text-neutral-300 transition disabled:opacity-40"
+          >
+            <LogOut size={13} />
+            התנתקות
+          </button>
+        ) : (
+          <div className="flex items-center gap-2 px-1">
+            <span className="flex-1 text-xs text-neutral-400">להתנתק? תוכלו לחזור עם מספר הטלפון וקוד השחזור.</span>
+            <button
+              onClick={handleLogout}
+              disabled={working}
+              className="px-3 py-1.5 rounded-lg bg-bg-panel2 border border-bg-border text-xs font-semibold text-neutral-200 active:scale-95 transition disabled:opacity-40"
+            >
+              {working ? "..." : "כן"}
+            </button>
+            <button
+              onClick={() => setConfirmingLogout(false)}
+              disabled={working}
+              className="px-3 py-1.5 text-xs text-neutral-500 active:text-neutral-300 transition"
+            >
+              ביטול
+            </button>
+          </div>
+        )}
+
+        {!confirmingDelete ? (
+          <button
+            onClick={() => setConfirmingDelete(true)}
+            disabled={working}
+            className="w-full flex items-center justify-center gap-1.5 py-2 text-xs text-red-400/70 active:text-red-400 transition disabled:opacity-40"
+          >
+            <Trash2 size={13} />
+            מחיקת חשבון
+          </button>
+        ) : (
+          <div className="flex items-center gap-2 px-1">
+            <span className="flex-1 text-xs text-red-300 font-semibold">למחוק את החשבון לצמיתות? אי אפשר לבטל.</span>
+            <button
+              onClick={handleDeleteAccount}
+              disabled={working}
+              className="px-3 py-1.5 rounded-lg bg-red-500 text-white text-xs font-bold active:scale-95 transition disabled:opacity-40"
+            >
+              {working ? "..." : "כן, מחיקה"}
+            </button>
+            <button
+              onClick={() => setConfirmingDelete(false)}
+              disabled={working}
+              className="px-3 py-1.5 text-xs text-neutral-500 active:text-neutral-300 transition"
+            >
+              ביטול
+            </button>
+          </div>
+        )}
+
+        {accountError && (
+          <p className="text-[11px] text-red-400 bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2 text-center">{accountError}</p>
+        )}
+      </div>
+
+      <p className="text-[11px] text-neutral-600 text-center mt-4" dir="ltr">
         Mifga v{__APP_VERSION__}
       </p>
     </BottomSheet>

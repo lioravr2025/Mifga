@@ -21,3 +21,14 @@ export function saveJSON<T>(key: string, value: T): void {
     // won't persist across reloads.
   }
 }
+
+/** Local (no-backend) mode logout/delete-account equivalent - wipes every mifga: key so the app starts fresh, same end state as a real reinstall would give a backend-mode user. */
+export function clearAllStorage(): void {
+  try {
+    Object.keys(localStorage)
+      .filter((k) => k.startsWith(PREFIX))
+      .forEach((k) => localStorage.removeItem(k));
+  } catch {
+    // storage unavailable - nothing to clear
+  }
+}

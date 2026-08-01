@@ -25,12 +25,18 @@ import {
   POINTS_PER_VOTE,
   REMOVAL_THRESHOLD,
 } from "../data/hazardTypes";
-import { loadJSON, saveJSON } from "../lib/storage";
+import { clearAllStorage, loadJSON, saveJSON } from "../lib/storage";
 import { playAudioUrl } from "../lib/nativeMic";
 import { setErrorLogUser } from "../lib/errorLogger";
 import { setAnalyticsUser } from "../lib/analytics";
 import { isBackendConfigured } from "../lib/supabaseClient";
-import { ensureSession, fetchOwnProfile, recoverAccount as recoverAccountRemote } from "../lib/backend/auth";
+import {
+  deleteOwnProfile,
+  ensureSession,
+  fetchOwnProfile,
+  recoverAccount as recoverAccountRemote,
+  signOutSession,
+} from "../lib/backend/auth";
 import { insertProfile, updateProfileRemote } from "../lib/backend/profile";
 import { awardPointsRemote, awardVotePointsRemote } from "../lib/backend/profile";
 import { confirmHazardRemote, denyHazardRemote, fetchHazards, insertHazard, subscribeHazards } from "../lib/backend/hazards";
@@ -147,6 +153,8 @@ interface AppContextValue {
   /** Throws on failure (e.g. network/backend error) so the onboarding screen can show it - local mode never throws. */
   completeOnboarding: (input: OnboardingInput) => Promise<void>;
   recoverAccount: (phone: string, code: string) => Promise<boolean>;
+  logout: () => Promise<void>;
+  deleteAccount: () => Promise<void>;
   addRideLogEntry: (entry: Omit<RideLogEntry, "id">) => void;
   deleteRideLogEntry: (id: string) => void;
   submitFeedback: (liked: boolean, note: string) => void;
@@ -675,6 +683,44 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  /**
+   * Ends the session and returns to onboarding - the profile row itself is
+   * untouched (backend mode), so signing back in later is just the existing
+   * phone+code recovery flow, exactly as if this were a fresh install.
+   */
+  const logout = async () => {
+    if (isBackendConfigured) {
+      await signOutSession().catch((err) => console.error("Mifga: logout failed", err));
+      setUser(EMPTY_USER);
+      setFriends([]);
+      setGroups([]);
+      setHazards([]);
+      setPrizes([]);
+      setMyCollectedPrizeIds(new Set());
+      setRideLog([]);
+      setFeedbackEntries([]);
+      setIncomingFriendRequests([]);
+      setIncomingGroupInvites([]);
+    } else {
+      clearAllStorage();
+      setUser(DEMO_USER);
+      setFriends(DEMO_FRIENDS);
+      setGroups([]);
+      setHazards(seedHazards());
+      setRideLog([]);
+      setFeedbackEntries([]);
+    }
+    setOnboardingComplete(false);
+  };
+
+  /** Permanently deletes the account (cascades server-side to everything owned by it), then logs out the same way. */
+  const deleteAccount = async () => {
+    if (isBackendConfigured) {
+      await deleteOwnProfile();
+    }
+    await logout();
+  };
+
   const addRideLogEntry = (entry: Omit<RideLogEntry, "id">) => {
     if (isBackendConfigured && user.id) {
       insertRideLogEntry(user.id, entry).catch((err) => console.error("Mifga: addRideLogEntry failed", err));
@@ -945,6 +991,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     clearLastAwarded: () => setLastAwardedPoints(null),
     completeOnboarding,
     recoverAccount,
+    logout,
+    deleteAccount,
     addRideLogEntry,
     deleteRideLogEntry,
     submitFeedback,

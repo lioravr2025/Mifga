@@ -59,3 +59,17 @@ export async function isUsernameTakenRemote(username: string, excludeUid?: strin
   if (error) throw error;
   return (count ?? 0) > 0;
 }
+
+/** Ends the current anonymous session - the profile row itself is untouched, so "logging back in" later is exactly the existing phone+code recovery flow. */
+export async function signOutSession(): Promise<void> {
+  if (!supabase) throw new Error("Supabase not configured");
+  const { error } = await supabase.auth.signOut();
+  if (error) throw error;
+}
+
+/** Self-service account deletion (delete_own_profile is scoped to auth.uid() server-side - can never target anyone else). */
+export async function deleteOwnProfile(): Promise<void> {
+  if (!supabase) throw new Error("Supabase not configured");
+  const { error } = await supabase.rpc("delete_own_profile");
+  if (error) throw error;
+}
