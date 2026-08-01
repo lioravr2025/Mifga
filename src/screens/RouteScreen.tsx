@@ -1,14 +1,17 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AttributionControl, Circle, MapContainer, Marker, Polyline, TileLayer } from "react-leaflet";
-import { AlertTriangle, Loader2, MapPin, ShieldCheck, Square } from "lucide-react";
+import { AlertTriangle, Loader2, MapPin, ShieldCheck, Square, Volume2, VolumeX } from "lucide-react";
 import { useApp } from "../context/AppContext";
 import ScooterIcon from "../components/ScooterIcon";
 import PulseRing from "../components/PulseRing";
 import AddressAutocomplete from "../components/AddressAutocomplete";
+import NavigationBanner from "../components/NavigationBanner";
 import { AutoFollow, MapResizeHandler } from "../components/MapView";
 import { trackClick } from "../lib/analytics";
-import { planSafeRoute, minDistanceToPath, remainingDistanceAlongPath } from "../lib/routing";
+import { planSafeRoute, minDistanceToPath, remainingDistanceAlongPath, describeManeuver, type RouteResult } from "../lib/routing";
 import { formatDistance } from "../lib/geo";
+import { speak } from "../lib/speech";
+import { useTurnByTurn } from "../hooks/useTurnByTurn";
 import { getHazardType } from "../data/hazardTypes";
 import { destinationDivIcon, hazardDivIcon, selfDivIcon } from "../lib/mapIcons";
 import type { RideMonitor } from "../hooks/useRideMonitor";
@@ -17,17 +20,50 @@ import type { LatLng } from "../types";
 const DARK_TILES = "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
 const LIGHT_TILES = "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png";
 const HAZARD_ALERT_RADIUS_M = 120;
+// Two-stage announcement per maneuver, same shape Waze uses: a heads-up
+// while there's still real distance to cover, then a sharp "now" cue right
+// before it.
+const VOICE_FAR_M = 250;
+const VOICE_NEAR_M = 40;
 
 export default function RouteScreen({ position, ride }: { position: LatLng; ride: RideMonitor }) {
   const { hazards, settings, user } = useApp();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [route, setRoute] = useState<{ points: LatLng[]; distanceM: number; durationS: number } | null>(null);
+  const [route, setRoute] = useState<RouteResult | null>(null);
   const [destPoint, setDestPoint] = useState<LatLng | null>(null);
   const [destLabel, setDestLabel] = useState("");
   const [remainingM, setRemainingM] = useState<number | null>(null);
+  const [voiceEnabled, setVoiceEnabled] = useState(true);
 
   const hazardsOnRoute = route ? hazards.filter((h) => minDistanceToPath(h.position, route.points) <= HAZARD_ALERT_RADIUS_M) : [];
+
+  const nav = useTurnByTurn(position, route?.steps ?? []);
+  const navigating = ride.rideActive && !!route && !!nav.upcoming && !nav.isArrived;
+
+  // Voice announcements - one "heads up" per maneuver as it comes within
+  // VOICE_FAR_M, one sharper "now" cue within VOICE_NEAR_M. Tracked by step
+  // index so each maneuver only gets each announcement once, no matter how
+  // many position ticks land inside those ranges.
+  const announcedFarRef = useRef<Set<number>>(new Set());
+  const announcedNearRef = useRef<Set<number>>(new Set());
+  useEffect(() => {
+    announcedFarRef.current = new Set();
+    announcedNearRef.current = new Set();
+  }, [route]);
+  useEffect(() => {
+    if (!navigating || !voiceEnabled || !nav.upcoming) return;
+    const idx = nav.activeIndex;
+    const instruction = describeManeuver(nav.upcoming);
+    if (nav.distanceToUpcomingM <= VOICE_NEAR_M && !announcedNearRef.current.has(idx)) {
+      announcedNearRef.current.add(idx);
+      speak(`${instruction}, עכשיו`);
+    } else if (nav.distanceToUpcomingM <= VOICE_FAR_M && !announcedFarRef.current.has(idx)) {
+      announcedFarRef.current.add(idx);
+      speak(`בעוד ${Math.round(nav.distanceToUpcomingM / 10) * 10} מטר, ${instruction}`);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navigating, voiceEnabled, nav.activeIndex, nav.distanceToUpcomingM]);
 
   // Live "how much is left" while riding this specific route - the shared ride
   // monitor already handles hazard-proximity audio alerts and path logging
@@ -64,6 +100,11 @@ export default function RouteScreen({ position, ride }: { position: LatLng; ride
       setLoading(false);
     }
   };
+
+  const remainingRatio = route && remainingM !== null && route.distanceM > 0 ? Math.min(1, remainingM / route.distanceM) : null;
+  const remainingDurationS = remainingRatio !== null && route ? route.durationS * remainingRatio : null;
+  const etaLabel =
+    remainingDurationS !== null ? new Date(Date.now() + remainingDurationS * 1000).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" }) : null;
 
   return (
     <div className="flex-1 min-h-0 flex flex-col safe-top">
@@ -115,6 +156,8 @@ export default function RouteScreen({ position, ride }: { position: LatLng; ride
           ))}
         </MapContainer>
 
+        {navigating && nav.upcoming && <NavigationBanner step={nav.upcoming} distanceM={nav.distanceToUpcomingM} />}
+
         <div className="absolute bottom-3 inset-x-3 z-[500] flex flex-col gap-2">
           <div className="relative">
             {ride.rideActive && <PulseRing color="#ef4444" />}
@@ -136,25 +179,41 @@ export default function RouteScreen({ position, ride }: { position: LatLng; ride
 
           {route && (
             <div className="bg-bg-panel/95 backdrop-blur border border-bg-border rounded-2xl p-4 shadow-2xl max-h-[40%] overflow-y-auto no-scrollbar">
-              <div className="flex items-center justify-between mb-3">
-                <div>
-                  {ride.rideActive && remainingM !== null ? (
-                    <>
-                      <div className="text-lg font-bold text-neutral-50">{formatDistance(remainingM)} נותרו</div>
-                      <div className="text-xs text-neutral-400">
-                        מתוך {formatDistance(route.distanceM)} · {Math.round(route.durationS / 60)} דק' משוער
+              {ride.rideActive ? (
+                <div className="flex items-center justify-between">
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-lg font-bold text-neutral-50 tabular-nums">
+                      {remainingM !== null ? formatDistance(remainingM) : formatDistance(route.distanceM)}
+                    </span>
+                    <span className="text-xs text-neutral-400">נותרו</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {remainingDurationS !== null && (
+                      <div className="text-left">
+                        <div className="text-sm font-bold text-neutral-100 tabular-nums">{Math.max(0, Math.round(remainingDurationS / 60))} דק'</div>
+                        {etaLabel && <div className="text-[10px] text-neutral-500 tabular-nums">הגעה {etaLabel}</div>}
                       </div>
-                    </>
-                  ) : (
-                    <>
-                      <div className="text-lg font-bold text-neutral-50">{Math.round(route.durationS / 60)} דק'</div>
-                      <div className="text-xs text-neutral-400">{formatDistance(route.distanceM)}</div>
-                    </>
-                  )}
+                    )}
+                    <button
+                      onClick={() => setVoiceEnabled((v) => !v)}
+                      className="w-8 h-8 rounded-full bg-bg-panel border border-bg-border flex items-center justify-center active:scale-95 transition shrink-0"
+                      title={voiceEnabled ? "השתקת הנחיות קוליות" : "הפעלת הנחיות קוליות"}
+                    >
+                      {voiceEnabled ? (
+                        <Volume2 size={14} className="text-brand-light" />
+                      ) : (
+                        <VolumeX size={14} className="text-neutral-500" />
+                      )}
+                    </button>
+                  </div>
                 </div>
-                {/* Once riding, hazards are already visible as markers on the (now much bigger) map - no need to also list them here. */}
-                {!ride.rideActive &&
-                  (hazardsOnRoute.length === 0 ? (
+              ) : (
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <div className="text-lg font-bold text-neutral-50">{Math.round(route.durationS / 60)} דק'</div>
+                    <div className="text-xs text-neutral-400">{formatDistance(route.distanceM)}</div>
+                  </div>
+                  {hazardsOnRoute.length === 0 ? (
                     <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-green-500/15 border border-green-500/40 text-green-300 text-xs font-semibold">
                       <ShieldCheck size={14} />
                       אין מפגעים ידועים בדרך
@@ -164,8 +223,9 @@ export default function RouteScreen({ position, ride }: { position: LatLng; ride
                       <AlertTriangle size={14} />
                       {hazardsOnRoute.length} מפגעים בדרך
                     </div>
-                  ))}
-              </div>
+                  )}
+                </div>
+              )}
               {!ride.rideActive && hazardsOnRoute.length > 0 && (
                 <div className="space-y-2">
                   {hazardsOnRoute.map((h) => {
@@ -178,7 +238,7 @@ export default function RouteScreen({ position, ride }: { position: LatLng; ride
                     );
                   })}
                   <p className="text-[10px] text-neutral-500 pt-1">
-                    ברגע שתלחצו "תחילת נסיעה" תקבלו צפצוף כשתתקרבו לכל מפגע לאורך הדרך - כמו בעמוד הראשי.
+                    ברגע שתלחצו "תחילת נסיעה" תקבלו הנחיות ניווט קוליות ותתריעו על כל מפגע לאורך הדרך - כמו בעמוד הראשי.
                   </p>
                 </div>
               )}

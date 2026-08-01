@@ -34,7 +34,7 @@ function shortLabel(name: string | undefined, address: NominatimAddress, fallbac
 }
 
 async function fetchSuggestions(query: string): Promise<Suggestion[]> {
-  const url = `${NOMINATIM_URL}?format=json&addressdetails=1&q=${encodeURIComponent(query)}&limit=5&countrycodes=il`;
+  const url = `${NOMINATIM_URL}?format=json&addressdetails=1&accept-language=he&q=${encodeURIComponent(query)}&limit=5&countrycodes=il`;
   const res = await fetch(url, { headers: { Accept: "application/json" } });
   if (!res.ok) return [];
   const data = await res.json();

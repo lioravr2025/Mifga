@@ -8,10 +8,68 @@ import type { LatLng } from "../types";
 const NOMINATIM_URL = "https://nominatim.openstreetmap.org/search";
 const OSRM_URL = "https://router.project-osrm.org/route/v1/driving";
 
+export interface RouteStep {
+  location: LatLng;
+  /** OSRM maneuver type - "depart" | "turn" | "arrive" | "merge" | "roundabout" | "fork" | "end of road" | "new name" | "continue" | ... */
+  type: string;
+  /** "left" | "right" | "slight left" | "slight right" | "sharp left" | "sharp right" | "straight" | "uturn" */
+  modifier?: string;
+  streetName: string;
+  /** length of this step's own road segment, i.e. distance from this maneuver to the next one */
+  distanceM: number;
+  durationS: number;
+  /** roundabout exit number, when type is "roundabout"/"rotary" */
+  exit?: number;
+}
+
 export interface RouteResult {
   points: LatLng[];
   distanceM: number;
   durationS: number;
+  /** turn-by-turn maneuvers in order, flattened across every leg (a safe-route detour has multiple via-waypoints, hence multiple OSRM "legs", but navigation should read as one continuous route) */
+  steps: RouteStep[];
+}
+
+const MODIFIER_HE: Record<string, string> = {
+  left: "שמאלה",
+  right: "ימינה",
+  "slight left": "מעט שמאלה",
+  "slight right": "מעט ימינה",
+  "sharp left": "בחדות שמאלה",
+  "sharp right": "בחדות ימינה",
+  straight: "ישר",
+  uturn: "פרסה",
+};
+
+/** Hebrew, Waze-style phrasing for one maneuver - covers OSRM's common step types, falls back to a generic "turn"/"continue" phrasing for anything unrecognized rather than showing raw English. */
+export function describeManeuver(step: RouteStep): string {
+  const mod = step.modifier ? MODIFIER_HE[step.modifier] : undefined;
+  const streetSuffix = step.streetName ? ` אל ${step.streetName}` : "";
+  switch (step.type) {
+    case "depart":
+      return `התחילו נסיעה${step.streetName ? ` ב${step.streetName}` : ""}`;
+    case "arrive":
+      return "הגעתם ליעד";
+    case "roundabout":
+    case "rotary":
+      return step.exit ? `בכיכר, צאו ביציאה ${step.exit}` : "היכנסו לכיכר";
+    case "fork":
+      return mod ? `בפיצול, פנו ${mod}${streetSuffix}` : `בפיצול, המשיכו${streetSuffix}`;
+    case "end of road":
+      return mod ? `בסוף הדרך, פנו ${mod}${streetSuffix}` : `בסוף הדרך, המשיכו${streetSuffix}`;
+    case "merge":
+      return `התמזגו${streetSuffix}`;
+    case "on ramp":
+      return `עלו לכביש${streetSuffix}`;
+    case "off ramp":
+      return `רדו מהכביש${streetSuffix}`;
+    case "new name":
+    case "continue":
+      return `המשיכו${streetSuffix}`;
+    case "turn":
+    default:
+      return mod ? `פנו ${mod}${streetSuffix}` : `המשיכו${streetSuffix}`;
+  }
 }
 
 export async function geocode(query: string, biasNear: LatLng): Promise<LatLng | null> {
@@ -27,17 +85,45 @@ export async function geocode(query: string, biasNear: LatLng): Promise<LatLng |
 
 async function fetchOsrmRoute(waypoints: LatLng[]): Promise<RouteResult | null> {
   const coordsParam = waypoints.map((p) => `${p.lng},${p.lat}`).join(";");
-  const url = `${OSRM_URL}/${coordsParam}?overview=full&geometries=geojson`;
+  const url = `${OSRM_URL}/${coordsParam}?overview=full&geometries=geojson&steps=true`;
   const res = await fetch(url);
   if (!res.ok) return null;
   const data = await res.json();
   const route = data?.routes?.[0];
   if (!route) return null;
   const coords: [number, number][] = route.geometry.coordinates;
+
+  // A safe-route detour has multiple via-waypoints, hence multiple OSRM
+  // "legs" (one per waypoint pair) - flatten them into one continuous
+  // step sequence so turn-by-turn reads as a single route regardless of
+  // how many detour points were involved in computing it.
+  interface OsrmStep {
+    maneuver: { location: [number, number]; type: string; modifier?: string; exit?: number };
+    name?: string;
+    distance: number;
+    duration: number;
+  }
+  const steps: RouteStep[] = [];
+  for (const leg of (route.legs ?? []) as { steps?: OsrmStep[] }[]) {
+    for (const step of leg.steps ?? []) {
+      const [lng, lat] = step.maneuver.location;
+      steps.push({
+        location: { lat, lng },
+        type: step.maneuver.type,
+        modifier: step.maneuver.modifier,
+        streetName: step.name?.trim() || "",
+        distanceM: step.distance,
+        durationS: step.duration,
+        exit: step.maneuver.exit,
+      });
+    }
+  }
+
   return {
     points: coords.map(([lng, lat]) => ({ lat, lng })),
     distanceM: route.distance,
     durationS: route.duration,
+    steps,
   };
 }
 
