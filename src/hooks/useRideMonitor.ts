@@ -3,6 +3,7 @@ import { useApp } from "../context/AppContext";
 import { rideAlertKind } from "../data/hazardTypes";
 import { distanceMeters } from "../lib/geo";
 import { playRideAlert, primeRideAudio } from "../lib/sound";
+import { speak } from "../lib/speech";
 import { isBackendConfigured } from "../lib/supabaseClient";
 import { setRidingStatus } from "../lib/backend/friends";
 import { startBackgroundRide, stopBackgroundRide } from "../lib/backgroundRide";
@@ -211,6 +212,7 @@ export function useRideMonitor(position: LatLng): RideMonitor {
   const startRide = () => {
     if (startedAtRef.current !== null) return; // already running - ignore a duplicate start
     primeRideAudio(); // called from the click handler - a real user gesture
+    speak("יוצאים לדרך", settings.voiceURI);
     alertedRef.current.clear();
     confirmQueueRef.current = [];
     setPendingConfirmHazard(null);

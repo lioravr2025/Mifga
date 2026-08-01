@@ -29,7 +29,6 @@ import { clearAllStorage, loadJSON, saveJSON } from "../lib/storage";
 import { registerPush, sendPushToUsers, unregisterPush } from "../lib/push";
 import { playAudioUrl } from "../lib/nativeMic";
 import { logClientError, setErrorLogUser } from "../lib/errorLogger";
-import { getHebrewVoices, isSpeechSupported } from "../lib/speech";
 import { setAnalyticsUser } from "../lib/analytics";
 import { isBackendConfigured } from "../lib/supabaseClient";
 import {
@@ -487,30 +486,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!isBackendConfigured || !user.id || !onboardingComplete) return;
     registerPush(user.id).catch((err) => console.error("Mifga: registerPush failed", err));
-  }, [user.id, onboardingComplete]);
-
-  // Temporary remote diagnostic for the "voice picker row is missing"
-  // report - logs whether this WebView exposes speechSynthesis at all, and
-  // how many Hebrew voices it reports, straight to client_error_logs so it's
-  // visible from the Supabase Table Editor without a USB debug session.
-  // Logged twice (immediately, and again after voices have had a chance to
-  // load async) since getVoices() is frequently empty on the very first call.
-  useEffect(() => {
-    if (!isBackendConfigured || !user.id || !onboardingComplete) return;
-    const report = (when: string) => {
-      logClientError(`speech: diagnostic (${when})`, {
-        context: {
-          uid: user.id,
-          hasSpeechSynthesis: isSpeechSupported(),
-          hebrewVoiceCount: getHebrewVoices().length,
-          hebrewVoiceNames: getHebrewVoices().map((v) => v.name),
-          userAgent: navigator.userAgent,
-        },
-      });
-    };
-    report("immediate");
-    const timer = setTimeout(() => report("after 1.5s"), 1500);
-    return () => clearTimeout(timer);
   }, [user.id, onboardingComplete]);
 
   // Live presence: push my position + activity timestamp periodically so

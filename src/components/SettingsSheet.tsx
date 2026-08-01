@@ -158,12 +158,12 @@ export default function SettingsSheet({ open, onClose }: { open: boolean; onClos
           </div>
           {hebrewVoices.length > 0 && (
             <select
-              value={settings.voiceURI && hebrewVoices.some((v) => v.voiceURI === settings.voiceURI) ? settings.voiceURI : hebrewVoices[0].voiceURI}
+              value={settings.voiceURI && hebrewVoices.some((v) => v.id === settings.voiceURI) ? settings.voiceURI : hebrewVoices[0].id}
               onChange={(e) => updateSettings({ voiceURI: e.target.value })}
               className="shrink-0 max-w-[38%] bg-bg-panel border border-bg-border rounded-lg px-2 py-1.5 text-xs text-neutral-200"
             >
               {hebrewVoices.map((v) => (
-                <option key={v.voiceURI} value={v.voiceURI}>
+                <option key={v.id} value={v.id}>
                   {v.name}
                 </option>
               ))}

@@ -1,16 +1,26 @@
 import { useEffect, useState } from "react";
-import { getHebrewVoices } from "../lib/speech";
+import { getHebrewVoices, isSpeechSupported, type VoiceOption } from "../lib/speech";
 
-/** Reactive list of Hebrew TTS voices installed on this device - most engines load their voice list asynchronously (fires "voiceschanged"), so this starts empty/partial and fills in once the browser reports it. */
-export function useHebrewVoices(): SpeechSynthesisVoice[] {
-  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>(() => getHebrewVoices());
+/** Reactive list of Hebrew TTS voices available on this device - native TextToSpeech voices load once the engine finishes initializing (Android), Web Speech API voices often load asynchronously too (fires "voiceschanged"), so this starts empty and fills in once ready. */
+export function useHebrewVoices(): VoiceOption[] {
+  const [voices, setVoices] = useState<VoiceOption[]>([]);
 
   useEffect(() => {
-    if (!("speechSynthesis" in window)) return;
-    const update = () => setVoices(getHebrewVoices());
-    update();
-    window.speechSynthesis.addEventListener("voiceschanged", update);
-    return () => window.speechSynthesis.removeEventListener("voiceschanged", update);
+    if (!isSpeechSupported()) return;
+    let cancelled = false;
+    const load = () => {
+      getHebrewVoices().then((v) => {
+        if (!cancelled) setVoices(v);
+      });
+    };
+    load();
+    if ("speechSynthesis" in window) {
+      window.speechSynthesis.addEventListener("voiceschanged", load);
+    }
+    return () => {
+      cancelled = true;
+      if ("speechSynthesis" in window) window.speechSynthesis.removeEventListener("voiceschanged", load);
+    };
   }, []);
 
   return voices;
