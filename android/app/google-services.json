@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "829917990913",
+    "project_id": "mifga-6cd81",
+    "storage_bucket": "mifga-6cd81.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:829917990913:android:491860a497600a738c3000",
+        "android_client_info": {
+          "package_name": "com.mifga.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC2dBVh2bPVcEkhAqrTxZX3xK4ymOB5wiw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

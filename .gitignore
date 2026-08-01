@@ -7,3 +7,11 @@ ios
 *.tsbuildinfo
 
 .vercel
+
+# Firebase credentials - google-services.json is safe to commit (it's a
+# public client identifier, not a secret), but any service-account /
+# admin-sdk key must never enter git history.
+*firebase-adminsdk*.json
+*serviceAccountKey*.json
+supabase/.temp
+supabase/functions/**/.env

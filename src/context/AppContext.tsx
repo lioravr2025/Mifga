@@ -26,6 +26,7 @@ import {
   REMOVAL_THRESHOLD,
 } from "../data/hazardTypes";
 import { clearAllStorage, loadJSON, saveJSON } from "../lib/storage";
+import { registerPush, sendPushToUsers, unregisterPush } from "../lib/push";
 import { playAudioUrl } from "../lib/nativeMic";
 import { setErrorLogUser } from "../lib/errorLogger";
 import { setAnalyticsUser } from "../lib/analytics";
@@ -479,6 +480,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setAnalyticsUser(user.id || null);
   }, [user.id]);
 
+  // Push registration - no-op on web/dev, and harmless to call again with an
+  // already-registered device (just re-upserts the same token).
+  useEffect(() => {
+    if (!isBackendConfigured || !user.id || !onboardingComplete) return;
+    registerPush(user.id).catch((err) => console.error("Mifga: registerPush failed", err));
+  }, [user.id, onboardingComplete]);
+
   // Live presence: push my position + activity timestamp periodically so
   // friends see "online" / distance, once I'm a real onboarded user.
   useEffect(() => {
@@ -690,6 +698,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
    */
   const logout = async () => {
     if (isBackendConfigured) {
+      if (user.id) await unregisterPush(user.id).catch(() => {});
       await signOutSession().catch((err) => console.error("Mifga: logout failed", err));
       setUser(EMPTY_USER);
       setFriends([]);
@@ -801,7 +810,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const addMembersToGroup = (groupId: string, memberFriendIds: string[]) => {
     if (isBackendConfigured) {
       inviteMembersRemote(groupId, memberFriendIds)
-        .then(() => reloadGroups(user.id))
+        .then(() => {
+          reloadGroups(user.id);
+          sendPushToUsers(memberFriendIds, "הזמנה לקבוצת ווקי-טוקי", `${user.name} הזמין אותך להצטרף לקבוצה`);
+        })
         .catch((err) => console.error("Mifga: addMembersToGroup failed", err));
       return;
     }
@@ -917,6 +929,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (!isBackendConfigured || !user.id) return;
     await sendFriendRequest(user.id, targetUid);
     await reloadFriendsAndRequests(user.id);
+    sendPushToUsers([targetUid], "בקשת חברות חדשה", `${user.name} רוצה להתחבר איתך ב-Mifga`);
   };
 
   const respondFriendRequest = async (friendshipId: string, accept: boolean): Promise<void> => {
