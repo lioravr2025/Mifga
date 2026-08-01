@@ -48,6 +48,7 @@ export interface PrizeRow {
   lng: number;
   collected_at: string | null;
   collect_mode: "single" | "multi";
+  expires_at: string | null;
 }
 
 export function prizeFromRow(row: PrizeRow): Prize {
@@ -58,6 +59,7 @@ export function prizeFromRow(row: PrizeRow): Prize {
     points: row.points,
     position: { lat: row.lat, lng: row.lng },
     collectMode: row.collect_mode,
+    expiresAt: row.expires_at ? new Date(row.expires_at).getTime() : undefined,
   };
 }
 

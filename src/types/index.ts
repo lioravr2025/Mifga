@@ -61,6 +61,8 @@ export interface Prize {
   position: LatLng;
   /** 'single' = first rider to collect it wins, it's then gone for everyone. 'multi' = stays on the map, every rider who passes collects it once for themselves. */
   collectMode: "single" | "multi";
+  /** admin-set at seed time, in days - undefined means it never expires */
+  expiresAt?: number;
 }
 
 export interface Meetup {

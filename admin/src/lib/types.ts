@@ -90,6 +90,7 @@ export interface PrizeRow {
   lng: number;
   collected_by: string | null;
   collected_at: string | null;
+  expires_at: string | null;
 }
 
 export interface MeetupRow {

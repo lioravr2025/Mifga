@@ -3,6 +3,7 @@ import { Gift, ImagePlus, MapPin, Shuffle, Siren, X } from "lucide-react";
 import { supabase } from "../lib/supabaseClient";
 import { HAZARD_TYPE_OPTIONS } from "../lib/hazardTypes";
 import { ISRAELI_CITIES } from "../lib/cities";
+import { isValidIsraelLandPoint } from "../lib/israelBounds";
 import { Card } from "./Card";
 import AddressPickerMap from "./AddressPickerMap";
 
@@ -14,6 +15,38 @@ const PRIZE_EMOJIS = ["🎁", "🏆", "⭐", "💰", "🪙", "💎", "🎉", "�
 // Only these two are ever placed one at a time at a real, specific spot -
 // every other type is inherently a "somewhere in this area" scatter.
 const ADDRESS_PICKABLE_TYPES = ["police", "inspector"];
+// Per rejected (sea/foreign) candidate, try again this many times before
+// giving up on that one point - land vastly dominates within any sane
+// scatter radius except right at the coastline, so this is generous headroom
+// rather than an expected-case budget.
+const MAX_ATTEMPTS_PER_POINT = 25;
+
+/**
+ * Random scatter within radiusM of center, same angle/distance formula the
+ * old server-side RPC used - but validated client-side against Israel's
+ * land boundary (see israelBounds.ts) before ever being sent to the server,
+ * so a coastal city's scatter circle overlapping the Mediterranean can't
+ * place a report or prize in the sea. Returns fewer than `count` points
+ * only if a candidate repeatedly failed validation (e.g. a tiny radius
+ * centered right on the shoreline).
+ */
+function scatterValidPoints(center: { lat: number; lng: number }, radiusM: number, count: number): { lat: number; lng: number }[] {
+  const points: { lat: number; lng: number }[] = [];
+  for (let i = 0; i < count; i++) {
+    for (let attempt = 0; attempt < MAX_ATTEMPTS_PER_POINT; attempt++) {
+      const angle = Math.random() * 2 * Math.PI;
+      const dist = Math.random() * radiusM;
+      const lat = center.lat + (dist * Math.cos(angle)) / 111_320;
+      const lng = center.lng + (dist * Math.sin(angle)) / (111_320 * Math.cos((center.lat * Math.PI) / 180));
+      const candidate = { lat, lng };
+      if (isValidIsraelLandPoint(candidate)) {
+        points.push(candidate);
+        break;
+      }
+    }
+  }
+  return points;
+}
 
 export default function SeedPanel() {
   const [mode, setMode] = useState<"hazard" | "prize">("hazard");
@@ -32,6 +65,8 @@ export default function SeedPanel() {
   const [prizeCount, setPrizeCount] = useState(5);
   const [prizeCities, setPrizeCities] = useState<string[]>([ISRAELI_CITIES[0].name]);
   const [prizeCollectMode, setPrizeCollectMode] = useState<"single" | "multi">("single");
+  // Empty = never expires (today's behavior). Admin-set in days, per request.
+  const [prizeExpiryDays, setPrizeExpiryDays] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [running, setRunning] = useState(false);
@@ -61,20 +96,23 @@ export default function SeedPanel() {
     setRunning(true);
     setError(null);
     setResult(null);
-    const { data, error: err } = await supabase.rpc("admin_seed_hazards", {
-      p_type: hazardType,
-      p_lat: point.lat,
-      p_lng: point.lng,
-      p_radius_m: useAddressMode ? ADDRESS_RADIUS_M : SCATTER_RADIUS_M,
-      p_count: hazardCount,
-    });
+    const positions = scatterValidPoints(point, useAddressMode ? ADDRESS_RADIUS_M : SCATTER_RADIUS_M, hazardCount);
+    if (positions.length === 0) {
+      setRunning(false);
+      setError("לא נמצאו נקודות תקינות בשטח היבשה באזור שנבחר");
+      return;
+    }
+    const { data, error: err } = await supabase.rpc("admin_seed_hazards_at", { p_type: hazardType, p_positions: positions });
     setRunning(false);
     if (err) {
       setError(err.message);
       return;
     }
     const label = HAZARD_TYPE_OPTIONS.find((o) => o.id === hazardType)?.label;
-    setResult(useAddressMode ? `פוזרו ${data} דיווחי "${label}" בכתובת שנבחרה.` : `פוזרו ${data} דיווחי "${label}" באזור ${hazardCity}.`);
+    const skippedNote = positions.length < hazardCount ? ` (${hazardCount - positions.length} נקודות נפסלו כי היו בים/מחוץ למדינה)` : "";
+    setResult(
+      (useAddressMode ? `פוזרו ${data} דיווחי "${label}" בכתובת שנבחרה.` : `פוזרו ${data} דיווחי "${label}" באזור ${hazardCity}.`) + skippedNote
+    );
   };
 
   const sendPrizes = async () => {
@@ -82,22 +120,25 @@ export default function SeedPanel() {
       setError("בחרו לפחות עיר אחת");
       return;
     }
+    const expiryDays = prizeExpiryDays.trim() ? Math.max(1, Math.round(Number(prizeExpiryDays))) : null;
     setRunning(true);
     setError(null);
     setResult(null);
     let total = 0;
+    let totalSkipped = 0;
     for (const cityName of prizeCities) {
       const city = ISRAELI_CITIES.find((c) => c.name === cityName);
       if (!city) continue;
-      const { data, error: err } = await supabase.rpc("admin_seed_prizes", {
+      const positions = scatterValidPoints(city, SCATTER_RADIUS_M, prizeCount);
+      totalSkipped += prizeCount - positions.length;
+      if (positions.length === 0) continue;
+      const { data, error: err } = await supabase.rpc("admin_seed_prizes_at", {
         p_icon: prizeIcon,
         p_points: prizePoints,
-        p_lat: city.lat,
-        p_lng: city.lng,
-        p_radius_m: SCATTER_RADIUS_M,
-        p_count: prizeCount,
+        p_positions: positions,
         p_icon_image_url: prizeImage,
         p_collect_mode: prizeCollectMode,
+        p_expiry_days: expiryDays,
       });
       if (err) {
         setRunning(false);
@@ -108,14 +149,17 @@ export default function SeedPanel() {
     }
     setRunning(false);
     const modeLabel = prizeCollectMode === "multi" ? "איסוף מרובה" : "איסוף חד-פעמי";
-    setResult(`פוזרו ${total} פרסים (${prizePoints} נק' כל אחד, ${modeLabel}) ב-${prizeCities.length} ערים.`);
+    const expiryLabel = expiryDays ? `, בתוקף ל-${expiryDays} ימים` : "";
+    const skippedNote = totalSkipped > 0 ? ` (${totalSkipped} נקודות נפסלו כי היו בים/מחוץ למדינה)` : "";
+    setResult(`פוזרו ${total} פרסים (${prizePoints} נק' כל אחד, ${modeLabel}${expiryLabel}) ב-${prizeCities.length} ערים.${skippedNote}`);
   };
 
   return (
     <Card title="פיזור מפגעים ופרסים" icon={<Shuffle size={16} className="text-brand-light" />}>
       <p className="text-[11px] text-neutral-500 mb-3 leading-relaxed">
         יוצר נתונים מלאכותיים על המפה - שוטרים/פקחים ייעלמו אוטומטית אחרי 20 דקות אם אף אחד לא מאשר שהם עדיין שם, בדיוק כמו
-        דיווח אמיתי. פרסים נעלמים לכולם ברגע שמישהו אוסף אותם.
+        דיווח אמיתי. פרסים במצב חד-פעמי נעלמים לכולם ברגע שמישהו אוסף אותם; במצב מרובה הם נשארים (כל אוסף פעם אחת לעצמו), ואפשר
+        גם להגביל תוקף בימים. כל הנקודות מסוננות אוטומטית כדי שלא ייפלו בים או מחוץ לגבולות המדינה.
       </p>
 
       <div className="flex gap-2 mb-4">
@@ -320,6 +364,17 @@ export default function SeedPanel() {
                 <span className="text-[10px] text-neutral-500">כל מי שעובר בטווח מקבל נקודות</span>
               </button>
             </div>
+          </div>
+          <div>
+            <label className="text-xs text-neutral-400 mb-1 block">תוקף (בימים, ריק = ללא תפוגה)</label>
+            <input
+              type="number"
+              min={1}
+              value={prizeExpiryDays}
+              onChange={(e) => setPrizeExpiryDays(e.target.value)}
+              placeholder="ללא תפוגה"
+              className="w-full px-3 py-2.5 rounded-xl bg-bg-panel border border-bg-border text-sm text-neutral-100 outline-none focus:border-brand"
+            />
           </div>
           <div>
             <label className="text-xs text-neutral-400 mb-1.5 block">ערים ({prizeCities.length} נבחרו)</label>

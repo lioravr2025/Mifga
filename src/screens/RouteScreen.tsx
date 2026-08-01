@@ -95,7 +95,7 @@ export default function RouteScreen({ position, ride }: { position: LatLng; ride
       <div className="flex-1 min-h-0 relative isolate">
         <MapContainer center={[position.lat, position.lng]} zoom={13} zoomControl={false} attributionControl={false} className="w-full h-full">
           <MapResizeHandler />
-          {ride.rideActive && <AutoFollow position={position} />}
+          {ride.rideActive && <AutoFollow position={position} zoom={17} />}
           <AttributionControl position="bottomright" prefix={false} />
           <TileLayer url={settings.theme === "dark" ? DARK_TILES : LIGHT_TILES} attribution="&copy; OpenStreetMap &copy; CARTO" />
           {ride.rideActive && (

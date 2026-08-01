@@ -904,10 +904,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hazards, expiryTick]);
 
-  const visiblePrizes = useMemo(
-    () => prizes.filter((p) => !myCollectedPrizeIds.has(p.id)),
-    [prizes, myCollectedPrizeIds]
-  );
+  const visiblePrizes = useMemo(() => {
+    const now = Date.now();
+    return prizes.filter((p) => !myCollectedPrizeIds.has(p.id) && (p.expiresAt === undefined || p.expiresAt > now));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prizes, myCollectedPrizeIds, expiryTick]);
 
   const value: AppContextValue = {
     user,

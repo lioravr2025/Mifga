@@ -1,6 +1,7 @@
 import { supabase } from "../supabaseClient";
 import { hazardFromRow, type HazardRow } from "./types";
 import { uploadDataUrl } from "./storage";
+import { isValidIsraelLandPoint } from "../israelBounds";
 import type { HazardReport, HazardTypeId, LatLng } from "../../types";
 
 export async function fetchHazards(): Promise<HazardReport[]> {
@@ -29,6 +30,13 @@ interface NewHazardInput {
 
 export async function insertHazard(input: NewHazardInput): Promise<HazardReport> {
   if (!supabase) throw new Error("Supabase not configured");
+  // A real rider's own GPS position is essentially never going to fail this
+  // (they're standing somewhere real), but it's a cheap guard against GPS
+  // glitches/spoofing placing a report in the sea or outside the country -
+  // checked before the photo upload so a bad position doesn't waste it.
+  if (!isValidIsraelLandPoint(input.position)) {
+    throw new Error("המיקום שדווח אינו בשטח ישראל");
+  }
   const photoUrl = input.photoDataUrl ? await uploadDataUrl("hazard-photos", input.reporterId, input.photoDataUrl) : null;
   const { data, error } = await supabase
     .from("hazards")

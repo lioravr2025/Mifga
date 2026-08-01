@@ -54,11 +54,27 @@ export function MapResizeHandler() {
   return null;
 }
 
-/** Waze-style following: keeps the map re-centered on the live position instead of leaving the rider to drift off the edge of a static map. Panning (not jumping) so it doesn't fight the rider trying to glance elsewhere. */
-export function AutoFollow({ position }: { position: LatLng }) {
+/**
+ * Waze-style following: keeps the map re-centered on the live position
+ * instead of leaving the rider to drift off the edge of a static map.
+ * Panning (not jumping) so it doesn't fight the rider trying to glance
+ * elsewhere. When `zoom` is given (route-planning screen, whose overview
+ * zoom is deliberately far-out for picking a destination) it's applied once
+ * on the first follow so starting a ride actually switches into a close-up
+ * "navigation" view instead of leaving the map at overview scale - true
+ * heading-up rotation/tilt isn't possible with plain Leaflet raster tiles,
+ * this is the closest equivalent available without swapping map libraries.
+ */
+export function AutoFollow({ position, zoom }: { position: LatLng; zoom?: number }) {
   const map = useMap();
+  const zoomedInRef = useRef(false);
   useEffect(() => {
-    map.panTo([position.lat, position.lng], { animate: true, duration: 0.5 });
+    if (zoom != null && !zoomedInRef.current) {
+      zoomedInRef.current = true;
+      map.setView([position.lat, position.lng], zoom, { animate: true });
+    } else {
+      map.panTo([position.lat, position.lng], { animate: true, duration: 0.5 });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [position.lat, position.lng]);
   return null;
