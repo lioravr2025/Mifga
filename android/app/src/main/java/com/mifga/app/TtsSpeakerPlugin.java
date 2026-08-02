@@ -59,7 +59,6 @@ public class TtsSpeakerPlugin extends Plugin {
                 String lang = locale != null ? locale.getLanguage() : "";
                 // "iw" is the old ISO 639-1 code for Hebrew some engines still report.
                 if (!"he".equals(lang) && !"iw".equals(lang)) continue;
-                if (v.getFeatures() != null && v.getFeatures().contains(TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED)) continue;
 
                 JSObject o = new JSObject();
                 o.put("id", v.getName());

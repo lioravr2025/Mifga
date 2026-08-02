@@ -94,11 +94,13 @@ export default function App() {
                 />
               </div>
             )}
-            {tab === "route" && (
-              <div className="flex-1 min-h-0 flex flex-col">
-                <RouteScreen position={position} ride={ride} />
-              </div>
-            )}
+            {/* Kept mounted (display toggling) like Map above, not remounted per tab
+                switch - otherwise an active turn-by-turn navigation (route, live
+                position tracking, voice announcement history) is destroyed the
+                moment you glance at another tab. */}
+            <div className={`flex-1 min-h-0 flex flex-col ${tab === "route" ? "" : "hidden"}`}>
+              <RouteScreen position={position} ride={ride} active={tab === "route"} />
+            </div>
 
             <BottomNav tab={tab} onChange={setTab} friendsBadgeCount={pendingFriendsCount} />
             <FeedbackButton />

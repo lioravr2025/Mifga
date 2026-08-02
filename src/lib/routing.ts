@@ -1,12 +1,36 @@
-import type { LatLng } from "../types";
+import type { LatLng, VehicleTypeId } from "../types";
 
 // Free, keyless public services used only for this local prototype:
 // - Nominatim for geocoding a typed destination into coordinates
-// - OSRM's public demo router for turn-by-turn driving routes
+// - A bicycle-profile OSRM router for turn-by-turn routes
 // Swap both for Google Geocoding + Directions API when porting to
 // production, to stay consistent with the Google Maps base layer.
 const NOMINATIM_URL = "https://nominatim.openstreetmap.org/search";
-const OSRM_URL = "https://router.project-osrm.org/route/v1/driving";
+// router.project-osrm.org's public demo only actually serves its car/driving
+// graph - requesting "/cycling/" or "/foot/" there silently returns the same
+// car route (verified directly: identical path and duration for both). This
+// community-run instance (openstreetmap.de) hosts a real, separately-weighted
+// bicycle graph, which is what actually keeps scooters/e-bikes off motorways
+// and toll roads - the URL segment stays "/driving/" (that's just OSRM's own
+// endpoint naming), the *host* is what picks the bike-weighted dataset.
+const OSRM_URL = "https://routing.openstreetmap.de/routed-bike/route/v1/driving";
+
+// Real-world average speeds (incl. traffic lights/junctions, not top speed) -
+// used instead of OSRM's own route.duration, which is tuned for whatever
+// profile served the route rather than any specific vehicle. Bicycle-profile
+// timing is closer than car timing but still not scooter/e-bike accurate.
+const AVG_SPEED_KMH: Record<VehicleTypeId, number> = {
+  scooter: 17,
+  ebike: 20,
+  emotorcycle: 32,
+};
+const DEFAULT_AVG_SPEED_KMH = 18;
+
+/** Duration estimate from real route distance and the rider's actual vehicle, replacing OSRM's own profile-based duration (car or generic bicycle, neither of which matches an e-scooter/e-bike). */
+export function estimateDurationS(distanceM: number, vehicleType?: VehicleTypeId): number {
+  const speedKmh = vehicleType ? AVG_SPEED_KMH[vehicleType] : DEFAULT_AVG_SPEED_KMH;
+  return (distanceM / 1000 / speedKmh) * 3600;
+}
 
 export interface RouteStep {
   location: LatLng;

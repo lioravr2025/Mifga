@@ -62,4 +62,13 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <!-- Android 11+ package-visibility filtering: without this, SpeechRecognizer
+         (voice-dictated address search) can silently fail to find/bind the
+         system's recognition service on some devices/OEMs. -->
+    <queries>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+    </queries>
 </manifest>

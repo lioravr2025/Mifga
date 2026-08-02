@@ -46,6 +46,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(MicRecorderPlugin.class);
         registerPlugin(BackgroundRidePlugin.class);
         registerPlugin(TtsSpeakerPlugin.class);
+        registerPlugin(SttListenerPlugin.class);
         super.onCreate(savedInstanceState);
 
         // Capacitor's default WebChromeClient grants getUserMedia() (mic/camera)

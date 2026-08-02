@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { AttributionControl, Circle, MapContainer, Marker, Polyline, TileLayer } from "react-leaflet";
-import { AlertTriangle, Loader2, MapPin, ShieldCheck, Square, Volume2, VolumeX } from "lucide-react";
+import { AlertTriangle, Loader2, Shield, ShieldCheck, Siren, Square, Volume2, VolumeX } from "lucide-react";
 import { useApp } from "../context/AppContext";
 import ScooterIcon from "../components/ScooterIcon";
 import PulseRing from "../components/PulseRing";
@@ -8,11 +8,20 @@ import AddressAutocomplete from "../components/AddressAutocomplete";
 import NavigationBanner from "../components/NavigationBanner";
 import { AutoFollow, MapResizeHandler } from "../components/MapView";
 import { trackClick } from "../lib/analytics";
-import { planSafeRoute, minDistanceToPath, remainingDistanceAlongPath, describeManeuver, type RouteResult } from "../lib/routing";
+import {
+  planSafeRoute,
+  minDistanceToPath,
+  remainingDistanceAlongPath,
+  describeManeuver,
+  estimateDurationS,
+  type RouteResult,
+} from "../lib/routing";
 import { formatDistance } from "../lib/geo";
 import { speak } from "../lib/speech";
+import { playRouteRecalculating } from "../lib/sound";
 import { useTurnByTurn } from "../hooks/useTurnByTurn";
 import { getHazardType } from "../data/hazardTypes";
+import { HAZARD_COLOR_HEX } from "../lib/colors";
 import { destinationDivIcon, hazardDivIcon, selfDivIcon } from "../lib/mapIcons";
 import type { RideMonitor } from "../hooks/useRideMonitor";
 import type { LatLng } from "../types";
@@ -25,9 +34,12 @@ const HAZARD_ALERT_RADIUS_M = 120;
 // before it.
 const VOICE_FAR_M = 250;
 const VOICE_NEAR_M = 40;
+// How far off the planned path counts as "actually left the route" (not
+// just GPS jitter) before triggering a Waze-style recalculation.
+const OFF_ROUTE_THRESHOLD_M = 45;
 
-export default function RouteScreen({ position, ride }: { position: LatLng; ride: RideMonitor }) {
-  const { hazards, settings, user } = useApp();
+export default function RouteScreen({ position, ride, active }: { position: LatLng; ride: RideMonitor; active: boolean }) {
+  const { hazards, settings, user, addReport } = useApp();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [route, setRoute] = useState<RouteResult | null>(null);
@@ -40,6 +52,41 @@ export default function RouteScreen({ position, ride }: { position: LatLng; ride
 
   const nav = useTurnByTurn(position, route?.steps ?? []);
   const navigating = ride.rideActive && !!route && !!nav.upcoming && !nav.isArrived;
+
+  // Instant one-tap police/inspector report while riding, no location/nickname/
+  // photo step - parity with the same buttons on the main map tab.
+  const quickAddWhileRiding = (type: "police" | "inspector") => {
+    trackClick(`report_quick_instant_${type}`, "route");
+    addReport({ type, position });
+  };
+
+  // Waze-style auto-reroute: once actually off the planned path (not just GPS
+  // jitter) during an active ride, recompute from the current position to the
+  // same destination and swap the route in, with a short recalculating chime.
+  // Never clears the displayed route while the new one is in flight, so the
+  // polyline doesn't flash empty mid-ride.
+  const reroutingRef = useRef(false);
+  useEffect(() => {
+    if (!ride.rideActive || !route || !destPoint || reroutingRef.current) return;
+    if (minDistanceToPath(position, route.points) <= OFF_ROUTE_THRESHOLD_M) return;
+    reroutingRef.current = true;
+    playRouteRecalculating();
+    planSafeRoute(
+      position,
+      destPoint,
+      hazards.map((h) => h.position)
+    )
+      .then((r) => {
+        if (r) setRoute(r);
+      })
+      .catch(() => {
+        // transient network hiccup - keep showing the previous route rather than clearing it
+      })
+      .finally(() => {
+        reroutingRef.current = false;
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [position, ride.rideActive, route, destPoint]);
 
   // Voice announcements - one "heads up" per maneuver as it comes within
   // VOICE_FAR_M, one sharper "now" cue within VOICE_NEAR_M. Tracked by step
@@ -101,8 +148,12 @@ export default function RouteScreen({ position, ride }: { position: LatLng; ride
     }
   };
 
-  const remainingRatio = route && remainingM !== null && route.distanceM > 0 ? Math.min(1, remainingM / route.distanceM) : null;
-  const remainingDurationS = remainingRatio !== null && route ? route.durationS * remainingRatio : null;
+  // Duration/ETA is computed from real route distance and the rider's actual
+  // vehicle (estimateDurationS), not OSRM's own route.duration - that's tuned
+  // for whichever profile served the route (car or generic bicycle), neither
+  // of which matches an e-scooter/e-bike's real average speed.
+  const totalDurationS = route ? estimateDurationS(route.distanceM, user.vehicleType) : null;
+  const remainingDurationS = remainingM !== null ? estimateDurationS(remainingM, user.vehicleType) : null;
   const etaLabel =
     remainingDurationS !== null ? new Date(Date.now() + remainingDurationS * 1000).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" }) : null;
 
@@ -115,14 +166,12 @@ export default function RouteScreen({ position, ride }: { position: LatLng; ride
         }`}
       >
         <h1 className="text-xl font-bold text-neutral-50 mb-4">תכנון מסלול בטוח ממפגעים</h1>
-        <div className="flex items-center gap-2 mb-2 px-4 py-3 rounded-2xl bg-bg-panel2 border border-bg-border">
-          <MapPin size={16} className="text-brand-light shrink-0" />
-          <span className="text-sm text-neutral-300">המיקום הנוכחי שלי</span>
-        </div>
+        {/* Navigation is always from the current position, same as Waze - one box, no separate "from" field. */}
         <AddressAutocomplete
           biasNear={position}
           placeholder="לאן נוסעים? הקלידו כתובת או יישוב"
           onSelect={(s) => planRouteTo(s.position, s.label)}
+          autoFocus={active}
         />
         {loading && (
           <div className="mt-2 flex items-center gap-1.5 text-xs text-neutral-400">
@@ -157,6 +206,30 @@ export default function RouteScreen({ position, ride }: { position: LatLng; ride
         </MapContainer>
 
         {navigating && nav.upcoming && <NavigationBanner step={nav.upcoming} distanceM={nav.distanceToUpcomingM} />}
+
+        {/* Parity with the main map tab's ride-mode quick-report strip - one tap
+            adds a police/inspector report at the current position instantly, no
+            location/nickname/photo step. */}
+        {ride.rideActive && (
+          <div className="absolute top-24 right-4 z-[500] flex flex-col gap-3">
+            <button
+              onClick={() => quickAddWhileRiding("police")}
+              className="w-12 h-12 rounded-full flex items-center justify-center active:scale-95 transition shadow-lg"
+              style={{ background: "#0f1830", border: `2px solid ${HAZARD_COLOR_HEX.police}`, boxShadow: `0 0 12px -2px ${HAZARD_COLOR_HEX.police}` }}
+              title="שוטר"
+            >
+              <Siren size={22} color={HAZARD_COLOR_HEX.police} />
+            </button>
+            <button
+              onClick={() => quickAddWhileRiding("inspector")}
+              className="w-12 h-12 rounded-full flex items-center justify-center active:scale-95 transition shadow-lg"
+              style={{ background: "#0f1830", border: `2px solid ${HAZARD_COLOR_HEX.inspector}`, boxShadow: `0 0 12px -2px ${HAZARD_COLOR_HEX.inspector}` }}
+              title="פקח"
+            >
+              <Shield size={22} color={HAZARD_COLOR_HEX.inspector} />
+            </button>
+          </div>
+        )}
 
         <div className="absolute bottom-3 inset-x-3 z-[500] flex flex-col gap-2">
           <div className="relative">
@@ -210,7 +283,7 @@ export default function RouteScreen({ position, ride }: { position: LatLng; ride
               ) : (
                 <div className="flex items-center justify-between mb-3">
                   <div>
-                    <div className="text-lg font-bold text-neutral-50">{Math.round(route.durationS / 60)} דק'</div>
+                    <div className="text-lg font-bold text-neutral-50">{Math.round((totalDurationS ?? route.durationS) / 60)} דק'</div>
                     <div className="text-xs text-neutral-400">{formatDistance(route.distanceM)}</div>
                   </div>
                   {hazardsOnRoute.length === 0 ? (

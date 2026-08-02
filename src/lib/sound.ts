@@ -105,6 +105,27 @@ export function playRideAlert(kind: RideAlertKind): void {
   else otherHazardBeeps(ctx);
 }
 
+/** Waze-style "recalculating route" chime: two short neutral blips, distinct from both the hazard alerts (which warn) and the prize chime (which rewards) - just a status cue. */
+export function playRouteRecalculating(): void {
+  const ctx = getContext();
+  if (!ctx) return;
+  const t0 = ctx.currentTime;
+  [660, 880].forEach((freq, i) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.value = freq;
+    const t = t0 + i * 0.11;
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(0.3, t + 0.015);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.15);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(t);
+    osc.stop(t + 0.17);
+  });
+}
+
 /** Prize pickup chime: a bright ascending major arpeggio - the classic "coin get" feel, unmistakably a reward rather than a warning. */
 export function playPrizeCollected(): void {
   const ctx = getContext();

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Loader2, MapPinned, Search } from "lucide-react";
+import { Loader2, MapPinned, Mic, Search } from "lucide-react";
+import { isVoiceInputSupported, listenForAddress } from "../lib/nativeStt";
 import type { LatLng } from "../types";
 
 interface Suggestion {
@@ -25,12 +26,26 @@ interface NominatimAddress {
 const NOMINATIM_URL = "https://nominatim.openstreetmap.org/search";
 const DEBOUNCE_MS = 400;
 
-/** "street number, city" like Waze shows - Nominatim's raw display_name is a full postal-style address (neighborhood, district, country, postcode) which is far too verbose for a suggestion list. */
-function shortLabel(name: string | undefined, address: NominatimAddress, fallback: string): string {
+/**
+ * "street number, city" like Waze shows - Nominatim's raw display_name is a
+ * full postal-style address (neighborhood, district, country, postcode)
+ * which is far too verbose for a suggestion list.
+ *
+ * `typedNumber`: many Israeli residential streets simply aren't mapped down
+ * to house-number granularity in OSM, so Nominatim returns a street-level
+ * match with no house_number at all even for a query that included one.
+ * Rather than silently dropping the number the user actually typed, this
+ * appends it to the label on a best-effort basis when Nominatim didn't
+ * confirm one itself - the pin still lands at the street-level coordinate
+ * (the most precise thing actually available), only the displayed text
+ * reflects what was typed.
+ */
+function shortLabel(name: string | undefined, address: NominatimAddress, fallback: string, typedNumber: string | null): string {
   const city = address.city || address.town || address.village || address.municipality || address.suburb || address.county;
   const parts: string[] = [];
   if (address.road) {
-    parts.push(address.house_number ? `${address.road} ${address.house_number}` : address.road);
+    const number = address.house_number || typedNumber;
+    parts.push(number ? `${address.road} ${number}` : address.road);
   } else if (name) {
     parts.push(name);
   }
@@ -38,7 +53,14 @@ function shortLabel(name: string | undefined, address: NominatimAddress, fallbac
   return parts.length > 0 ? parts.join(", ") : fallback;
 }
 
+/** Pulls a standalone house-number-shaped token (1-4 digits, optionally suffixed with a single Hebrew letter like "13א") out of a free-typed address query. */
+function extractTypedNumber(query: string): string | null {
+  const m = query.match(/\b\d{1,4}[א-ת]?\b/);
+  return m ? m[0] : null;
+}
+
 async function fetchSuggestions(query: string, biasNear: LatLng): Promise<Suggestion[]> {
+  const typedNumber = extractTypedNumber(query);
   const url = `${NOMINATIM_URL}?format=json&addressdetails=1&accept-language=he&q=${encodeURIComponent(query)}&limit=5&viewbox=${
     biasNear.lng - 0.3
   },${biasNear.lat + 0.3},${biasNear.lng + 0.3},${biasNear.lat - 0.3}&bounded=0`;
@@ -47,7 +69,7 @@ async function fetchSuggestions(query: string, biasNear: LatLng): Promise<Sugges
   const data = await res.json();
   if (!Array.isArray(data)) return [];
   return data.map((d: { display_name: string; name?: string; address?: NominatimAddress; lat: string; lon: string }) => ({
-    label: shortLabel(d.name, d.address ?? {}, d.display_name),
+    label: shortLabel(d.name, d.address ?? {}, d.display_name, typedNumber),
     fullLabel: d.display_name,
     position: { lat: parseFloat(d.lat), lng: parseFloat(d.lon) },
   }));
@@ -59,20 +81,47 @@ export default function AddressAutocomplete({
   placeholder,
   onSelect,
   onQueryChange,
+  autoFocus,
 }: {
   biasNear: LatLng;
   placeholder?: string;
   onSelect: (s: { label: string; position: LatLng }) => void;
   /** fired on every keystroke, not just on picking a suggestion - lets a search box filter live while still offering the dropdown for a precise pick */
   onQueryChange?: (q: string) => void;
+  /** focuses and visually highlights the field as soon as it mounts - for screens where this is the one thing to fill in (the route planner's destination box) */
+  autoFocus?: boolean;
 }) {
   const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const [dropdownRect, setDropdownRect] = useState<{ top: number; left: number; width: number } | null>(null);
+  const [listening, setListening] = useState(false);
+  const [voiceError, setVoiceError] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (autoFocus) inputRef.current?.focus();
+  }, [autoFocus]);
+
+  const startVoiceInput = async () => {
+    setVoiceError(false);
+    setListening(true);
+    try {
+      const text = await listenForAddress();
+      if (text) {
+        setQuery(text);
+        onQueryChange?.(text);
+        setOpen(true);
+      }
+    } catch {
+      setVoiceError(true);
+    } finally {
+      setListening(false);
+    }
+  };
 
   // Screens embedding this field (e.g. the route planner) clip their header with
   // overflow-hidden for a slide-collapse animation, which was swallowing the
@@ -128,9 +177,14 @@ export default function AddressAutocomplete({
 
   return (
     <div className="relative" ref={wrapRef}>
-      <div className="flex items-center gap-2 px-4 py-3 rounded-2xl bg-bg-panel2 border border-bg-border">
+      <div
+        className={`flex items-center gap-2 px-4 py-3 rounded-2xl bg-bg-panel2 border transition-colors ${
+          autoFocus && !query ? "border-brand shadow-glow shadow-brand/40" : "border-bg-border"
+        }`}
+      >
         {loading ? <Loader2 size={16} className="text-neutral-400 animate-spin shrink-0" /> : <Search size={16} className="text-neutral-400 shrink-0" />}
         <input
+          ref={inputRef}
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);
@@ -141,6 +195,19 @@ export default function AddressAutocomplete({
           placeholder={placeholder ?? "הקלידו כתובת..."}
           className="flex-1 bg-transparent outline-none text-sm text-neutral-100 placeholder:text-neutral-500"
         />
+        {isVoiceInputSupported() && (
+          <button
+            type="button"
+            onClick={startVoiceInput}
+            disabled={listening}
+            title={voiceError ? "לא הצלחנו לשמוע, נסו שוב" : "אמרו את הכתובת"}
+            className={`shrink-0 w-7 h-7 rounded-full flex items-center justify-center transition ${
+              listening ? "bg-brand text-white animate-pulse" : voiceError ? "bg-red-500/15 text-red-400" : "bg-bg-panel text-neutral-400 active:scale-90"
+            }`}
+          >
+            <Mic size={14} />
+          </button>
+        )}
       </div>
       {open &&
         suggestions.length > 0 &&
