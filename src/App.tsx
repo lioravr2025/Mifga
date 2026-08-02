@@ -14,7 +14,7 @@ import UpdateNudge from "./components/UpdateNudge";
 import MapScreen from "./screens/MapScreen";
 import ProfileScreen from "./screens/ProfileScreen";
 import FriendsScreen from "./screens/FriendsScreen";
-import RouteScreen from "./screens/RouteScreen";
+import RouteScreen from "./screens/GoogleRouteScreen";
 import MeetupsScreen from "./screens/MeetupsScreen";
 import MarketplaceScreen from "./screens/MarketplaceScreen";
 import OnboardingScreen from "./screens/OnboardingScreen";
