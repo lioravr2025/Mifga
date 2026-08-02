@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Locate, Square } from "lucide-react";
-import MapView from "../components/MapView";
+import MapView from "../components/GoogleMapView";
 import TopBar from "../components/TopBar";
 import ReportFlow from "../components/ReportFlow";
 import HazardDetailSheet from "../components/HazardDetailSheet";

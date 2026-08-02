@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Mic } from "lucide-react";
+import { APIProvider } from "@vis.gl/react-google-maps";
 import BottomNav from "./components/BottomNav";
 import LoadingScreen from "./components/LoadingScreen";
 import FeedbackButton from "./components/FeedbackButton";
@@ -49,6 +50,7 @@ export default function App() {
     !updateRequired && !!appConfig.latestVersion && compareVersions(__APP_VERSION__, appConfig.latestVersion) < 0;
 
   return (
+    <APIProvider apiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string} libraries={["places", "geometry"]}>
     <div className="min-h-screen w-full flex items-center justify-center bg-[#05070d] sm:py-4">
       <div className="relative w-full h-[100dvh] sm:h-[92dvh] sm:max-h-[900px] max-w-[430px] bg-bg overflow-hidden flex flex-col sm:rounded-[2.5rem] sm:border-8 sm:border-black sm:shadow-2xl">
         {!backendReady ? (
@@ -135,5 +137,6 @@ export default function App() {
         )}
       </div>
     </div>
+    </APIProvider>
   );
 }
