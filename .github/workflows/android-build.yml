@@ -66,6 +66,14 @@ jobs:
             -keyalg RSA -keysize 2048 -validity 10000 \
             -dname "CN=Android Debug,O=Android,C=US"
 
+      # Same cached keystore every build (see above), so this SHA-1 is stable
+      # across runs - printed here so it's always one build-log click away
+      # (Actions tab -> latest run -> this step) instead of needing a local
+      # Android SDK/keytool just to hand it to Google Maps/Firebase console
+      # API-key restriction screens.
+      - name: Print debug keystore SHA-1 (for Google API key restriction etc.)
+        run: keytool -list -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey | grep -A1 "SHA1:"
+
       - name: Build debug APK
         working-directory: android
         run: |
