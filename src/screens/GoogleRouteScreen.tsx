@@ -159,6 +159,7 @@ export default function GoogleRouteScreen({ position, ride, active }: { position
           mapId={MAP_ID}
           defaultCenter={{ lat: position.lat, lng: position.lng }}
           defaultZoom={13}
+          renderingType="VECTOR"
           colorScheme={settings.theme === "dark" ? "DARK" : "LIGHT"}
           disableDefaultUI
           gestureHandling="greedy"
@@ -220,10 +221,14 @@ export default function GoogleRouteScreen({ position, ride, active }: { position
 
         {navigating && nav.upcoming && <GoogleNavigationBanner step={nav.upcoming} distanceM={nav.distanceToUpcomingM} isArrived={nav.isArrived} />}
 
+        {/* Anchored to the top (not bottom-left like the main map tab) - the
+            bottom-left corner here is always claimed by the ride button/ETA
+            panel, whose height changes depending on ride state and whether a
+            route exists, so a fixed bottom offset kept overlapping it. */}
         {!isPicking && (
           <button
             onClick={() => setRecenterSignal((s) => s + 1)}
-            className="absolute bottom-4 left-4 z-[500] w-11 h-11 rounded-2xl bg-bg-panel/90 backdrop-blur border border-bg-border shadow-lg flex items-center justify-center active:scale-95"
+            className="absolute top-24 left-4 z-[700] w-11 h-11 rounded-2xl bg-bg-panel/90 backdrop-blur border border-bg-border shadow-lg flex items-center justify-center active:scale-95"
           >
             <Locate size={20} className="text-brand-light" />
           </button>

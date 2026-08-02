@@ -29,16 +29,57 @@ export function RecenterController({ target, signal }: { target: LatLng; signal:
   return null;
 }
 
+/** Initial bearing in degrees (0-360, 0 = north) from `a` to `b` - standard great-circle formula. */
+function bearing(a: LatLng, b: LatLng): number {
+  const lat1 = (a.lat * Math.PI) / 180;
+  const lat2 = (b.lat * Math.PI) / 180;
+  const dLng = ((b.lng - a.lng) * Math.PI) / 180;
+  const y = Math.sin(dLng) * Math.cos(lat2);
+  const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
+  return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
+}
+function distanceMetersApprox(a: LatLng, b: LatLng): number {
+  const R = 6371000;
+  const dLat = ((b.lat - a.lat) * Math.PI) / 180;
+  const dLng = ((b.lng - a.lng) * Math.PI) / 180;
+  const lat1 = (a.lat * Math.PI) / 180;
+  const lat2 = (b.lat * Math.PI) / 180;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+// Below this movement, GPS jitter alone can swing the computed bearing
+// wildly (a rider standing still "faces" a random direction each fix) - only
+// rotate the camera once there's been enough real displacement to trust it.
+const MIN_HEADING_UPDATE_M = 4;
+
+/**
+ * Waze/Google-Maps-walking-style close nav view: tight zoom, tilted 3D
+ * perspective, and heading-up rotation (the map turns to face the direction
+ * of travel, instead of staying north-up) - much easier to follow turn by
+ * turn than a flat top-down view at overview zoom.
+ */
 export function AutoFollow({ position, zoom }: { position: LatLng; zoom?: number }) {
   const map = useMap();
   const zoomedInRef = useRef(false);
+  const lastHeadingPosRef = useRef<LatLng | null>(null);
+  const headingRef = useRef(0);
+
   useEffect(() => {
     if (!map) return;
+
+    const last = lastHeadingPosRef.current;
+    if (last && distanceMetersApprox(last, position) >= MIN_HEADING_UPDATE_M) {
+      headingRef.current = bearing(last, position);
+      lastHeadingPosRef.current = position;
+    } else if (!last) {
+      lastHeadingPosRef.current = position;
+    }
+
     if (zoom != null && !zoomedInRef.current) {
       zoomedInRef.current = true;
-      map.moveCamera({ center: { lat: position.lat, lng: position.lng }, zoom });
+      map.moveCamera({ center: { lat: position.lat, lng: position.lng }, zoom, tilt: 45, heading: headingRef.current });
     } else {
-      map.panTo({ lat: position.lat, lng: position.lng });
+      map.moveCamera({ center: { lat: position.lat, lng: position.lng }, heading: headingRef.current });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [position.lat, position.lng, map]);
@@ -117,6 +158,7 @@ export default function GoogleMapView({
         mapId={MAP_ID}
         defaultCenter={{ lat: userPosition.lat, lng: userPosition.lng }}
         defaultZoom={DEFAULT_ZOOM}
+        renderingType="VECTOR"
         colorScheme={theme === "dark" ? "DARK" : "LIGHT"}
         disableDefaultUI
         gestureHandling="greedy"

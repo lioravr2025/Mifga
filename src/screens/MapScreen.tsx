@@ -141,7 +141,7 @@ export default function MapScreen({
             setCameraTarget(null);
             setRecenterSignal((s) => s + 1);
           }}
-          className="absolute bottom-4 left-4 z-[500] w-11 h-11 rounded-2xl bg-bg-panel/90 backdrop-blur border border-bg-border shadow-lg flex items-center justify-center active:scale-95"
+          className="absolute bottom-4 left-4 z-[700] w-11 h-11 rounded-2xl bg-bg-panel/90 backdrop-blur border border-bg-border shadow-lg flex items-center justify-center active:scale-95"
         >
           <Locate size={20} className="text-brand-light" />
         </button>
