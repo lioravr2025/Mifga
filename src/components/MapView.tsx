@@ -19,15 +19,45 @@ const DEFAULT_ZOOM = 18;
 export function RecenterController({ target, signal }: { target: LatLng; signal: number }) {
   const map = useMap();
   const first = useRef(true);
+  // Tracks which `signal` value the initial setView already accounted for,
+  // so the flyTo effect below (which also runs on mount, same as any
+  // useEffect) doesn't immediately re-fire right after it.
+  const lastHandledSignal = useRef(signal);
+
   useEffect(() => {
-    if (first.current) {
+    if (!first.current) return;
+
+    // A map that's still hidden (e.g. RouteScreen's map before its tab has
+    // ever been shown - it's kept permanently mounted now, just display:none)
+    // has a zero-size container. Positioning it with setView() at that point
+    // makes Leaflet compute NaN internally ("Invalid LatLng object"), even
+    // though `target` itself is perfectly valid. Defer the initial view until
+    // the container actually has real dimensions - MapResizeHandler's
+    // ResizeObserver already calls invalidateSize() the moment the tab
+    // becomes visible, which is what fires Leaflet's own "resize" event below.
+    const trySetInitialView = () => {
+      if (map.getSize().x === 0 || map.getSize().y === 0) return;
       map.setView([target.lat, target.lng], DEFAULT_ZOOM);
       first.current = false;
-      return;
-    }
+      lastHandledSignal.current = signal;
+      map.off("resize", trySetInitialView);
+    };
+
+    trySetInitialView();
+    if (first.current) map.on("resize", trySetInitialView);
+    return () => {
+      map.off("resize", trySetInitialView);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (first.current || signal === lastHandledSignal.current) return;
+    lastHandledSignal.current = signal;
     map.flyTo([target.lat, target.lng], Math.max(map.getZoom(), DEFAULT_ZOOM), { duration: 0.6 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [signal]);
+
   return null;
 }
 
