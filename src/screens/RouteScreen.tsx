@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { AttributionControl, Circle, MapContainer, Marker, Polyline, TileLayer } from "react-leaflet";
-import { AlertTriangle, Loader2, Shield, ShieldCheck, Siren, Square, Volume2, VolumeX } from "lucide-react";
+import { AlertTriangle, Loader2, Locate, Shield, ShieldCheck, Siren, Square, Volume2, VolumeX } from "lucide-react";
 import { useApp } from "../context/AppContext";
 import ScooterIcon from "../components/ScooterIcon";
 import PulseRing from "../components/PulseRing";
 import AddressAutocomplete from "../components/AddressAutocomplete";
 import NavigationBanner from "../components/NavigationBanner";
-import { AutoFollow, MapResizeHandler } from "../components/MapView";
+import ReportFlow from "../components/ReportFlow";
+import { AutoFollow, CenterTracker, MapResizeHandler, RecenterController } from "../components/MapView";
 import { trackClick } from "../lib/analytics";
 import {
   planSafeRoute,
@@ -24,7 +25,7 @@ import { getHazardType } from "../data/hazardTypes";
 import { HAZARD_COLOR_HEX } from "../lib/colors";
 import { destinationDivIcon, hazardDivIcon, selfDivIcon } from "../lib/mapIcons";
 import type { RideMonitor } from "../hooks/useRideMonitor";
-import type { LatLng } from "../types";
+import type { HazardTypeId, LatLng } from "../types";
 
 const DARK_TILES = "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
 const LIGHT_TILES = "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png";
@@ -47,6 +48,14 @@ export default function RouteScreen({ position, ride, active }: { position: LatL
   const [destLabel, setDestLabel] = useState("");
   const [remainingM, setRemainingM] = useState<number | null>(null);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
+  const [recenterSignal, setRecenterSignal] = useState(0);
+  // "···" more-hazards report flow (same component the main map tab uses),
+  // including its own manual-pin picking cycle for this screen's own map.
+  const [reportOpen, setReportOpen] = useState(false);
+  const [presetType, setPresetType] = useState<HazardTypeId | null>(null);
+  const [reportStep, setReportStep] = useState<"type" | "more">("more");
+  const [isPicking, setIsPicking] = useState(false);
+  const [pickedCenter, setPickedCenter] = useState<LatLng | null>(null);
 
   const hazardsOnRoute = route ? hazards.filter((h) => minDistanceToPath(h.position, route.points) <= HAZARD_ALERT_RADIUS_M) : [];
 
@@ -58,6 +67,13 @@ export default function RouteScreen({ position, ride, active }: { position: LatL
   const quickAddWhileRiding = (type: "police" | "inspector") => {
     trackClick(`report_quick_instant_${type}`, "route");
     addReport({ type, position });
+  };
+
+  const openMoreReport = () => {
+    trackClick("report_more", "route");
+    setPresetType(null);
+    setReportStep("more");
+    setReportOpen(true);
   };
 
   // Waze-style auto-reroute: once actually off the planned path (not just GPS
@@ -171,7 +187,7 @@ export default function RouteScreen({ position, ride, active }: { position: LatL
           biasNear={position}
           placeholder="לאן נוסעים? הקלידו כתובת או יישוב"
           onSelect={(s) => planRouteTo(s.position, s.label)}
-          autoFocus={active}
+          highlight={active}
         />
         {loading && (
           <div className="mt-2 flex items-center gap-1.5 text-xs text-neutral-400">
@@ -185,6 +201,8 @@ export default function RouteScreen({ position, ride, active }: { position: LatL
       <div className="flex-1 min-h-0 relative isolate">
         <MapContainer center={[position.lat, position.lng]} zoom={13} zoomControl={false} attributionControl={false} className="w-full h-full">
           <MapResizeHandler />
+          <RecenterController target={position} signal={recenterSignal} />
+          {isPicking && <CenterTracker onChange={setPickedCenter} />}
           {ride.rideActive && <AutoFollow position={position} zoom={17} />}
           <AttributionControl position="bottomright" prefix={false} />
           <TileLayer url={settings.theme === "dark" ? DARK_TILES : LIGHT_TILES} attribution="&copy; OpenStreetMap &copy; CARTO" />
@@ -205,12 +223,30 @@ export default function RouteScreen({ position, ride, active }: { position: LatL
           ))}
         </MapContainer>
 
+        {isPicking && (
+          <div className="absolute inset-0 z-[900] flex items-center justify-center pointer-events-none">
+            <div className="flex flex-col items-center -translate-y-4">
+              <div className="w-4 h-4 rounded-full bg-brand border-2 border-white shadow-glow shadow-brand" />
+              <div className="w-0.5 h-5 bg-brand" />
+            </div>
+          </div>
+        )}
+
         {navigating && nav.upcoming && <NavigationBanner step={nav.upcoming} distanceM={nav.distanceToUpcomingM} />}
+
+        {!isPicking && (
+          <button
+            onClick={() => setRecenterSignal((s) => s + 1)}
+            className="absolute bottom-4 left-4 z-[500] w-11 h-11 rounded-2xl bg-bg-panel/90 backdrop-blur border border-bg-border shadow-lg flex items-center justify-center active:scale-95"
+          >
+            <Locate size={20} className="text-brand-light" />
+          </button>
+        )}
 
         {/* Parity with the main map tab's ride-mode quick-report strip - one tap
             adds a police/inspector report at the current position instantly, no
-            location/nickname/photo step. */}
-        {ride.rideActive && (
+            location/nickname/photo step; "···" opens the full hazard-type grid. */}
+        {ride.rideActive && !isPicking && (
           <div className="absolute top-24 right-4 z-[500] flex flex-col gap-3">
             <button
               onClick={() => quickAddWhileRiding("police")}
@@ -227,6 +263,13 @@ export default function RouteScreen({ position, ride, active }: { position: LatL
               title="פקח"
             >
               <Shield size={22} color={HAZARD_COLOR_HEX.inspector} />
+            </button>
+            <button
+              onClick={openMoreReport}
+              className="w-12 h-12 rounded-full flex items-center justify-center bg-bg-panel/90 backdrop-blur border border-bg-border active:scale-95 transition shadow-lg"
+              title="עוד"
+            >
+              <span className="text-lg leading-none text-neutral-300">···</span>
             </button>
           </div>
         )}
@@ -245,7 +288,7 @@ export default function RouteScreen({ position, ride, active }: { position: LatL
             >
               {ride.rideActive ? <Square size={18} className="text-white fill-white" /> : <ScooterIcon size={20} color="white" />}
               <span className="text-white text-base font-bold">
-                {ride.rideActive ? "הפסקת נסיעה" : route ? "תחילת נסיעה במסלול" : "תחילת נסיעה"}
+                {ride.rideActive ? "סיום נסיעה" : route ? "תחילת נסיעה במסלול" : "תחילת נסיעה"}
               </span>
             </button>
           </div>
@@ -318,6 +361,18 @@ export default function RouteScreen({ position, ride, active }: { position: LatL
             </div>
           )}
         </div>
+
+        <ReportFlow
+          open={reportOpen}
+          userPosition={position}
+          onClose={() => setReportOpen(false)}
+          onStartPicking={() => setIsPicking(true)}
+          onStopPicking={() => setIsPicking(false)}
+          pickedCenter={pickedCenter}
+          isPicking={isPicking}
+          initialType={presetType}
+          initialStep={reportStep}
+        />
       </div>
     </div>
   );

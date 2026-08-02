@@ -194,7 +194,7 @@ export default function MapScreen({
             {ride.rideActive && (
               <div className="flex flex-col items-center gap-0.5 mb-1.5 px-3 py-1 rounded-full bg-black/45 backdrop-blur-sm pointer-events-none">
                 <span className="text-[11px] text-neutral-200">נסיעה פעילה - נתריע על מפגעים בדרך</span>
-                <span className="text-sm font-bold text-white">הפסקת נסיעה</span>
+                <span className="text-sm font-bold text-white">סיום נסיעה</span>
               </div>
             )}
             <div className="relative w-20 h-20 shrink-0">
@@ -204,7 +204,7 @@ export default function MapScreen({
                   trackClick(ride.rideActive ? "ride_stop" : "ride_start", "map");
                   ride.rideActive ? ride.stopRide() : ride.startRide();
                 }}
-                aria-label={ride.rideActive ? "הפסקת נסיעה" : "תחילת נסיעה"}
+                aria-label={ride.rideActive ? "סיום נסיעה" : "תחילת נסיעה"}
                 className={`absolute inset-0 rounded-full flex items-center justify-center shadow-glow border-4 border-bg-panel active:scale-95 transition ${
                   ride.rideActive
                     ? "bg-gradient-to-br from-red-600 to-red-500 shadow-red-500"

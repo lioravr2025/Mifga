@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Loader2, MapPinned, Mic, Search } from "lucide-react";
+import { Loader2, MapPinned, Mic, Search, X } from "lucide-react";
 import { isVoiceInputSupported, listenForAddress } from "../lib/nativeStt";
 import type { LatLng } from "../types";
 
@@ -81,15 +81,15 @@ export default function AddressAutocomplete({
   placeholder,
   onSelect,
   onQueryChange,
-  autoFocus,
+  highlight,
 }: {
   biasNear: LatLng;
   placeholder?: string;
   onSelect: (s: { label: string; position: LatLng }) => void;
   /** fired on every keystroke, not just on picking a suggestion - lets a search box filter live while still offering the dropdown for a precise pick */
   onQueryChange?: (q: string) => void;
-  /** focuses and visually highlights the field as soon as it mounts - for screens where this is the one thing to fill in (the route planner's destination box) */
-  autoFocus?: boolean;
+  /** visually highlights the field (does NOT focus it - that pops the keyboard and shrinks the map) - for screens where this is the one thing to fill in (the route planner's destination box) */
+  highlight?: boolean;
 }) {
   const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
@@ -101,10 +101,16 @@ export default function AddressAutocomplete({
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  // Voice input already ran its own immediate search (see startVoiceInput) -
+  // this skips the debounced effect's redundant re-fetch of the same query.
+  const skipNextDebounceRef = useRef(false);
 
-  useEffect(() => {
-    if (autoFocus) inputRef.current?.focus();
-  }, [autoFocus]);
+  const clear = () => {
+    setQuery("");
+    onQueryChange?.("");
+    setSuggestions([]);
+    setOpen(false);
+  };
 
   const startVoiceInput = async () => {
     setVoiceError(false);
@@ -112,9 +118,19 @@ export default function AddressAutocomplete({
     try {
       const text = await listenForAddress();
       if (text) {
+        skipNextDebounceRef.current = true;
         setQuery(text);
         onQueryChange?.(text);
         setOpen(true);
+        // Search immediately instead of waiting for the debounce delay - the
+        // whole point of voice input is that the text arrived all at once,
+        // not mid-keystroke, so there's nothing to wait for.
+        setLoading(true);
+        try {
+          setSuggestions(await fetchSuggestions(text, biasNear));
+        } finally {
+          setLoading(false);
+        }
       }
     } catch {
       setVoiceError(true);
@@ -148,6 +164,10 @@ export default function AddressAutocomplete({
 
   useEffect(() => {
     if (timer.current) clearTimeout(timer.current);
+    if (skipNextDebounceRef.current) {
+      skipNextDebounceRef.current = false;
+      return;
+    }
     if (query.trim().length < 3) {
       setSuggestions([]);
       setLoading(false);
@@ -178,8 +198,8 @@ export default function AddressAutocomplete({
   return (
     <div className="relative" ref={wrapRef}>
       <div
-        className={`flex items-center gap-2 px-4 py-3 rounded-2xl bg-bg-panel2 border transition-colors ${
-          autoFocus && !query ? "border-brand shadow-glow shadow-brand/40" : "border-bg-border"
+        className={`flex items-center gap-2 px-4 py-3 rounded-2xl bg-bg-panel2 border-2 transition-colors ${
+          highlight && !query ? "border-white shadow-glow shadow-white/30" : "border-bg-border"
         }`}
       >
         {loading ? <Loader2 size={16} className="text-neutral-400 animate-spin shrink-0" /> : <Search size={16} className="text-neutral-400 shrink-0" />}
@@ -192,21 +212,30 @@ export default function AddressAutocomplete({
             setOpen(true);
           }}
           onFocus={() => setOpen(true)}
-          placeholder={placeholder ?? "הקלידו כתובת..."}
+          readOnly={listening}
+          placeholder={listening ? "מקשיב..." : placeholder ?? "הקלידו כתובת..."}
           className="flex-1 bg-transparent outline-none text-sm text-neutral-100 placeholder:text-neutral-500"
         />
-        {isVoiceInputSupported() && (
-          <button
-            type="button"
-            onClick={startVoiceInput}
-            disabled={listening}
-            title={voiceError ? "לא הצלחנו לשמוע, נסו שוב" : "אמרו את הכתובת"}
-            className={`shrink-0 w-7 h-7 rounded-full flex items-center justify-center transition ${
-              listening ? "bg-brand text-white animate-pulse" : voiceError ? "bg-red-500/15 text-red-400" : "bg-bg-panel text-neutral-400 active:scale-90"
-            }`}
-          >
-            <Mic size={14} />
+        {query.length > 0 && !listening && (
+          <button type="button" onClick={clear} title="נקה" className="shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-neutral-400 active:scale-90 transition">
+            <X size={15} />
           </button>
+        )}
+        {isVoiceInputSupported() && (
+          <div className="relative shrink-0">
+            {listening && <span className="absolute inset-0 rounded-full bg-brand animate-ping" />}
+            <button
+              type="button"
+              onClick={startVoiceInput}
+              disabled={listening}
+              title={voiceError ? "לא הצלחנו לשמוע, נסו שוב" : "אמרו את הכתובת"}
+              className={`relative w-7 h-7 rounded-full flex items-center justify-center transition ${
+                listening ? "bg-brand text-white" : voiceError ? "bg-red-500/15 text-red-400" : "bg-bg-panel text-neutral-400 active:scale-90"
+              }`}
+            >
+              <Mic size={14} />
+            </button>
+          </div>
         )}
       </div>
       {open &&

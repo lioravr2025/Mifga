@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Tag, ThumbsDown, ThumbsUp, X } from "lucide-react";
+import { Tag, ThumbsDown, ThumbsUp, Trash2, X } from "lucide-react";
 import BottomSheet from "./BottomSheet";
 import { HazardIcon } from "./HazardIcon";
 import Confetti from "./Confetti";
@@ -9,7 +9,7 @@ import { timeAgo } from "../lib/geo";
 import { useApp } from "../context/AppContext";
 
 export default function HazardDetailSheet({ hazardId, onClose }: { hazardId: string | null; onClose: () => void }) {
-  const { hazards, confirmHazard, denyHazard } = useApp();
+  const { hazards, user, confirmHazard, denyHazard, deleteOwnHazard } = useApp();
   const [confettiTrigger, setConfettiTrigger] = useState(0);
   // look up the live hazard by id every render (rather than taking a snapshot
   // object as a prop) so vote counts update immediately after confirm/deny
@@ -18,11 +18,20 @@ export default function HazardDetailSheet({ hazardId, onClose }: { hazardId: str
   const def = getHazardType(hazard.type);
   const hex = HAZARD_COLOR_HEX[def.color];
   const likeScore = hazard.confirmations - hazard.denials;
+  // Undo-your-own-mistake window: only while nobody's confirmed it's really
+  // there yet - mainly for the police/inspector one-tap buttons, which have
+  // no confirmation step at all so a mis-tap has no other way to fix itself.
+  const canDeleteOwn = hazard.reporterId === user.id && hazard.confirmations === 0;
 
   const vote = (kind: "confirm" | "deny") => {
     if (kind === "confirm") confirmHazard(hazard.id);
     else denyHazard(hazard.id);
     setConfettiTrigger((t) => t + 1);
+  };
+
+  const remove = () => {
+    deleteOwnHazard(hazard.id);
+    onClose();
   };
 
   return (
@@ -94,6 +103,16 @@ export default function HazardDetailSheet({ hazardId, onClose }: { hazardId: str
             </>
           )}
         </div>
+
+        {canDeleteOwn && (
+          <button
+            onClick={remove}
+            className="w-full flex items-center justify-center gap-1.5 mt-3 pt-3 border-t border-bg-border text-xs text-red-400/70 active:text-red-400 transition"
+          >
+            <Trash2 size={13} />
+            דיווחתי בטעות - מחיקת הדיווח שלי
+          </button>
+        )}
       </div>
     </BottomSheet>
   );

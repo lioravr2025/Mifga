@@ -16,7 +16,7 @@ const LIGHT_TILES = "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.
 // Close street-level default so the map opens zoomed in on the user, not the neighborhood.
 const DEFAULT_ZOOM = 18;
 
-function RecenterController({ target, signal }: { target: LatLng; signal: number }) {
+export function RecenterController({ target, signal }: { target: LatLng; signal: number }) {
   const map = useMap();
   const first = useRef(true);
   useEffect(() => {
@@ -80,7 +80,7 @@ export function AutoFollow({ position, zoom }: { position: LatLng; zoom?: number
   return null;
 }
 
-function CenterTracker({ onChange }: { onChange: (c: LatLng) => void }) {
+export function CenterTracker({ onChange }: { onChange: (c: LatLng) => void }) {
   const map = useMapEvents({
     move: () => {
       const c = map.getCenter();

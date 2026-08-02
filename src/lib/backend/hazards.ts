@@ -68,6 +68,13 @@ export async function denyHazardRemote(id: string): Promise<void> {
   if (error) throw error;
 }
 
+/** Self-service undo for the reporter's own mistake - server-side blocks it once anyone else has confirmed the hazard is really there (see delete_own_hazard in schema_v7.sql). */
+export async function deleteOwnHazardRemote(id: string): Promise<void> {
+  if (!supabase) throw new Error("Supabase not configured");
+  const { error } = await supabase.rpc("delete_own_hazard", { p_hazard_id: id });
+  if (error) throw error;
+}
+
 /** Live updates for every insert/update on the hazards table - lets every connected tester see reports and votes as they happen. */
 export function subscribeHazards(onChange: (hazard: HazardReport) => void): () => void {
   if (!supabase) return () => {};

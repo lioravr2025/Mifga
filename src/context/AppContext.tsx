@@ -40,7 +40,7 @@ import {
 } from "../lib/backend/auth";
 import { insertProfile, updateProfileRemote } from "../lib/backend/profile";
 import { awardPointsRemote, awardVotePointsRemote } from "../lib/backend/profile";
-import { confirmHazardRemote, denyHazardRemote, fetchHazards, insertHazard, subscribeHazards } from "../lib/backend/hazards";
+import { confirmHazardRemote, denyHazardRemote, deleteOwnHazardRemote, fetchHazards, insertHazard, subscribeHazards } from "../lib/backend/hazards";
 import { collectPrizeRemote, fetchMyCollectedPrizeIds, fetchPrizes, subscribePrizes } from "../lib/backend/prizes";
 import { awardMeetupArrival } from "../lib/backend/meetups";
 import { uploadBlob } from "../lib/backend/storage";
@@ -134,6 +134,8 @@ interface AppContextValue {
   addReport: (input: NewReportInput) => void;
   confirmHazard: (id: string) => void;
   denyHazard: (id: string) => void;
+  /** Reporter's own undo for a mis-tap - server-side blocked once anyone else has confirmed it's really there. */
+  deleteOwnHazard: (id: string) => void;
   collectPrize: (id: string) => void;
   awardMeetupArrivalPoints: (meetupId: string) => void;
   updateSettings: (patch: Partial<AppSettings>) => void;
@@ -169,7 +171,7 @@ interface AppContextValue {
 const AppContext = createContext<AppContextValue | null>(null);
 
 const DEFAULT_SETTINGS: AppSettings = {
-  theme: "dark",
+  theme: "light",
   notificationsEnabled: true,
   notifyTypes: { police: true, inspector: true, other: false, meetups: true, prizes: true },
   notifyDailyLimit: "limited",
@@ -625,6 +627,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
     awardVotePoints();
   };
 
+  const deleteOwnHazard = (id: string) => {
+    // Optimistic removal - the realtime UPDATE (removed:true) would also
+    // drop it via mergeHazard, but that round trip is what a fast second
+    // glance at the map would otherwise still show it during.
+    setHazards((prev) => prev.filter((h) => h.id !== id));
+    if (isBackendConfigured) {
+      deleteOwnHazardRemote(id).catch((err) => {
+        console.error("Mifga: deleteOwnHazard failed", err);
+        // Failed server-side (already confirmed/removed/not-mine) - the optimistic
+        // removal was wrong, so re-sync from the server's actual current list.
+        fetchHazards().then(setHazards).catch(() => {});
+      });
+    }
+  };
+
   const updateSettings = (patch: Partial<AppSettings>) => setSettings((s) => ({ ...s, ...patch }));
 
   const updateNotifyTypes = (patch: Partial<NotifyTypePrefs>) =>
@@ -987,6 +1004,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     addReport,
     confirmHazard,
     denyHazard,
+    deleteOwnHazard,
     collectPrize,
     awardMeetupArrivalPoints,
     updateSettings,
