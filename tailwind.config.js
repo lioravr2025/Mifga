@@ -71,6 +71,41 @@ export default {
           "90%": { transform: "translateY(0) rotate(200deg) scale(0.85)" },
           "100%": { transform: "translateY(0) rotate(360deg) scale(1)" },
         },
+        // "radar scan" boot screen (LoadingScreen.tsx v2)
+        radarPulse: {
+          "0%": { width: "60px", height: "60px", opacity: "0.55", borderColor: "rgba(168,85,247,.55)" },
+          "70%": { opacity: "0.12" },
+          "100%": { width: "900px", height: "900px", opacity: "0", borderColor: "rgba(34,211,238,.15)" },
+        },
+        gridDrift: {
+          from: { backgroundPosition: "0 0" },
+          to: { backgroundPosition: "0 44px" },
+        },
+        dotBlink: {
+          "0%, 100%": { opacity: "1" },
+          "50%": { opacity: "0.25" },
+        },
+        laneDash: {
+          to: { transform: "translateX(-32px)" },
+        },
+        blipPing: {
+          "0%, 100%": { transform: "scale(1)" },
+          "15%": { transform: "scale(1.22)" },
+          "30%": { transform: "scale(1)" },
+        },
+        scooterRun: {
+          "0%": { left: "-12%" },
+          "92%": { left: "96%" },
+          "100%": { left: "96%", opacity: "0" },
+        },
+        trailFlicker: {
+          from: { opacity: "0.4" },
+          to: { opacity: "1" },
+        },
+        barSweep: {
+          "0%": { left: "-40%" },
+          "100%": { left: "100%" },
+        },
       },
       animation: {
         pulseRing: "pulseRing 1.8s ease-out infinite",
@@ -80,6 +115,14 @@ export default {
         slideInRight: "slideInRight 0.22s ease-out",
         scooterMoveX: "scooterMoveX 4.5s cubic-bezier(0.45,0,0.55,1) infinite",
         scooterMotion: "scooterMotion 4.5s ease-in-out infinite",
+        radarPulse: "radarPulse 3.6s cubic-bezier(.2,.6,.3,1) infinite",
+        gridDrift: "gridDrift 1.6s linear infinite",
+        dotBlink: "dotBlink 1.4s ease-in-out infinite",
+        laneDash: "laneDash 0.5s linear infinite",
+        blipPing: "blipPing 2.6s ease-in-out infinite",
+        scooterRun: "scooterRun 2.6s cubic-bezier(.4,0,.2,1) infinite",
+        trailFlicker: "trailFlicker 0.3s ease-in-out infinite alternate",
+        barSweep: "barSweep 1.5s ease-in-out infinite",
       },
     },
   },
