@@ -124,6 +124,8 @@ interface AppContextValue {
   onboardingComplete: boolean;
   /** false only while bootstrapping a real backend session on first load - App.tsx should show a loading state until this flips true */
   backendReady: boolean;
+  /** 0-4, advances as the bootstrap effect below clears each stage - drives the LoadingScreen's progress bar off real state instead of a decorative animation */
+  bootstrapStage: number;
   rideLog: RideLogEntry[];
   /** backend mode only: friend requests other people sent me, awaiting my accept/decline */
   incomingFriendRequests: IncomingFriendRequest[];
@@ -210,6 +212,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       lastSeenAt: f.lastSeenAt ?? Date.now(),
       favorite: f.favorite ?? false,
       username: f.username ?? `friend${i + 1}`,
+      reportsCount: f.reportsCount ?? 0,
+      riding: f.riding ?? false,
     }));
   });
   const [hazards, setHazards] = useState<HazardReport[]>(() => {
@@ -246,6 +250,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     isBackendConfigured ? false : loadJSON("onboardingComplete", false)
   );
   const [backendReady, setBackendReady] = useState<boolean>(!isBackendConfigured);
+  const [bootstrapStage, setBootstrapStage] = useState(0);
   const [rideLog, setRideLog] = useState<RideLogEntry[]>(() => (isBackendConfigured ? [] : loadJSON("rideLog", [])));
   const [feedbackEntries, setFeedbackEntries] = useState<FeedbackEntry[]>(() => loadJSON("feedback", []));
   const [incomingFriendRequests, setIncomingFriendRequests] = useState<IncomingFriendRequest[]>([]);
@@ -345,6 +350,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     (async () => {
       try {
         const uid = await ensureSession();
+        if (cancelled) return;
+        setBootstrapStage(1);
         const profile = await fetchOwnProfile(uid);
         if (cancelled) return;
         if (profile) {
@@ -353,12 +360,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
         } else {
           setUser({ ...EMPTY_USER, id: uid });
         }
+        setBootstrapStage(2);
 
         const [remoteHazards, rideLogEntries] = await Promise.all([fetchHazards(), fetchRideLog(uid)]);
         if (cancelled) return;
         setHazards(remoteHazards);
         setRideLog(rideLogEntries);
+        setBootstrapStage(3);
         await Promise.all([reloadFriendsAndRequests(uid), reloadGroups(uid)]);
+        if (cancelled) return;
+        setBootstrapStage(4);
 
         // Isolated from the critical path above on purpose - the prizes table
         // is a newer addition, and a hiccup fetching it (or the SQL simply not
@@ -505,6 +516,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
     push();
     const interval = setInterval(push, PRESENCE_PUSH_INTERVAL_MS);
     return () => clearInterval(interval);
+  }, [user.id, onboardingComplete]);
+
+  // Pulls friends' own live state (online/position/riding-now/points) on the
+  // same cadence as the presence push above - friendships changing already
+  // triggers a reload via the realtime subscription, but a friend's *riding*
+  // status or position drifting live needs its own periodic pull since
+  // there's no realtime subscription on the profiles table for this.
+  useEffect(() => {
+    if (!isBackendConfigured || !user.id || !onboardingComplete) return;
+    const interval = setInterval(() => reloadFriendsAndRequests(user.id), PRESENCE_PUSH_INTERVAL_MS);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user.id, onboardingComplete]);
 
   const addReport = (input: NewReportInput) => {
@@ -997,6 +1020,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     lastAwardedPoints,
     onboardingComplete,
     backendReady,
+    bootstrapStage,
     rideLog,
     incomingFriendRequests,
     incomingGroupInvites,

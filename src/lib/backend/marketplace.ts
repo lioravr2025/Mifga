@@ -37,7 +37,7 @@ export async function fetchListings(): Promise<MarketplaceListing[]> {
   if (listings.length === 0) return [];
 
   const sellerIds = [...new Set(listings.map((l) => l.seller_id))];
-  const { data: sellers, error: sErr } = await supabase.from("profiles").select("id, name, avatar_emoji, avatar_photo_url").in("id", sellerIds);
+  const { data: sellers, error: sErr } = await supabase.from("profiles_public").select("id, name, avatar_emoji, avatar_photo_url").in("id", sellerIds);
   if (sErr) throw sErr;
   const sellerById = new Map((sellers as ProfileRow[]).map((s) => [s.id, s]));
 

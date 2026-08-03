@@ -71,11 +71,15 @@ export default {
           "90%": { transform: "translateY(0) rotate(200deg) scale(0.85)" },
           "100%": { transform: "translateY(0) rotate(360deg) scale(1)" },
         },
-        // "radar scan" boot screen (LoadingScreen.tsx v2)
+        // "radar scan" boot screen (LoadingScreen.tsx v2) - scale+opacity only
+        // (not width/height) so this stays on the compositor thread instead
+        // of forcing a layout reflow on every frame, which was visible as
+        // jank/"shaking" on real (lower-end) phones even though it looked
+        // smooth in desktop testing.
         radarPulse: {
-          "0%": { width: "60px", height: "60px", opacity: "0.55", borderColor: "rgba(168,85,247,.55)" },
+          "0%": { transform: "scale(1)", opacity: "0.55" },
           "70%": { opacity: "0.12" },
-          "100%": { width: "900px", height: "900px", opacity: "0", borderColor: "rgba(34,211,238,.15)" },
+          "100%": { transform: "scale(15)", opacity: "0" },
         },
         gridDrift: {
           from: { backgroundPosition: "0 0" },
@@ -93,18 +97,15 @@ export default {
           "15%": { transform: "scale(1.22)" },
           "30%": { transform: "scale(1)" },
         },
+        // transform, not `left` - same reflow-avoidance reason as radarPulse above
         scooterRun: {
-          "0%": { left: "-12%" },
-          "92%": { left: "96%" },
-          "100%": { left: "96%", opacity: "0" },
+          "0%": { transform: "translateX(-12vw)" },
+          "92%": { transform: "translateX(96vw)" },
+          "100%": { transform: "translateX(96vw)", opacity: "0" },
         },
         trailFlicker: {
           from: { opacity: "0.4" },
           to: { opacity: "1" },
-        },
-        barSweep: {
-          "0%": { left: "-40%" },
-          "100%": { left: "100%" },
         },
       },
       animation: {
@@ -122,7 +123,6 @@ export default {
         blipPing: "blipPing 2.6s ease-in-out infinite",
         scooterRun: "scooterRun 2.6s cubic-bezier(.4,0,.2,1) infinite",
         trailFlicker: "trailFlicker 0.3s ease-in-out infinite alternate",
-        barSweep: "barSweep 1.5s ease-in-out infinite",
       },
     },
   },

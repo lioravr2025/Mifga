@@ -36,7 +36,7 @@ export async function fetchMeetups(uid: string): Promise<Meetup[]> {
   const hostIds = [...new Set(meetups.map((m) => m.host_id))];
   const meetupIds = meetups.map((m) => m.id);
   const [{ data: hosts, error: hErr }, { data: rsvps, error: rErr }] = await Promise.all([
-    supabase.from("profiles").select("id, name, avatar_emoji, avatar_photo_url").in("id", hostIds),
+    supabase.from("profiles_public").select("id, name, avatar_emoji, avatar_photo_url").in("id", hostIds),
     supabase.from("meetup_rsvps").select("meetup_id, user_id").in("meetup_id", meetupIds),
   ]);
   if (hErr) throw hErr;
@@ -73,7 +73,7 @@ export async function fetchMeetupAttendees(meetupId: string): Promise<MeetupAtte
   if (error) throw error;
   const ids = (rsvps as { user_id: string }[]).map((r) => r.user_id);
   if (ids.length === 0) return [];
-  const { data: profiles, error: pErr } = await supabase.from("profiles").select("*").in("id", ids);
+  const { data: profiles, error: pErr } = await supabase.from("profiles_public").select("*").in("id", ids);
   if (pErr) throw pErr;
   return (profiles as ProfileRow[]).map((p) => ({
     id: p.id,

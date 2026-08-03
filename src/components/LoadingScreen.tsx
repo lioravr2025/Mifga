@@ -1,5 +1,12 @@
 import { Shield, Construction, Siren } from "lucide-react";
 import ScooterIcon from "./ScooterIcon";
+import { useApp } from "../context/AppContext";
+
+// Mirrors the stages AppContext's bootstrap effect actually walks through
+// (session -> profile -> hazards/ride log -> friends/groups), so the label
+// and bar below reflect what's really loading, not a decorative loop.
+const STAGE_LABELS = ["מתחברים...", "טוענים את הפרופיל שלך...", "טוענים מפגעים בסביבה...", "טוענים חברים...", "כמעט מוכן..."];
+const TOTAL_STAGES = 4;
 
 /**
  * Boot-time loading screen ("radar scan" concept, v2) - a neon night-ride HUD:
@@ -10,6 +17,12 @@ import ScooterIcon from "./ScooterIcon";
  * what the app actually does, not just decoration.
  */
 export default function LoadingScreen() {
+  const { bootstrapStage } = useApp();
+  // Floored at 8% so there's immediate visual feedback the instant this
+  // screen mounts, rather than an empty-looking bar during stage 0.
+  const progressPct = Math.min(100, Math.max(8, (bootstrapStage / TOTAL_STAGES) * 100));
+  const statusLabel = STAGE_LABELS[Math.min(bootstrapStage, STAGE_LABELS.length - 1)];
+
   return (
     <div
       className="relative flex-1 flex items-center justify-center overflow-hidden"
@@ -88,7 +101,7 @@ export default function LoadingScreen() {
             <Shield size={22} color="#38bdf8" />
           </div>
 
-          <div className="absolute bottom-3 animate-scooterRun">
+          <div className="absolute bottom-3 left-0 animate-scooterRun">
             <div
               className="absolute right-[38px] top-[14px] w-11 h-0.5 rounded-full bg-gradient-to-r from-transparent to-brand animate-trailFlicker"
               style={{ filter: "drop-shadow(0 0 6px #7c3aed)" }}
@@ -103,11 +116,15 @@ export default function LoadingScreen() {
           <p className="text-2xl font-bold text-neutral-50">טוען את האפליקציה...</p>
           <div className="relative w-[260px] h-2 rounded-full bg-neutral-100/10 overflow-hidden">
             <div
-              className="absolute inset-0 w-2/5 rounded-full animate-barSweep"
-              style={{ background: "linear-gradient(90deg, #22d3ee, #a855f7, #f472b6)", boxShadow: "0 0 12px rgba(168,85,247,.7)" }}
+              className="absolute inset-y-0 left-0 rounded-full transition-[width] duration-500 ease-out"
+              style={{
+                width: `${progressPct}%`,
+                background: "linear-gradient(90deg, #22d3ee, #a855f7, #f472b6)",
+                boxShadow: "0 0 12px rgba(168,85,247,.7)",
+              }}
             />
           </div>
-          <p className="text-lg text-violet-200/70 font-medium">תכף מתחילים לנסוע בטוח</p>
+          <p className="text-lg text-violet-200/70 font-medium">{statusLabel}</p>
           <p className="text-base text-violet-200/70 font-semibold">
             כמו <b className="text-cyan-300 font-extrabold">WAZE</b>, רק לכלים חשמליים
           </p>

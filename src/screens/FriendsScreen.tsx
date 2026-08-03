@@ -12,9 +12,11 @@ import {
   Radio,
   Settings2,
   Square,
+  Trophy,
   Users,
   X,
 } from "lucide-react";
+import ScooterIcon from "../components/ScooterIcon";
 import { useApp, MAX_FAVORITE_FRIENDS, MAX_PINNED_GROUPS } from "../context/AppContext";
 import { isBackendConfigured } from "../lib/supabaseClient";
 import { formatDistance, distanceMeters } from "../lib/geo";
@@ -90,6 +92,13 @@ export default function FriendsScreen({ onLocateFriend }: { onLocateFriend: (fri
   // Pinned first, otherwise keep the order the backend/local store already gave us.
   const sortedFriends = [...friends].sort((a, b) => Number(b.favorite) - Number(a.favorite));
   const sortedGroups = [...groups].sort((a, b) => Number(b.pinned) - Number(a.pinned));
+  // Friends-only leaderboard on purpose - competing against people you know
+  // beats a faceless global one. Hidden entirely if nobody's reported anything.
+  const topReporters = [...friends]
+    .filter((f) => f.reportsCount > 0)
+    .sort((a, b) => b.reportsCount - a.reportsCount)
+    .slice(0, 3);
+  const ridingFriends = friends.filter((f) => f.riding);
 
   const handleTogglePinFriend = (id: string) => {
     const ok = toggleFavorite(id);
@@ -195,6 +204,61 @@ export default function FriendsScreen({ onLocateFriend }: { onLocateFriend: (fri
 
           {isBackendConfigured && <AddFriendInline />}
 
+          {ridingFriends.length > 0 && (
+            <div className="mb-5">
+              <h2 className="text-sm font-bold text-neutral-100 mb-2.5 flex items-center gap-1.5">
+                <span className="relative flex w-2 h-2">
+                  <span className="absolute inset-0 rounded-full bg-green-500 animate-ping" />
+                  <span className="relative w-2 h-2 rounded-full bg-green-500" />
+                </span>
+                רוכבים עכשיו
+              </h2>
+              <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1">
+                {ridingFriends.map((f) => (
+                  <button
+                    key={f.id}
+                    onClick={() => (f.shareLocation ? onLocateFriend(f.id) : setViewingFriend(f))}
+                    className="flex flex-col items-center gap-1 shrink-0 active:scale-95 transition"
+                  >
+                    <div className="relative">
+                      <span className="absolute -inset-1 rounded-full border-2 border-green-500 animate-pulseRing" />
+                      <Avatar emoji={f.avatarEmoji} photoUrl={f.avatarPhoto} size={48} className="border-2 border-green-500" />
+                      <span className="absolute -bottom-0.5 -left-0.5 w-5 h-5 rounded-full bg-green-500 border-2 border-bg flex items-center justify-center">
+                        <ScooterIcon size={11} color="white" />
+                      </span>
+                    </div>
+                    <span className="text-[11px] font-semibold text-neutral-200 max-w-[56px] truncate">{f.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {topReporters.length > 0 && (
+            <div className="mb-5 p-4 rounded-2xl bg-bg-panel2 border border-bg-border">
+              <h2 className="text-sm font-bold text-neutral-100 mb-3 flex items-center gap-1.5">
+                <Trophy size={15} className="text-amber-400" />
+                אלופי הדיווח בין החברים שלך
+              </h2>
+              <div className="space-y-2.5">
+                {topReporters.map((f, i) => (
+                  <div key={f.id} className="flex items-center gap-2.5">
+                    <span
+                      className={`w-6 text-center text-sm font-extrabold shrink-0 ${
+                        i === 0 ? "text-amber-400" : i === 1 ? "text-neutral-300" : "text-amber-700"
+                      }`}
+                    >
+                      {i === 0 ? "🥇" : i === 1 ? "🥈" : "🥉"}
+                    </span>
+                    <Avatar emoji={f.avatarEmoji} photoUrl={f.avatarPhoto} size={32} className="border border-bg-border shrink-0" />
+                    <span className="flex-1 text-sm font-semibold text-neutral-100 truncate">{f.name}</span>
+                    <span className="text-xs font-bold text-brand-light shrink-0">{f.reportsCount} דיווחים</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-sm font-bold text-neutral-100">כל החברים</h2>
             <span className="text-[11px] text-neutral-500">
@@ -213,10 +277,21 @@ export default function FriendsScreen({ onLocateFriend }: { onLocateFriend: (fri
               return (
                 <div key={f.id} className="flex items-center gap-2.5 p-3.5 rounded-2xl bg-bg-panel2 border border-bg-border">
                   <button onClick={() => setViewingFriend(f)} className="relative shrink-0 active:scale-95 transition">
-                    <Avatar emoji={f.avatarEmoji} photoUrl={f.avatarPhoto} size={48} className="border border-bg-border" />
-                    <span
-                      className={`absolute bottom-0 left-0 w-3.5 h-3.5 rounded-full border-2 border-bg-panel2 ${f.online ? "bg-green-500" : "bg-neutral-600"}`}
+                    <Avatar
+                      emoji={f.avatarEmoji}
+                      photoUrl={f.avatarPhoto}
+                      size={48}
+                      className={f.riding ? "border-2 border-green-500" : "border border-bg-border"}
                     />
+                    {f.riding ? (
+                      <span className="absolute bottom-0 left-0 w-4 h-4 rounded-full bg-green-500 border-2 border-bg-panel2 flex items-center justify-center">
+                        <ScooterIcon size={9} color="white" />
+                      </span>
+                    ) : (
+                      <span
+                        className={`absolute bottom-0 left-0 w-3.5 h-3.5 rounded-full border-2 border-bg-panel2 ${f.online ? "bg-green-500" : "bg-neutral-600"}`}
+                      />
+                    )}
                   </button>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">

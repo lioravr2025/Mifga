@@ -53,7 +53,9 @@ export async function submitSupportTicket(phone: string | null, message: string)
 
 export async function isUsernameTakenRemote(username: string, excludeUid?: string): Promise<boolean> {
   if (!supabase) throw new Error("Supabase not configured");
-  let query = supabase.from("profiles").select("id", { count: "exact", head: true }).ilike("username", username);
+  // profiles_public, not profiles - checking another rider's username can't
+  // depend on being able to read their full row (see schema_v8.sql).
+  let query = supabase.from("profiles_public").select("id", { count: "exact", head: true }).ilike("username", username);
   if (excludeUid) query = query.neq("id", excludeUid);
   const { count, error } = await query;
   if (error) throw error;

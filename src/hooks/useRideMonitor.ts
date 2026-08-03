@@ -63,7 +63,7 @@ export interface RideMonitor {
   isMoving: boolean;
 }
 
-export function useRideMonitor(position: LatLng): RideMonitor {
+export function useRideMonitor(position: LatLng, hasRealFix: boolean): RideMonitor {
   const { hazards, prizes, collectPrize, settings, addRideLogEntry, user, awardMeetupArrivalPoints } = useApp();
   const [rideActive, setRideActive] = useState(false);
   const [pendingConfirmHazard, setPendingConfirmHazard] = useState<HazardReport | null>(null);
@@ -99,13 +99,22 @@ export function useRideMonitor(position: LatLng): RideMonitor {
 
   useEffect(() => {
     if (!rideActive) return;
-    for (const h of hazards) {
-      if (alertedRef.current.has(h.id)) continue;
-      if (distanceMeters(position, h.position) <= settings.rideAlertRadiusM) {
-        alertedRef.current.add(h.id);
-        playRideAlert(rideAlertKind(h.type));
-        confirmQueueRef.current.push(h);
-        setPendingConfirmHazard((cur) => cur ?? h);
+    // `position` starts out at the hardcoded Tel Aviv fallback (see
+    // useGeolocation) until the first real GPS fix lands, which can take a
+    // few seconds after cold start. Scanning against that fallback point
+    // used to fire a "police/inspector nearby" beep for whatever real hazard
+    // happens to be reported near Tel Aviv, even though the rider is
+    // actually somewhere else entirely - skip alerting (but still sample the
+    // path once real fixes start) until the position is a real fix.
+    if (hasRealFix) {
+      for (const h of hazards) {
+        if (alertedRef.current.has(h.id)) continue;
+        if (distanceMeters(position, h.position) <= settings.rideAlertRadiusM) {
+          alertedRef.current.add(h.id);
+          playRideAlert(rideAlertKind(h.type));
+          confirmQueueRef.current.push(h);
+          setPendingConfirmHazard((cur) => cur ?? h);
+        }
       }
     }
 
@@ -116,7 +125,7 @@ export function useRideMonitor(position: LatLng): RideMonitor {
       lastSampleRef.current = { pos: position, at: now };
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [position, rideActive, hazards, settings.rideAlertRadiusM]);
+  }, [position, rideActive, hazards, settings.rideAlertRadiusM, hasRealFix]);
 
   useEffect(() => {
     if (!rideActive) {

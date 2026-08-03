@@ -35,13 +35,13 @@ export default function App() {
   const [myPointsOpen, setMyPointsOpen] = useState(false);
   const [editProfileSignal, setEditProfileSignal] = useState(0);
   const [focusFriendId, setFocusFriendId] = useState<string | null>(null);
-  const { position } = useGeolocation();
+  const { position, status: geoStatus } = useGeolocation();
   const { onboardingComplete, backendReady, lastIncomingVoiceLabel, incomingFriendRequests, incomingGroupInvites } = useApp();
   const appConfig = useAppConfig();
   const pendingFriendsCount = incomingFriendRequests.length + incomingGroupInvites.length;
   // Lives here (not inside a screen) so a ride keeps beeping regardless of
   // which tab is open - Route isn't kept mounted like Map is.
-  const ride = useRideMonitor(position);
+  const ride = useRideMonitor(position, geoStatus === "granted");
   // Screen stays on for the whole ride, same as Waze during turn-by-turn.
   useWakeLock(ride.rideActive);
   const updateRequired = isVersionBelow(__APP_VERSION__, appConfig.minRequiredVersion);

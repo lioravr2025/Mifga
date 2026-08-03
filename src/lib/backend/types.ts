@@ -82,6 +82,7 @@ export interface ProfileRow {
   recovery_code?: string | null;
   instagram?: string | null;
   tiktok?: string | null;
+  riding_since?: string | null;
 }
 
 export function profileFromRow(row: ProfileRow): UserProfile {

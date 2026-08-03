@@ -1,8 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Loader2, MapPinned, Mic, Search, X } from "lucide-react";
+import { Check, Loader2, MapPinned, Mic, MicOff, Search, X } from "lucide-react";
 import { isVoiceInputSupported, listenForAddress } from "../lib/nativeStt";
 import type { LatLng } from "../types";
+
+// How long the popup lingers on the green "recognized" / red "not heard"
+// state before auto-closing, so the rider actually gets to read it (Waze's
+// own listening sheet does the same brief hold before dismissing).
+const SUCCESS_HOLD_MS = 700;
+const ERROR_HOLD_MS = 1200;
 
 interface Suggestion {
   /** short, Waze-style label: "street number, city" - what's actually shown and filled into the field */
@@ -96,8 +102,12 @@ export default function AddressAutocomplete({
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const [dropdownRect, setDropdownRect] = useState<{ top: number; left: number; width: number } | null>(null);
-  const [listening, setListening] = useState(false);
-  const [voiceError, setVoiceError] = useState(false);
+  // Drives the Waze-style full listening popup: idle (hidden) -> listening
+  // (red pulsing mic) -> success (green check + recognized text, briefly) or
+  // error (briefly) -> back to idle.
+  const [voicePhase, setVoicePhase] = useState<"idle" | "listening" | "success" | "error">("idle");
+  const [recognizedText, setRecognizedText] = useState("");
+  const listening = voicePhase === "listening";
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -113,29 +123,33 @@ export default function AddressAutocomplete({
   };
 
   const startVoiceInput = async () => {
-    setVoiceError(false);
-    setListening(true);
+    setVoicePhase("listening");
     try {
       const text = await listenForAddress();
-      if (text) {
-        skipNextDebounceRef.current = true;
-        setQuery(text);
-        onQueryChange?.(text);
-        setOpen(true);
-        // Search immediately instead of waiting for the debounce delay - the
-        // whole point of voice input is that the text arrived all at once,
-        // not mid-keystroke, so there's nothing to wait for.
-        setLoading(true);
-        try {
-          setSuggestions(await fetchSuggestions(text, biasNear));
-        } finally {
-          setLoading(false);
-        }
+      if (!text) {
+        setVoicePhase("error");
+        setTimeout(() => setVoicePhase("idle"), ERROR_HOLD_MS);
+        return;
       }
+      setRecognizedText(text);
+      setVoicePhase("success");
+      skipNextDebounceRef.current = true;
+      setQuery(text);
+      onQueryChange?.(text);
+      setOpen(true);
+      // Search immediately instead of waiting for the debounce delay - the
+      // whole point of voice input is that the text arrived all at once,
+      // not mid-keystroke, so there's nothing to wait for.
+      setLoading(true);
+      try {
+        setSuggestions(await fetchSuggestions(text, biasNear));
+      } finally {
+        setLoading(false);
+      }
+      setTimeout(() => setVoicePhase("idle"), SUCCESS_HOLD_MS);
     } catch {
-      setVoiceError(true);
-    } finally {
-      setListening(false);
+      setVoicePhase("error");
+      setTimeout(() => setVoicePhase("idle"), ERROR_HOLD_MS);
     }
   };
 
@@ -198,11 +212,23 @@ export default function AddressAutocomplete({
   return (
     <div className="relative" ref={wrapRef}>
       <div
-        className={`flex items-center gap-2 px-4 py-3 rounded-2xl bg-bg-panel2 border-2 transition-colors ${
+        className={`flex items-center px-1.5 py-1.5 rounded-2xl bg-bg-panel2 border-2 transition-colors ${
           highlight && !query ? "border-white shadow-glow shadow-white/30" : "border-bg-border"
         }`}
       >
-        {loading ? <Loader2 size={16} className="text-neutral-400 animate-spin shrink-0" /> : <Search size={16} className="text-neutral-400 shrink-0" />}
+        {/* right-hand slot (RTL: first child = rightmost) - search glass while empty, clears the field once there's text to clear */}
+        <div className="flex items-center justify-center w-9 h-9 shrink-0">
+          {loading ? (
+            <Loader2 size={16} className="text-neutral-400 animate-spin" />
+          ) : query.length > 0 && !listening ? (
+            <button type="button" onClick={clear} title="נקה" className="w-9 h-9 rounded-full flex items-center justify-center text-neutral-400 active:scale-90 transition">
+              <X size={17} />
+            </button>
+          ) : (
+            <Search size={16} className="text-neutral-400" />
+          )}
+        </div>
+        <span className="w-px h-6 bg-bg-border shrink-0" />
         <input
           ref={inputRef}
           value={query}
@@ -214,30 +240,56 @@ export default function AddressAutocomplete({
           onFocus={() => setOpen(true)}
           readOnly={listening}
           placeholder={listening ? "מקשיב..." : placeholder ?? "הקלידו כתובת..."}
-          className="flex-1 bg-transparent outline-none text-sm text-neutral-100 placeholder:text-neutral-500"
+          className="flex-1 min-w-0 bg-transparent outline-none text-sm text-neutral-100 placeholder:text-neutral-500 px-3"
         />
-        {query.length > 0 && !listening && (
-          <button type="button" onClick={clear} title="נקה" className="shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-neutral-400 active:scale-90 transition">
-            <X size={15} />
-          </button>
-        )}
         {isVoiceInputSupported() && (
-          <div className="relative shrink-0">
-            {listening && <span className="absolute inset-0 rounded-full bg-brand animate-ping" />}
+          <>
+            <span className="w-px h-6 bg-bg-border shrink-0" />
             <button
               type="button"
               onClick={startVoiceInput}
-              disabled={listening}
-              title={voiceError ? "לא הצלחנו לשמוע, נסו שוב" : "אמרו את הכתובת"}
-              className={`relative w-7 h-7 rounded-full flex items-center justify-center transition ${
-                listening ? "bg-brand text-white" : voiceError ? "bg-red-500/15 text-red-400" : "bg-bg-panel text-neutral-400 active:scale-90"
-              }`}
+              disabled={voicePhase !== "idle"}
+              title="אמרו את הכתובת"
+              className="shrink-0 w-9 h-9 rounded-full flex items-center justify-center transition bg-bg-panel text-neutral-300 active:scale-90"
             >
-              <Mic size={14} />
+              <Mic size={18} />
             </button>
-          </div>
+          </>
         )}
       </div>
+      {voicePhase !== "idle" &&
+        createPortal(
+          <div className="fixed inset-0 z-[5000] flex flex-col justify-end" onClick={() => voicePhase !== "listening" && setVoicePhase("idle")}>
+            <div className="absolute inset-0 bg-black/60" />
+            <div className="relative bg-bg-panel2 rounded-t-3xl pt-10 pb-10 px-6 flex flex-col items-center gap-5 animate-slideUp">
+              <div className="relative w-28 h-28 flex items-center justify-center">
+                {voicePhase === "listening" && (
+                  <>
+                    <span className="absolute inset-0 rounded-full bg-red-500/30 animate-ping" />
+                    <span className="absolute inset-2 rounded-full bg-red-500/40" />
+                    <span className="relative w-20 h-20 rounded-full bg-red-500 flex items-center justify-center shadow-[0_0_30px_rgba(239,68,68,.6)]">
+                      <Mic size={34} className="text-white" />
+                    </span>
+                  </>
+                )}
+                {voicePhase === "success" && (
+                  <span className="w-20 h-20 rounded-full bg-emerald-500 flex items-center justify-center shadow-[0_0_30px_rgba(16,185,129,.6)] animate-popIn">
+                    <Check size={34} className="text-white" />
+                  </span>
+                )}
+                {voicePhase === "error" && (
+                  <span className="w-20 h-20 rounded-full bg-neutral-700 flex items-center justify-center animate-popIn">
+                    <MicOff size={34} className="text-neutral-300" />
+                  </span>
+                )}
+              </div>
+              <p className="text-lg font-bold text-neutral-100 text-center">
+                {voicePhase === "listening" ? "מקשיב..." : voicePhase === "success" ? recognizedText : "לא הצלחנו לשמוע, נסו שוב"}
+              </p>
+            </div>
+          </div>,
+          document.body
+        )}
       {open &&
         suggestions.length > 0 &&
         dropdownRect &&

@@ -18,7 +18,7 @@ export async function searchProfiles(query: string, excludeUid: string): Promise
   const trimmed = query.trim();
   if (!trimmed) return [];
   const { data, error } = await supabase
-    .from("profiles")
+    .from("profiles_public")
     .select("id, name, username, avatar_emoji, avatar_photo_url, points")
     .ilike("username", `%${trimmed}%`)
     .neq("id", excludeUid)
@@ -95,7 +95,7 @@ export async function fetchFriends(uid: string): Promise<Friend[]> {
   if (friendships.length === 0) return [];
 
   const otherIds = friendships.map((f) => (f.requester_id === uid ? f.addressee_id : f.requester_id));
-  const { data: profiles, error: pErr } = await supabase.from("profiles").select("*").in("id", otherIds);
+  const { data: profiles, error: pErr } = await supabase.from("profiles_public").select("*").in("id", otherIds);
   if (pErr) throw pErr;
   const profileById = new Map((profiles as ProfileRow[]).map((p) => [p.id, p]));
   const now = Date.now();
@@ -114,6 +114,8 @@ export async function fetchFriends(uid: string): Promise<Friend[]> {
       avatarPhoto: p?.avatar_photo_url ?? undefined,
       online: now - lastActive < ONLINE_WINDOW_MS,
       points: p?.points ?? 0,
+      reportsCount: p?.reports_count ?? 0,
+      riding: p?.riding_since != null,
       position: hasLivePosition ? { lat: p!.live_lat as number, lng: p!.live_lng as number } : { lat: 0, lng: 0 },
       shareLocation: hasLivePosition,
       allowWalkie: true,
@@ -137,7 +139,7 @@ export async function fetchIncomingFriendRequests(uid: string): Promise<Incoming
 
   const ids = friendships.map((f) => f.requester_id);
   const { data: profiles, error: pErr } = await supabase
-    .from("profiles")
+    .from("profiles_public")
     .select("id, name, username, avatar_emoji, avatar_photo_url")
     .in("id", ids);
   if (pErr) throw pErr;

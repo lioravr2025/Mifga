@@ -136,6 +136,10 @@ export interface Friend {
   avatarPhoto?: string;
   online: boolean;
   points: number;
+  /** total hazard reports this friend has filed - used for the friends leaderboard */
+  reportsCount: number;
+  /** true while this friend currently has an active ride (backend mode only) - drives the "riding now" map/list indicator */
+  riding: boolean;
   position: LatLng;
   shareLocation: boolean;
   allowWalkie: boolean;
