@@ -1,0 +1,56 @@
+name: Build iOS (Simulator)
+
+# Compiles the iOS app for the Simulator only - no code signing needed, so no
+# Apple Developer account/certificates are required for this to succeed. It
+# exists to catch "does the native iOS project even build" early, not to
+# produce something installable on a real iPhone (that needs your own Mac +
+# Xcode + a signing identity - see the guide the app owner has separately).
+# Manual trigger only (not on every push) since macOS runner minutes cost
+# several times more than Linux ones.
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build web assets
+        run: npm run build
+        env:
+          # Safe to keep here, not a secret - see android-build.yml for why.
+          VITE_SUPABASE_URL: https://tmmyimiubfnpkujulqll.supabase.co
+          VITE_SUPABASE_ANON_KEY: sb_publishable_2yytuXb8y5nQGCZqd5bquQ_t-ZEY7j7
+
+      - name: Sync Capacitor
+        run: npx cap sync ios
+
+      - name: Install CocoaPods dependencies
+        working-directory: ios/App
+        run: pod install
+
+      - name: Build for Simulator (no signing required)
+        working-directory: ios/App
+        run: |
+          xcodebuild -workspace App.xcworkspace -scheme App \
+            -sdk iphonesimulator -configuration Debug \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      - name: Upload .app (installable in Simulator only, not on a real device)
+        uses: actions/upload-artifact@v4
+        with:
+          name: mifga-ios-simulator-app
+          path: ios/App/build/Build/Products/Debug-iphonesimulator/App.app
+          if-no-files-found: error
