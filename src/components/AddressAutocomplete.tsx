@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Check, Loader2, MapPinned, Mic, MicOff, Search, X } from "lucide-react";
 import { isVoiceInputSupported, listenForAddress } from "../lib/nativeStt";
+import { distanceMeters } from "../lib/geo";
 import type { LatLng } from "../types";
 
 // How long the popup lingers on the green "recognized" / red "not heard"
@@ -74,11 +75,27 @@ async function fetchSuggestions(query: string, biasNear: LatLng): Promise<Sugges
   if (!res.ok) return [];
   const data = await res.json();
   if (!Array.isArray(data)) return [];
-  return data.map((d: { display_name: string; name?: string; address?: NominatimAddress; lat: string; lon: string }) => ({
-    label: shortLabel(d.name, d.address ?? {}, d.display_name, typedNumber),
-    fullLabel: d.display_name,
-    position: { lat: parseFloat(d.lat), lng: parseFloat(d.lon) },
-  }));
+  const mapped: Suggestion[] = data.map(
+    (d: { display_name: string; name?: string; address?: NominatimAddress; lat: string; lon: string }) => ({
+      label: shortLabel(d.name, d.address ?? {}, d.display_name, typedNumber),
+      fullLabel: d.display_name,
+      position: { lat: parseFloat(d.lat), lng: parseFloat(d.lon) },
+    })
+  );
+
+  // Nominatim's own relevance ranking (text match quality, place "importance")
+  // easily outranks a same-city result behind a more "important" one further
+  // away - viewbox+bounded=0 is only a soft hint, not an actual distance
+  // sort. Re-sorting by real distance from the rider ourselves is what
+  // actually gets "the address in my own city" to the top.
+  const seenLabels = new Set<string>();
+  const deduped = mapped.filter((s) => {
+    if (seenLabels.has(s.label)) return false;
+    seenLabels.add(s.label);
+    return true;
+  });
+  deduped.sort((a, b) => distanceMeters(biasNear, a.position) - distanceMeters(biasNear, b.position));
+  return deduped;
 }
 
 /** Debounced address search-as-you-type against Nominatim (free, keyless OSM geocoder). */

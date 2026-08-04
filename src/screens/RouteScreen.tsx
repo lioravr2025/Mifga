@@ -60,7 +60,7 @@ export default function RouteScreen({ position, ride, active }: { position: LatL
   const hazardsOnRoute = route ? hazards.filter((h) => minDistanceToPath(h.position, route.points) <= HAZARD_ALERT_RADIUS_M) : [];
 
   const nav = useTurnByTurn(position, route?.steps ?? []);
-  const navigating = ride.rideActive && !!route && !!nav.upcoming && !nav.isArrived;
+  const navigating = active && ride.rideActive && !!route && !!nav.upcoming && !nav.isArrived;
 
   // Instant one-tap police/inspector report while riding, no location/nickname/
   // photo step - parity with the same buttons on the main map tab.
@@ -83,7 +83,12 @@ export default function RouteScreen({ position, ride, active }: { position: LatL
   // polyline doesn't flash empty mid-ride.
   const reroutingRef = useRef(false);
   useEffect(() => {
-    if (!ride.rideActive || !route || !destPoint || reroutingRef.current) return;
+    // `active` matters here because this screen stays mounted (just hidden)
+    // while another tab is open - without it, a route planned earlier and
+    // then abandoned (switched to the main tab and started a plain,
+    // destination-less ride from there) kept silently auto-rerouting and
+    // chiming toward that stale destination in the background.
+    if (!active || !ride.rideActive || !route || !destPoint || reroutingRef.current) return;
     if (minDistanceToPath(position, route.points) <= OFF_ROUTE_THRESHOLD_M) return;
     reroutingRef.current = true;
     playRouteRecalculating();

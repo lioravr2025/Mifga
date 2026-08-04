@@ -109,6 +109,7 @@ export function useRideMonitor(position: LatLng, hasRealFix: boolean): RideMonit
     if (hasRealFix) {
       for (const h of hazards) {
         if (alertedRef.current.has(h.id)) continue;
+        if (h.reporterId === user.id) continue; // you know it's there - you're the one who reported it
         if (distanceMeters(position, h.position) <= settings.rideAlertRadiusM) {
           alertedRef.current.add(h.id);
           playRideAlert(rideAlertKind(h.type));
