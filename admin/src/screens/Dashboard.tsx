@@ -17,6 +17,7 @@ import SeedPanel from "../components/SeedPanel";
 import RidersPanel from "../components/RidersPanel";
 import MeetupsAdminPanel from "../components/MeetupsAdminPanel";
 import MarketplaceAdminPanel from "../components/MarketplaceAdminPanel";
+import GoogleMapsUsagePanel from "../components/GoogleMapsUsagePanel";
 
 function isRecentlyActive(lastActiveAt: string | null) {
   if (!lastActiveAt) return false;
@@ -210,6 +211,9 @@ export default function Dashboard({ onSignOut }: { onSignOut: () => void }) {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <SupportTicketsPanel />
               <VersionConfigPanel />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <GoogleMapsUsagePanel />
             </div>
           </div>
         ) : (
