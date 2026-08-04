@@ -30,6 +30,13 @@ jobs:
           # in Postgres, not keeping this value hidden.
           VITE_SUPABASE_URL: https://tmmyimiubfnpkujulqll.supabase.co
           VITE_SUPABASE_ANON_KEY: sb_publishable_2yytuXb8y5nQGCZqd5bquQ_t-ZEY7j7
+          # Also safe to keep here, same reasoning: a Google Maps JS API key
+          # always ships inside the client bundle by design - the actual
+          # protection is the HTTP-referrer/package + per-API restrictions and
+          # daily quota caps set in Google Cloud Console, not secrecy of the
+          # key string itself.
+          VITE_GOOGLE_MAPS_API_KEY: AIzaSyCeuPxX7lnurnV9dSYrQVBTvHpJCeN_yks
+          VITE_GOOGLE_MAPS_MAP_ID: 893d8cb798a96224bbc50b37
 
       - name: Sync Capacitor
         run: npx cap sync android

@@ -1,7 +1,7 @@
 {
   "name": "mifga",
   "private": true,
-  "version": "0.14.4",
+  "version": "0.15.0",
   "description": "Mifga (מפגע) - crowd-sourced road hazard reporting app",
   "type": "module",
   "scripts": {
@@ -13,6 +13,7 @@
   "dependencies": {
     "@capacitor/push-notifications": "^6.0.5",
     "@supabase/supabase-js": "^2.110.8",
+    "@vis.gl/react-google-maps": "^1.9.0",
     "clsx": "^2.1.1",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.474.0",
