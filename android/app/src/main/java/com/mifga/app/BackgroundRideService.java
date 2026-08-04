@@ -242,19 +242,30 @@ public class BackgroundRideService extends Service {
         }
     }
 
+    // Mirrors HAZARD_EXPIRY_MS / HAZARD_EXPIRY_TYPES in src/data/hazardTypes.ts -
+    // a police/inspector report is only trusted for this long since it was
+    // last reported/voted on. The web app's visibleHazards filter applies
+    // this, but this service polls Supabase directly and has to apply it
+    // itself too - without it, a rider could get alerted about a report that
+    // expired (and disappeared from the map) hours earlier, simply because
+    // it was never manually denied enough times to flip removed=true.
+    private static final long HAZARD_EXPIRY_MS = 20 * 60_000L;
+
     private void pollHazards() {
         Location loc = lastLocation;
         if (loc == null) return;
         try {
-            String url = SUPABASE_URL + "/rest/v1/hazards?removed=eq.false&select=id,type,lat,lng";
+            String url = SUPABASE_URL + "/rest/v1/hazards?removed=eq.false&select=id,type,lat,lng,created_at,last_vote_at";
             String body = httpGet(url);
             if (body == null) return;
             JSONArray arr = new JSONArray(body);
+            long now = System.currentTimeMillis();
             for (int i = 0; i < arr.length(); i++) {
                 JSONObject h = arr.getJSONObject(i);
                 String id = h.getString("id");
                 String type = h.getString("type");
                 if (alertedHazardIds.contains(id)) continue;
+                if (isExpiryType(type) && now - lastInteractionMs(h) >= HAZARD_EXPIRY_MS) continue;
                 double lat = h.getDouble("lat");
                 double lng = h.getDouble("lng");
                 double distance = haversineMeters(loc.getLatitude(), loc.getLongitude(), lat, lng);
@@ -266,6 +277,47 @@ public class BackgroundRideService extends Service {
             }
         } catch (Exception e) {
             Log.w(TAG, "pollHazards failed", e);
+        }
+    }
+
+    private boolean isExpiryType(String type) {
+        return "police".equals(type) || "inspector".equals(type);
+    }
+
+    private long lastInteractionMs(JSONObject h) {
+        String iso = h.isNull("last_vote_at") ? null : h.optString("last_vote_at", null);
+        if (iso == null || iso.isEmpty()) iso = h.isNull("created_at") ? null : h.optString("created_at", null);
+        return iso == null ? 0L : parseIsoMillis(iso);
+    }
+
+    /**
+     * PostgREST returns timestamptz values with variable fractional-second
+     * precision (e.g. "2026-08-04T12:34:56.789012+00:00", sometimes with no
+     * fractional part at all) - SimpleDateFormat needs an exact pattern
+     * match, so normalize to exactly 3 fractional digits and a numeric
+     * offset before parsing. Any failure here just returns 0 (epoch), which
+     * fails safe: the hazard reads as long-expired and gets skipped rather
+     * than risking a crash or a wrong alert.
+     */
+    private long parseIsoMillis(String iso) {
+        try {
+            String s = iso.endsWith("Z") ? iso.substring(0, iso.length() - 1) + "+0000" : iso;
+            int offsetIdx = Math.max(s.lastIndexOf('+'), s.lastIndexOf('-'));
+            String main = offsetIdx > 10 ? s.substring(0, offsetIdx) : s;
+            String offset = offsetIdx > 10 ? s.substring(offsetIdx).replace(":", "") : "+0000";
+            int dot = main.indexOf('.');
+            if (dot < 0) {
+                main = main + ".000";
+            } else {
+                String frac = main.substring(dot + 1);
+                if (frac.length() > 3) frac = frac.substring(0, 3);
+                while (frac.length() < 3) frac = frac + "0";
+                main = main.substring(0, dot + 1) + frac;
+            }
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ", Locale.US);
+            return sdf.parse(main + offset).getTime();
+        } catch (Exception e) {
+            return 0L;
         }
     }
 
