@@ -47,11 +47,18 @@
 	<true/>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>מפגע צריכה את המיקום שלך כדי להראות מפגעים בסביבתך ולתכנן מסלול רכיבה בטוח.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>מפגע ממשיכה להתריע על שוטרים ופקחים בקרבתך גם כשהמסך כבוי במהלך נסיעה פעילה - בדיוק כמו Waze.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>מפגע צריכה גישה למצלמה כדי לצלם תמונה של מפגע שדיווחת עליו.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>מפגע צריכה גישה לתמונות כדי לצרף תמונה קיימת לדיווח על מפגע.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>מפגע צריכה גישה למיקרופון כדי לשלוח הודעות קוליות לחברים ולקבוצות.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+		<string>audio</string>
+	</array>
 </dict>
 </plist>
