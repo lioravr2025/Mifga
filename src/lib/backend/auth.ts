@@ -13,25 +13,7 @@ import type { UserProfile } from "../../types";
 export async function ensureSession(): Promise<string> {
   if (!supabase) throw new Error("Supabase not configured");
   const { data: existing } = await supabase.auth.getSession();
-  if (existing.session) {
-    // getSession() returns whatever's in storage without checking whether
-    // the access token has actually expired - Supabase's silent auto-refresh
-    // only runs via a timer while the app is alive, so a session that sat in
-    // storage while the app was fully killed for a while (e.g. reopened from
-    // a push notification tap after being swiped away) can come back with an
-    // already-expired token. Used as-is, the very next authenticated request
-    // (fetchOwnProfile below) 401s and throws, which left onboardingComplete
-    // stuck at its default false - showing the registration screen for an
-    // already-registered rider. Refresh proactively whenever it's expired or
-    // about to be.
-    const expiresAt = existing.session.expires_at;
-    const isStale = expiresAt != null && expiresAt * 1000 < Date.now() + 60_000;
-    if (!isStale) return existing.session.user.id;
-    const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
-    if (!refreshError && refreshed.session) return refreshed.session.user.id;
-    // Refresh token itself is dead (revoked/too old) - fall through to a
-    // fresh anonymous sign-in rather than getting stuck either way.
-  }
+  if (existing.session) return existing.session.user.id;
 
   const { data, error } = await supabase.auth.signInAnonymously();
   if (error || !data.session) throw error ?? new Error("Anonymous sign-in failed");

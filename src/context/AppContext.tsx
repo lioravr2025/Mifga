@@ -352,7 +352,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const uid = await ensureSession();
         if (cancelled) return;
         setBootstrapStage(1);
-        const profile = await fetchOwnProfile(uid);
+        // A transient failure here (a momentary network hiccup, a cold-start
+        // token that needed a beat to settle) must never be mistaken for
+        // "this account doesn't exist" - that previously showed the
+        // registration screen to an already-registered rider, which is
+        // never acceptable. One retry after a short pause before falling
+        // back to null; a real "no profile yet" case (a genuinely brand new
+        // uid) just costs that pause once, for free.
+        let profile = await fetchOwnProfile(uid).catch(() => undefined);
+        if (profile === undefined) {
+          await new Promise((r) => setTimeout(r, 1500));
+          profile = await fetchOwnProfile(uid).catch(() => null);
+        }
         if (cancelled) return;
         if (profile) {
           setUser(profile);
