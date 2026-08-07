@@ -65,14 +65,19 @@ async function getMonitoringAccessToken(account: ServiceAccount): Promise<string
   return data.access_token as string;
 }
 
-// Which "consumed_api" services we care about, and a rough $/1000-request
-// rate for each - sourced from Google's public pricing page at the time this
-// was written. Verify against https://developers.google.com/maps/billing-and-pricing/pricing
-// before trusting this for anything beyond a rough heads-up.
-const TRACKED_SERVICES: { service: string; label: string; usdPer1000: number }[] = [
-  { service: "maps-backend.googleapis.com", label: "Dynamic Maps (טעינות מפה)", usdPer1000: 7 },
-  { service: "places-backend.googleapis.com", label: "Places (חיפוש/פרטי מקום)", usdPer1000: 17 },
-  { service: "directions-backend.googleapis.com", label: "Directions (חישוב מסלול)", usdPer1000: 5 },
+// Which "consumed_api" services we care about, a rough $/1000-request rate
+// for each, and the monthly free quota Google grants per SKU on the
+// Essentials tier - sourced from the Cloud Billing SKU list at the time this
+// was written (10,000 free calls/month for all three as of writing). Verify
+// against https://developers.google.com/maps/billing-and-pricing/pricing
+// before trusting this for anything beyond a rough heads-up: Places in
+// particular bundles several sub-SKUs (Text Search, Nearby Search, Place
+// Details, ...) at different real prices under one Cloud Monitoring metric,
+// so usdPer1000 here is a blended approximation, not any single SKU's exact rate.
+const TRACKED_SERVICES: { service: string; label: string; usdPer1000: number; freeQuota: number }[] = [
+  { service: "maps-backend.googleapis.com", label: "Dynamic Maps (טעינות מפה)", usdPer1000: 7, freeQuota: 10000 },
+  { service: "places-backend.googleapis.com", label: "Places (חיפוש/פרטי מקום)", usdPer1000: 17, freeQuota: 10000 },
+  { service: "directions-backend.googleapis.com", label: "Directions (חישוב מסלול)", usdPer1000: 5, freeQuota: 10000 },
 ];
 
 interface TimeSeriesPoint {
@@ -132,7 +137,15 @@ Deno.serve(async (req) => {
     const services = await Promise.all(
       TRACKED_SERVICES.map(async (s) => {
         const requests = await fetchServiceUsage(account.project_id, accessToken, s.service, periodStart, periodEnd);
-        return { label: s.label, requests, estimatedUsd: Math.round((requests / 1000) * s.usdPer1000 * 100) / 100 };
+        // Only requests past the free monthly quota are ever actually billed.
+        const billableRequests = Math.max(0, requests - s.freeQuota);
+        return {
+          label: s.label,
+          requests,
+          freeQuota: s.freeQuota,
+          billableRequests,
+          estimatedUsd: Math.round((billableRequests / 1000) * s.usdPer1000 * 100) / 100,
+        };
       })
     );
 

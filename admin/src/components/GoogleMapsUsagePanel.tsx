@@ -13,6 +13,8 @@ const DANGER_AT_USD = 50;
 interface ServiceUsage {
   label: string;
   requests: number;
+  freeQuota: number;
+  billableRequests: number;
   estimatedUsd: number;
 }
 
@@ -84,7 +86,7 @@ export default function GoogleMapsUsagePanel() {
         <div className="space-y-3">
           <div className="rounded-xl p-3.5 border" style={{ background: `${severityColor}15`, borderColor: `${severityColor}40` }}>
             <div className="flex items-center justify-between mb-1">
-              <span className="text-[11px] text-neutral-400">הערכת עלות מתחילת החודש</span>
+              <span className="text-[11px] text-neutral-400">הערכת עלות בפועל מתחילת החודש</span>
               <span className="text-[10px] text-neutral-500">
                 נכון ל-{new Date(data.asOf).toLocaleString("he-IL", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
               </span>
@@ -92,23 +94,48 @@ export default function GoogleMapsUsagePanel() {
             <div className="text-2xl font-extrabold tabular-nums" style={{ color: severityColor }}>
               ${data.totalEstimatedUsd.toFixed(2)}
             </div>
+            <div className="text-[10px] text-neutral-500 mt-1">
+              {data.totalEstimatedUsd === 0
+                ? "כל השירותים עדיין בתוך המכסה החינמית החודשית של Google - עדיין לא משלמים בפועל."
+                : "כולל רק קריאות שכבר חרגו מהמכסה החינמית של כל שירות - זה מה שבאמת ייגבה."}
+            </div>
           </div>
 
           <div className="space-y-1.5">
-            {data.services.map((s) => (
-              <div key={s.label} className="flex items-center justify-between px-3 py-2 rounded-lg bg-bg-panel border border-bg-border text-xs">
-                <span className="text-neutral-300">{s.label}</span>
-                <span className="flex items-center gap-2 tabular-nums">
-                  <span className="text-neutral-500">{s.requests.toLocaleString("he-IL")} קריאות</span>
-                  <span className="text-neutral-100 font-semibold">${s.estimatedUsd.toFixed(2)}</span>
-                </span>
-              </div>
-            ))}
+            {data.services.map((s) => {
+              const pctOfQuota = Math.min(100, Math.round((s.requests / s.freeQuota) * 100));
+              const overQuota = s.billableRequests > 0;
+              return (
+                <div key={s.label} className="px-3 py-2 rounded-lg bg-bg-panel border border-bg-border text-xs space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-neutral-300">{s.label}</span>
+                    <span className="flex items-center gap-2 tabular-nums">
+                      <span className="text-neutral-500">
+                        {s.requests.toLocaleString("he-IL")} / {s.freeQuota.toLocaleString("he-IL")} חינם
+                      </span>
+                      <span className={`font-semibold ${overQuota ? "text-neutral-100" : "text-neutral-600"}`}>${s.estimatedUsd.toFixed(2)}</span>
+                    </span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-bg-border overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all"
+                      style={{ width: `${pctOfQuota}%`, background: overQuota ? "#ef4444" : "#22c55e" }}
+                    />
+                  </div>
+                  {overQuota && (
+                    <div className="text-[10px] text-red-300">
+                      חרג מהמכסה ב-{s.billableRequests.toLocaleString("he-IL")} קריאות - אלו אלו שנגבות בפועל.
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
 
           <p className="text-[10px] text-neutral-500 leading-relaxed">
-            זו הערכה בלבד, מבוססת על תעריפי מחירון ידועים ולא על החיוב הרשמי - המספר הרשמי תמיד ב-Google Cloud Console → Billing. ה-Budget
-            Alert שהוגדר שם הוא רשת הביטחון האמיתית, לא הפאנל הזה.
+            המכסה החינמית (10,000 קריאות/שירות בחודש, Essentials tier) והתעריפים לאחריה מבוססים על מחירון Google הידוע בזמן כתיבת הפאנל
+            הזה - ולא על החיוב הרשמי. המספר הרשמי תמיד ב-Google Cloud Console → Billing. ה-Budget Alert שהוגדר שם הוא רשת הביטחון האמיתית,
+            לא הפאנל הזה.
           </p>
         </div>
       )}
