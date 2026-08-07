@@ -127,7 +127,16 @@ export default function UsersMap({
       }
     >
       <div className="h-[420px] rounded-xl overflow-hidden border border-bg-border">
-        <Map mapId={MAP_ID} renderingType="VECTOR" colorScheme="DARK" defaultCenter={ISRAEL_CENTER} defaultZoom={8} className="w-full h-full">
+        {/* renderingType/colorScheme only make sense - and only work - once a
+            real vector Map ID is set; forcing VECTOR without one throws a fatal
+            "can't load Google Maps" error instead of degrading to raster. */}
+        <Map
+          mapId={MAP_ID}
+          {...(MAP_ID ? { renderingType: "VECTOR" as const, colorScheme: "DARK" as const } : {})}
+          defaultCenter={ISRAEL_CENTER}
+          defaultZoom={8}
+          className="w-full h-full"
+        >
           {located.map((p) => {
             const color = p.riding_since ? "#22c55e" : isRecentlyActive(p.last_active_at) ? "#38bdf8" : "#64748b";
             return (
