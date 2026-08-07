@@ -127,16 +127,15 @@ export default function UsersMap({
       }
     >
       <div className="h-[420px] rounded-xl overflow-hidden border border-bg-border">
-        {/* renderingType/colorScheme only make sense - and only work - once a
-            real vector Map ID is set; forcing VECTOR without one throws a fatal
-            "can't load Google Maps" error instead of degrading to raster. */}
-        <Map
-          mapId={MAP_ID}
-          {...(MAP_ID ? { renderingType: "VECTOR" as const, colorScheme: "DARK" as const } : {})}
-          defaultCenter={ISRAEL_CENTER}
-          defaultZoom={8}
-          className="w-full h-full"
-        >
+        {/* No renderingType/colorScheme here on purpose: forcing "VECTOR"
+            requires WebGL, and when it's unavailable (older GPU drivers,
+            hardware acceleration off, some VM/remote-desktop setups) Google
+            shows a "degraded map" warning dialog instead of just falling back
+            - confirmed via the dialog's own DOM class, CizjDb-degraded-map-dialog-view.
+            Advanced Markers work fine in raster mode too, so just pass mapId
+            (required for them) and let Google pick whichever mode the
+            browser actually supports. */}
+        <Map mapId={MAP_ID} defaultCenter={ISRAEL_CENTER} defaultZoom={8} className="w-full h-full">
           {located.map((p) => {
             const color = p.riding_since ? "#22c55e" : isRecentlyActive(p.last_active_at) ? "#38bdf8" : "#64748b";
             return (
