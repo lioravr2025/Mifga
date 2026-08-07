@@ -13,6 +13,14 @@
 // still the real safety net if this estimate ever drifts from reality.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+// Called directly from the admin dashboard in a browser (unlike send-push,
+// which is only ever called from the mobile app), so it needs explicit CORS
+// headers or the browser blocks the response before supabase-js ever sees it.
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
 interface ServiceAccount {
   project_id: string;
   client_email: string;
@@ -99,6 +107,7 @@ async function fetchServiceUsage(projectId: string, accessToken: string, service
 }
 
 Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
     // Admin-only: verify the caller's own session (not the service role) is
     // a member of admin_users, the same gate every admin-only RPC uses.
@@ -109,9 +118,9 @@ Deno.serve(async (req) => {
     const {
       data: { user },
     } = await callerClient.auth.getUser();
-    if (!user) return new Response(JSON.stringify({ error: "UNAUTHENTICATED" }), { status: 401 });
+    if (!user) return new Response(JSON.stringify({ error: "UNAUTHENTICATED" }), { status: 401, headers: corsHeaders });
     const { data: adminRow } = await callerClient.from("admin_users").select("user_id").eq("user_id", user.id).maybeSingle();
-    if (!adminRow) return new Response(JSON.stringify({ error: "NOT_ADMIN" }), { status: 403 });
+    if (!adminRow) return new Response(JSON.stringify({ error: "NOT_ADMIN" }), { status: 403, headers: corsHeaders });
 
     const account: ServiceAccount = JSON.parse(Deno.env.get("GOOGLE_MAPS_SERVICE_ACCOUNT")!);
     const accessToken = await getMonitoringAccessToken(account);
@@ -131,10 +140,10 @@ Deno.serve(async (req) => {
 
     return new Response(JSON.stringify({ periodStart, asOf: periodEnd, services, totalEstimatedUsd }), {
       status: 200,
-      headers: { "Content-Type": "application/json" },
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
     console.error("google-maps-usage failed", err);
-    return new Response(JSON.stringify({ error: String(err) }), { status: 500 });
+    return new Response(JSON.stringify({ error: String(err) }), { status: 500, headers: corsHeaders });
   }
 });
