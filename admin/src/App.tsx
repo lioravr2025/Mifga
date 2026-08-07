@@ -1,9 +1,15 @@
+import { APIProvider } from "@vis.gl/react-google-maps";
 import { Loader2, ShieldOff } from "lucide-react";
 import { useAdminAuth } from "./hooks/useAdminAuth";
 import LoginScreen from "./screens/LoginScreen";
 import Dashboard from "./screens/Dashboard";
 
-export default function App() {
+// Same key + Map ID the mobile app uses (src/App.tsx) - one Google Maps
+// Platform key shared across app and admin keeps the cost panel's numbers
+// meaningful instead of having to reconcile two separate keys' usage.
+const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined;
+
+function AppShell() {
   const auth = useAdminAuth();
 
   if (auth.status === "loading") {
@@ -31,4 +37,12 @@ export default function App() {
   }
 
   return <Dashboard onSignOut={() => auth.signOut()} />;
+}
+
+export default function App() {
+  return (
+    <APIProvider apiKey={GOOGLE_MAPS_API_KEY ?? ""} libraries={["places"]} language="he" region="il">
+      <AppShell />
+    </APIProvider>
+  );
 }

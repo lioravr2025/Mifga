@@ -25,3 +25,27 @@ export function prizeMapIcon(icon: string, imageUrl?: string | null): L.DivIcon 
   );
   return L.divIcon({ html, className: "mifga-admin-prize-marker", iconSize: [size, size], iconAnchor: [size / 2, size / 2], popupAnchor: [0, -size / 2] });
 }
+
+/** Same visual as prizeMapIcon, as plain JSX for Google Maps AdvancedMarker children (which render arbitrary React, not an icon URL like classic Marker). */
+export function PrizeMarkerGlyph({ icon, imageUrl }: { icon: string; imageUrl?: string | null }) {
+  const size = 32;
+  return (
+    <div
+      style={{
+        width: size,
+        height: size,
+        borderRadius: "9999px",
+        background: "#0f1830",
+        border: "2px solid #f59e0b",
+        boxShadow: "0 0 10px -1px #f59e0b",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: 16,
+        overflow: "hidden",
+      }}
+    >
+      {imageUrl ? <img src={imageUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "9999px" }} /> : icon}
+    </div>
+  );
+}

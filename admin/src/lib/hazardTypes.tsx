@@ -67,6 +67,31 @@ export function hazardMapIcon(type: string): L.DivIcon {
   return L.divIcon({ html, className: "mifga-admin-hazard-marker", iconSize: [size, size], iconAnchor: [size / 2, size / 2], popupAnchor: [0, -size / 2] });
 }
 
+/** Same visual as hazardMapIcon, as plain JSX for Google Maps AdvancedMarker children (which render arbitrary React, not an icon URL like classic Marker). */
+export function HazardMarkerGlyph({ type }: { type: string }) {
+  const def = HAZARD_TYPE_BY_ID[type];
+  const hex = def?.color ?? "#38bdf8";
+  const Icon = def?.icon ?? TriangleAlert;
+  const size = 34;
+  return (
+    <div
+      style={{
+        width: size,
+        height: size,
+        borderRadius: "9999px",
+        background: "#0f1830",
+        border: `2px solid ${hex}`,
+        boxShadow: `0 0 10px -1px ${hex}`,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      <Icon size={17} color={hex} strokeWidth={2.4} />
+    </div>
+  );
+}
+
 // Mirrors src/data/hazardTypes.ts on the mobile app - police/inspector hazards
 // are never actually deleted server-side when their 20-minute silent window
 // elapses, each client just stops showing them. The admin dashboard needs the

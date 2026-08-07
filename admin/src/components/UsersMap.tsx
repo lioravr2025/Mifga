@@ -1,14 +1,19 @@
 import { useState } from "react";
-import { CircleMarker, MapContainer, Marker, Popup, TileLayer } from "react-leaflet";
+import { AdvancedMarker, InfoWindow, Map } from "@vis.gl/react-google-maps";
 import type { ProfileRow, HazardRow, PrizeRow } from "../lib/types";
 import { Card } from "./Card";
 import { Map as MapIcon, RefreshCw } from "lucide-react";
 import { supabase } from "../lib/supabaseClient";
-import { HAZARD_TYPE_LABELS, hazardMapIcon } from "../lib/hazardTypes";
-import { prizeMapIcon } from "../lib/prizeIcon";
+import { HAZARD_TYPE_LABELS, HazardMarkerGlyph } from "../lib/hazardTypes";
+import { PrizeMarkerGlyph } from "../lib/prizeIcon";
 
-const TILES = "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
-const ISRAEL_CENTER: [number, number] = [31.5, 34.9];
+// Same Map ID the mobile app uses (VITE_GOOGLE_MAPS_MAP_ID) - required for
+// AdvancedMarker/vector rendering; without it the map still works but shows
+// Google's "for development purposes only" watermark.
+const MAP_ID = import.meta.env.VITE_GOOGLE_MAPS_MAP_ID as string | undefined;
+const ISRAEL_CENTER = { lat: 31.5, lng: 34.9 };
+
+type Selected = { kind: "user" | "hazard" | "prize"; id: string } | null;
 
 function isRecentlyActive(lastActiveAt: string | null) {
   if (!lastActiveAt) return false;
@@ -97,6 +102,7 @@ export default function UsersMap({
   onHazardRemoved?: () => void;
 }) {
   const located = profiles.filter((p) => p.live_lat != null && p.live_lng != null);
+  const [selected, setSelected] = useState<Selected>(null);
 
   return (
     <Card
@@ -121,51 +127,81 @@ export default function UsersMap({
       }
     >
       <div className="h-[420px] rounded-xl overflow-hidden border border-bg-border">
-        <MapContainer center={ISRAEL_CENTER} zoom={8} className="w-full h-full">
-          <TileLayer url={TILES} />
-          {located.map((p) => (
-            <CircleMarker
-              key={p.id}
-              center={[p.live_lat!, p.live_lng!]}
-              radius={6}
-              pathOptions={{
-                color: p.riding_since ? "#22c55e" : isRecentlyActive(p.last_active_at) ? "#38bdf8" : "#64748b",
-                fillColor: p.riding_since ? "#22c55e" : isRecentlyActive(p.last_active_at) ? "#38bdf8" : "#64748b",
-                fillOpacity: 0.8,
-                weight: 2,
-              }}
-            >
-              <Popup>
-                <div style={{ direction: "rtl" }}>
-                  <strong>{p.name}</strong> (@{p.username})
-                  <br />
-                  {p.riding_since ? "בנסיעה כעת" : isRecentlyActive(p.last_active_at) ? "פעיל עכשיו" : "לא פעיל"}
-                </div>
-              </Popup>
-            </CircleMarker>
-          ))}
+        <Map mapId={MAP_ID} renderingType="VECTOR" colorScheme="DARK" defaultCenter={ISRAEL_CENTER} defaultZoom={8} className="w-full h-full">
+          {located.map((p) => {
+            const color = p.riding_since ? "#22c55e" : isRecentlyActive(p.last_active_at) ? "#38bdf8" : "#64748b";
+            return (
+              <AdvancedMarker key={p.id} position={{ lat: p.live_lat!, lng: p.live_lng! }} onClick={() => setSelected({ kind: "user", id: p.id })}>
+                <div style={{ width: 12, height: 12, borderRadius: "9999px", background: color, border: "2px solid white", boxShadow: "0 0 4px -1px rgba(0,0,0,0.6)" }} />
+              </AdvancedMarker>
+            );
+          })}
+          {selected?.kind === "user" &&
+            (() => {
+              const p = located.find((x) => x.id === selected.id);
+              if (!p) return null;
+              return (
+                <InfoWindow position={{ lat: p.live_lat!, lng: p.live_lng! }} onCloseClick={() => setSelected(null)}>
+                  <div style={{ direction: "rtl" }}>
+                    <strong>{p.name}</strong> (@{p.username})
+                    <br />
+                    {p.riding_since ? "בנסיעה כעת" : isRecentlyActive(p.last_active_at) ? "פעיל עכשיו" : "לא פעיל"}
+                  </div>
+                </InfoWindow>
+              );
+            })()}
+
           {hazards.map((h) => (
-            <Marker key={h.id} position={[h.lat, h.lng]} icon={hazardMapIcon(h.type)}>
-              <Popup>
-                <div style={{ direction: "rtl", minWidth: 140 }}>
-                  <strong>{HAZARD_TYPE_LABELS[h.type] ?? h.type}</strong> - {h.reporter_name}
-                  <br />+{h.confirmations} / -{h.denials}
-                  <RemoveHazardButton id={h.id} onRemoved={onHazardRemoved} />
-                </div>
-              </Popup>
-            </Marker>
+            <AdvancedMarker key={h.id} position={{ lat: h.lat, lng: h.lng }} onClick={() => setSelected({ kind: "hazard", id: h.id })}>
+              <HazardMarkerGlyph type={h.type} />
+            </AdvancedMarker>
           ))}
+          {selected?.kind === "hazard" &&
+            (() => {
+              const h = hazards.find((x) => x.id === selected.id);
+              if (!h) return null;
+              return (
+                <InfoWindow position={{ lat: h.lat, lng: h.lng }} onCloseClick={() => setSelected(null)}>
+                  <div style={{ direction: "rtl", minWidth: 140 }}>
+                    <strong>{HAZARD_TYPE_LABELS[h.type] ?? h.type}</strong> - {h.reporter_name}
+                    <br />+{h.confirmations} / -{h.denials}
+                    <RemoveHazardButton
+                      id={h.id}
+                      onRemoved={() => {
+                        setSelected(null);
+                        onHazardRemoved?.();
+                      }}
+                    />
+                  </div>
+                </InfoWindow>
+              );
+            })()}
+
           {prizes.map((p) => (
-            <Marker key={p.id} position={[p.lat, p.lng]} icon={prizeMapIcon(p.icon, p.icon_image_url)}>
-              <Popup>
-                <div style={{ direction: "rtl", minWidth: 140 }}>
-                  <strong>פרס · {p.points} נק'</strong>
-                  <RemovePrizeButton id={p.id} onRemoved={onHazardRemoved} />
-                </div>
-              </Popup>
-            </Marker>
+            <AdvancedMarker key={p.id} position={{ lat: p.lat, lng: p.lng }} onClick={() => setSelected({ kind: "prize", id: p.id })}>
+              <PrizeMarkerGlyph icon={p.icon} imageUrl={p.icon_image_url} />
+            </AdvancedMarker>
           ))}
-        </MapContainer>
+          {selected?.kind === "prize" &&
+            (() => {
+              const p = prizes.find((x) => x.id === selected.id);
+              if (!p) return null;
+              return (
+                <InfoWindow position={{ lat: p.lat, lng: p.lng }} onCloseClick={() => setSelected(null)}>
+                  <div style={{ direction: "rtl", minWidth: 140 }}>
+                    <strong>פרס · {p.points} נק'</strong>
+                    <RemovePrizeButton
+                      id={p.id}
+                      onRemoved={() => {
+                        setSelected(null);
+                        onHazardRemoved?.();
+                      }}
+                    />
+                  </div>
+                </InfoWindow>
+              );
+            })()}
+        </Map>
       </div>
       <div className="flex items-center gap-4 mt-3 text-[11px] text-neutral-400">
         <span className="flex items-center gap-1.5">
