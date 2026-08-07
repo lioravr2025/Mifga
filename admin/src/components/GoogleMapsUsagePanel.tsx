@@ -15,6 +15,7 @@ interface ServiceUsage {
   requests: number;
   freeQuota: number;
   billableRequests: number;
+  listPriceUsd: number;
   estimatedUsd: number;
 }
 
@@ -23,6 +24,7 @@ interface UsageResponse {
   asOf: string;
   services: ServiceUsage[];
   totalEstimatedUsd: number;
+  totalListPriceUsd: number;
 }
 
 export default function GoogleMapsUsagePanel() {
@@ -49,7 +51,11 @@ export default function GoogleMapsUsagePanel() {
     }
   };
 
-  const severity = !data ? "ok" : data.totalEstimatedUsd >= DANGER_AT_USD ? "danger" : data.totalEstimatedUsd >= WARN_AT_USD ? "warn" : "ok";
+  // Severity tracks the uncapped list price, not the (often $0) billable
+  // amount - the list price is the trend line that matters for "should I
+  // start worrying", since it climbs continuously while the billable amount
+  // stays flat at $0 until a quota is blown through.
+  const severity = !data ? "ok" : data.totalListPriceUsd >= DANGER_AT_USD ? "danger" : data.totalListPriceUsd >= WARN_AT_USD ? "warn" : "ok";
   const severityColor = severity === "danger" ? "#ef4444" : severity === "warn" ? "#f59e0b" : "#22c55e";
 
   return (
@@ -86,18 +92,18 @@ export default function GoogleMapsUsagePanel() {
         <div className="space-y-3">
           <div className="rounded-xl p-3.5 border" style={{ background: `${severityColor}15`, borderColor: `${severityColor}40` }}>
             <div className="flex items-center justify-between mb-1">
-              <span className="text-[11px] text-neutral-400">הערכת עלות בפועל מתחילת החודש</span>
+              <span className="text-[11px] text-neutral-400">הערכת עלות מתחילת החודש (ללא מכסה חינמית)</span>
               <span className="text-[10px] text-neutral-500">
                 נכון ל-{new Date(data.asOf).toLocaleString("he-IL", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
               </span>
             </div>
             <div className="text-2xl font-extrabold tabular-nums" style={{ color: severityColor }}>
-              ${data.totalEstimatedUsd.toFixed(2)}
+              ${data.totalListPriceUsd.toFixed(2)}
             </div>
-            <div className="text-[10px] text-neutral-500 mt-1">
+            <div className="text-[11px] mt-1.5 font-medium" style={{ color: data.totalEstimatedUsd === 0 ? "#22c55e" : "#ef4444" }}>
               {data.totalEstimatedUsd === 0
-                ? "כל השירותים עדיין בתוך המכסה החינמית החודשית של Google - עדיין לא משלמים בפועל."
-                : "כולל רק קריאות שכבר חרגו מהמכסה החינמית של כל שירות - זה מה שבאמת ייגבה."}
+                ? "✓ בתוך המכסה החינמית של Google - לא מחויב בפועל החודש."
+                : `✗ חרגת מהמכסה החינמית - נגבה בפועל: $${data.totalEstimatedUsd.toFixed(2)}`}
             </div>
           </div>
 
@@ -113,7 +119,7 @@ export default function GoogleMapsUsagePanel() {
                       <span className="text-neutral-500">
                         {s.requests.toLocaleString("he-IL")} / {s.freeQuota.toLocaleString("he-IL")} חינם
                       </span>
-                      <span className={`font-semibold ${overQuota ? "text-neutral-100" : "text-neutral-600"}`}>${s.estimatedUsd.toFixed(2)}</span>
+                      <span className="text-neutral-400">${s.listPriceUsd.toFixed(2)}</span>
                     </span>
                   </div>
                   <div className="h-1.5 rounded-full bg-bg-border overflow-hidden">
@@ -124,7 +130,7 @@ export default function GoogleMapsUsagePanel() {
                   </div>
                   {overQuota && (
                     <div className="text-[10px] text-red-300">
-                      חרג מהמכסה ב-{s.billableRequests.toLocaleString("he-IL")} קריאות - אלו אלו שנגבות בפועל.
+                      חרג מהמכסה ב-{s.billableRequests.toLocaleString("he-IL")} קריאות - ${s.estimatedUsd.toFixed(2)} נגבים בפועל.
                     </div>
                   )}
                 </div>

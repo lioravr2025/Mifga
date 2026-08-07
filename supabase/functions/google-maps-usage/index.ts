@@ -138,20 +138,26 @@ Deno.serve(async (req) => {
       TRACKED_SERVICES.map(async (s) => {
         const requests = await fetchServiceUsage(account.project_id, accessToken, s.service, periodStart, periodEnd);
         // Only requests past the free monthly quota are ever actually billed.
+        // listPriceUsd ignores the free quota entirely - "what this volume
+        // would cost with no free tier at all" - kept alongside estimatedUsd
+        // (the real, post-quota number) so the admin can see both: how close
+        // they are to the quota mattering, and what's actually charged today.
         const billableRequests = Math.max(0, requests - s.freeQuota);
         return {
           label: s.label,
           requests,
           freeQuota: s.freeQuota,
           billableRequests,
+          listPriceUsd: Math.round((requests / 1000) * s.usdPer1000 * 100) / 100,
           estimatedUsd: Math.round((billableRequests / 1000) * s.usdPer1000 * 100) / 100,
         };
       })
     );
 
     const totalEstimatedUsd = Math.round(services.reduce((sum, s) => sum + s.estimatedUsd, 0) * 100) / 100;
+    const totalListPriceUsd = Math.round(services.reduce((sum, s) => sum + s.listPriceUsd, 0) * 100) / 100;
 
-    return new Response(JSON.stringify({ periodStart, asOf: periodEnd, services, totalEstimatedUsd }), {
+    return new Response(JSON.stringify({ periodStart, asOf: periodEnd, services, totalEstimatedUsd, totalListPriceUsd }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
