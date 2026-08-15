@@ -131,4 +131,18 @@ export interface AppConfigRow {
   min_required_version: string | null;
   latest_version: string | null;
   update_message: string | null;
+  service_area_enabled: boolean;
+  service_area_city_name: string;
+  service_area_lat: number;
+  service_area_lng: number;
+  service_area_radius_km: number;
+  service_area_message: string;
+}
+
+export interface WaitlistSignupRow {
+  id: string;
+  phone: string;
+  city: string;
+  source: string;
+  created_at: string;
 }

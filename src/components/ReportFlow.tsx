@@ -1,10 +1,14 @@
 import { useEffect, useRef, useState } from "react";
-import { Camera, Check, ChevronRight, Crosshair, ImagePlus, MapPin, Tag, X } from "lucide-react";
+import { Camera, Check, ChevronRight, Crosshair, ImagePlus, MapPin, MapPinOff, Tag, X } from "lucide-react";
 import BottomSheet from "./BottomSheet";
 import { HazardIcon } from "./HazardIcon";
 import AddressAutocomplete from "./AddressAutocomplete";
+import IsraeliCityAutocomplete from "./IsraeliCityAutocomplete";
 import { MORE_HAZARD_TYPES, POINTS_PER_REPORT, POINTS_PER_REPORT_WITH_PHOTO, PRIMARY_HAZARD_TYPES } from "../data/hazardTypes";
 import { HAZARD_COLOR_HEX } from "../lib/colors";
+import { distanceMeters } from "../lib/geo";
+import { submitWaitlistSignup } from "../lib/backend/waitlist";
+import { useAppConfig } from "../hooks/useAppConfig";
 import type { HazardTypeId, LatLng } from "../types";
 import { useApp } from "../context/AppContext";
 import { trackClick } from "../lib/analytics";
@@ -43,12 +47,40 @@ export default function ReportFlow({
   initialStep,
 }: ReportFlowProps) {
   const { addReport } = useApp();
+  const appConfig = useAppConfig();
   const [step, setStep] = useState<Step>("type");
   const [selectedType, setSelectedType] = useState<HazardTypeId | null>(null);
   const [manualPosition, setManualPosition] = useState<LatLng | null>(null);
   const [nickname, setNickname] = useState("");
   const [photo, setPhoto] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // Pilot-launch geofence (see admin dashboard's ServiceAreaPanel) - reporting
+  // is limited to the current service area, but riders anywhere can still
+  // browse the map/navigate. Recomputed on every render off the live
+  // userPosition, not cached - a rider who crosses into the area mid-session
+  // should see this update immediately, not need to reopen the sheet.
+  const outOfServiceArea =
+    appConfig.serviceAreaEnabled &&
+    distanceMeters(userPosition, appConfig.serviceAreaCenter) > appConfig.serviceAreaRadiusKm * 1000;
+
+  const [waitlistPhone, setWaitlistPhone] = useState("");
+  const [waitlistCity, setWaitlistCity] = useState("");
+  const [waitlistSubmitting, setWaitlistSubmitting] = useState(false);
+  const [waitlistSubmitted, setWaitlistSubmitted] = useState(false);
+
+  const submitWaitlist = async () => {
+    if (!waitlistPhone.trim() || !waitlistCity.trim()) return;
+    setWaitlistSubmitting(true);
+    try {
+      await submitWaitlistSignup(waitlistPhone.trim(), waitlistCity.trim());
+      setWaitlistSubmitted(true);
+    } catch (err) {
+      console.error("Mifga: submitWaitlistSignup failed", err);
+    } finally {
+      setWaitlistSubmitting(false);
+    }
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -67,6 +99,9 @@ export default function ReportFlow({
     setManualPosition(null);
     setNickname("");
     setPhoto(null);
+    setWaitlistPhone("");
+    setWaitlistCity("");
+    setWaitlistSubmitted(false);
     onStopPicking();
   };
 
@@ -140,7 +175,59 @@ export default function ReportFlow({
 
   return (
     <BottomSheet open={open} onClose={close} maxHeight="88%">
-      {step === "type" && (
+      {outOfServiceArea ? (
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-bold text-neutral-50">עוד לא אצלכם</h2>
+            <button onClick={close} className="text-neutral-400">
+              <X size={22} />
+            </button>
+          </div>
+
+          <div className="flex flex-col items-center text-center gap-3 mb-5">
+            <span className="w-16 h-16 rounded-full flex items-center justify-center bg-bg-panel2 border border-bg-border">
+              <MapPinOff size={28} className="text-neutral-400" />
+            </span>
+            <p className="text-sm text-neutral-300 leading-relaxed max-w-[280px]">{appConfig.serviceAreaMessage}</p>
+          </div>
+
+          {waitlistSubmitted ? (
+            <div className="flex flex-col items-center text-center gap-2 py-4">
+              <span className="w-12 h-12 rounded-full bg-green-500/15 flex items-center justify-center">
+                <Check size={22} className="text-green-400" />
+              </span>
+              <p className="text-sm font-semibold text-neutral-100">נרשמתם!</p>
+              <p className="text-xs text-neutral-500">ככל שיירשמו יותר אנשים מהעיר שלכם, ככה נדע שכדאי לפתוח אצלכם קודם.</p>
+            </div>
+          ) : (
+            <div>
+              <p className="text-xs text-neutral-500 mb-3 text-center">
+                תרשמו אותנו - העיר עם הכי הרבה נרשמים היא היעד הבא שנפתח.
+              </p>
+              <div className="mb-3">
+                <input
+                  value={waitlistPhone}
+                  onChange={(e) => setWaitlistPhone(e.target.value)}
+                  placeholder="מספר טלפון"
+                  type="tel"
+                  inputMode="tel"
+                  className="w-full px-4 py-3 rounded-2xl bg-bg-panel2 border-2 border-bg-border outline-none text-sm text-neutral-100 placeholder:text-neutral-500"
+                />
+              </div>
+              <div className="mb-4">
+                <IsraeliCityAutocomplete value={waitlistCity} onChange={setWaitlistCity} placeholder="עיר מגורים" />
+              </div>
+              <button
+                onClick={submitWaitlist}
+                disabled={waitlistSubmitting || !waitlistPhone.trim() || !waitlistCity.trim()}
+                className="w-full py-3.5 rounded-2xl bg-brand text-white font-bold text-base active:scale-95 transition disabled:opacity-40"
+              >
+                {waitlistSubmitting ? "שולח..." : "הרשמה"}
+              </button>
+            </div>
+          )}
+        </div>
+      ) : step === "type" && (
         <div>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-bold text-neutral-50">מה קורה בדרכים?</h2>

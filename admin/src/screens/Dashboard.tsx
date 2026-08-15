@@ -13,6 +13,8 @@ import ErrorLogsPanel from "../components/ErrorLogsPanel";
 import SupportTicketsPanel from "../components/SupportTicketsPanel";
 import BroadcastPanel from "../components/BroadcastPanel";
 import VersionConfigPanel from "../components/VersionConfigPanel";
+import ServiceAreaPanel from "../components/ServiceAreaPanel";
+import WaitlistPanel from "../components/WaitlistPanel";
 import SeedPanel from "../components/SeedPanel";
 import RidersPanel from "../components/RidersPanel";
 import MeetupsAdminPanel from "../components/MeetupsAdminPanel";
@@ -211,6 +213,10 @@ export default function Dashboard({ onSignOut }: { onSignOut: () => void }) {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <SupportTicketsPanel />
               <VersionConfigPanel />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <ServiceAreaPanel />
+              <WaitlistPanel />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <GoogleMapsUsagePanel />

@@ -13,7 +13,9 @@ import { HazardIcon } from "../components/HazardIcon";
 import { PRIMARY_HAZARD_TYPES } from "../data/hazardTypes";
 import { HAZARD_COLOR_HEX } from "../lib/colors";
 import { useApp } from "../context/AppContext";
+import { useAppConfig } from "../hooks/useAppConfig";
 import { trackClick } from "../lib/analytics";
+import { distanceMeters } from "../lib/geo";
 import type { RideMonitor } from "../hooks/useRideMonitor";
 import type { HazardTypeId, LatLng } from "../types";
 
@@ -39,6 +41,9 @@ export default function MapScreen({
   onConsumeFocusFriend: () => void;
 }) {
   const { hazards, prizes, friends, settings, lastAwardedPoints, clearLastAwarded, addReport } = useApp();
+  const appConfig = useAppConfig();
+  const outOfServiceArea =
+    appConfig.serviceAreaEnabled && distanceMeters(position, appConfig.serviceAreaCenter) > appConfig.serviceAreaRadiusKm * 1000;
   const friendsInMotionCount = friends.filter((f) => f.online && f.shareLocation).length;
 
   const [reportOpen, setReportOpen] = useState(false);
@@ -135,6 +140,14 @@ export default function MapScreen({
           friendsInMotionCount={friendsInMotionCount}
           notifDot={!settings.notificationsEnabled}
         />
+
+        {outOfServiceArea && (
+          <div className="absolute top-[70px] inset-x-4 z-[500] flex justify-center pointer-events-none">
+            <div className="px-3.5 py-1.5 rounded-full bg-bg-panel/90 backdrop-blur border border-bg-border text-[11px] font-semibold text-neutral-300 shadow-lg">
+              אזור שירות: {appConfig.serviceAreaCityName}
+            </div>
+          </div>
+        )}
 
         <button
           onClick={() => {
