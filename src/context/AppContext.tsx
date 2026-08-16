@@ -136,8 +136,8 @@ interface AppContextValue {
   addReport: (input: NewReportInput) => void;
   confirmHazard: (id: string) => void;
   denyHazard: (id: string) => void;
-  /** Reporter's own undo for a mis-tap - server-side blocked once anyone else has confirmed it's really there. */
-  deleteOwnHazard: (id: string) => void;
+  /** Reporter's own undo for a mis-tap - server-side blocked once anyone else has confirmed it's really there. Resolves once the server confirms the delete actually happened; throws (with the hazard restored) if it was blocked. */
+  deleteOwnHazard: (id: string) => Promise<void>;
   collectPrize: (id: string) => void;
   awardMeetupArrivalPoints: (meetupId: string) => void;
   updateSettings: (patch: Partial<AppSettings>) => void;
@@ -661,18 +661,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
     awardVotePoints();
   };
 
-  const deleteOwnHazard = (id: string) => {
+  const deleteOwnHazard = async (id: string): Promise<void> => {
     // Optimistic removal - the realtime UPDATE (removed:true) would also
     // drop it via mergeHazard, but that round trip is what a fast second
     // glance at the map would otherwise still show it during.
     setHazards((prev) => prev.filter((h) => h.id !== id));
-    if (isBackendConfigured) {
-      deleteOwnHazardRemote(id).catch((err) => {
-        console.error("Mifga: deleteOwnHazard failed", err);
-        // Failed server-side (already confirmed/removed/not-mine) - the optimistic
-        // removal was wrong, so re-sync from the server's actual current list.
-        fetchHazards().then(setHazards).catch(() => {});
-      });
+    if (!isBackendConfigured) return;
+    try {
+      await deleteOwnHazardRemote(id);
+    } catch (err) {
+      console.error("Mifga: deleteOwnHazard failed", err);
+      // Blocked server-side (someone else already confirmed it since we last
+      // synced, already removed, or not actually ours) - the optimistic
+      // removal was wrong, so re-sync from the server's real current list
+      // and let the caller know it didn't actually happen, instead of just
+      // silently reverting with no explanation.
+      fetchHazards().then(setHazards).catch(() => {});
+      throw err;
     }
   };
 

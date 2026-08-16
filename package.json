@@ -1,7 +1,7 @@
 {
   "name": "mifga",
   "private": true,
-  "version": "0.16.1",
+  "version": "0.16.2",
   "description": "Mifga (מפגע) - crowd-sourced road hazard reporting app",
   "type": "module",
   "scripts": {

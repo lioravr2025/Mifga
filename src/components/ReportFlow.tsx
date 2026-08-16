@@ -56,13 +56,16 @@ export default function ReportFlow({
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Pilot-launch geofence (see admin dashboard's ServiceAreaPanel) - reporting
-  // is limited to the current service area, but riders anywhere can still
-  // browse the map/navigate. Recomputed on every render off the live
-  // userPosition, not cached - a rider who crosses into the area mid-session
-  // should see this update immediately, not need to reopen the sheet.
+  // is limited to the current service area. Checked against wherever the
+  // report would actually land - initialPosition (a direct map tap) or
+  // manualPosition (address search / drag-to-pin) if either is set, not just
+  // the rider's own live GPS - a rider standing inside the area can still
+  // tap or search a point outside it, and that's what matters here. Matches
+  // exactly what submit() below uses to place the report.
+  const reportPosition = initialPosition ?? manualPosition ?? userPosition;
   const outOfServiceArea =
     appConfig.serviceAreaEnabled &&
-    distanceMeters(userPosition, appConfig.serviceAreaCenter) > appConfig.serviceAreaRadiusKm * 1000;
+    distanceMeters(reportPosition, appConfig.serviceAreaCenter) > appConfig.serviceAreaRadiusKm * 1000;
 
   const [waitlistPhone, setWaitlistPhone] = useState("");
   const [waitlistCity, setWaitlistCity] = useState("");

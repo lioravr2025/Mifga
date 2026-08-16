@@ -11,6 +11,8 @@ import { useApp } from "../context/AppContext";
 export default function HazardDetailSheet({ hazardId, onClose }: { hazardId: string | null; onClose: () => void }) {
   const { hazards, user, confirmHazard, denyHazard, deleteOwnHazard } = useApp();
   const [confettiTrigger, setConfettiTrigger] = useState(0);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
   // look up the live hazard by id every render (rather than taking a snapshot
   // object as a prop) so vote counts update immediately after confirm/deny
   const hazard = hazardId ? hazards.find((h) => h.id === hazardId) ?? null : null;
@@ -29,9 +31,21 @@ export default function HazardDetailSheet({ hazardId, onClose }: { hazardId: str
     setConfettiTrigger((t) => t + 1);
   };
 
-  const remove = () => {
-    deleteOwnHazard(hazard.id);
-    onClose();
+  const remove = async () => {
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await deleteOwnHazard(hazard.id);
+      onClose();
+    } catch {
+      // Most common real reason: someone else confirmed it's really there
+      // since this sheet last synced, which server-side blocks the undo on
+      // purpose - the hazard is already restored on the map by now, this
+      // just explains why instead of the sheet silently closing on a delete
+      // that didn't actually happen.
+      setDeleteError("אי אפשר למחוק - כבר יש אישור מרוכב אחר שהמפגע עדיין שם");
+      setDeleting(false);
+    }
   };
 
   return (
@@ -105,13 +119,17 @@ export default function HazardDetailSheet({ hazardId, onClose }: { hazardId: str
         </div>
 
         {canDeleteOwn && (
-          <button
-            onClick={remove}
-            className="w-full flex items-center justify-center gap-1.5 mt-3 pt-3 border-t border-bg-border text-xs text-red-400/70 active:text-red-400 transition"
-          >
-            <Trash2 size={13} />
-            דיווחתי בטעות - מחיקת הדיווח שלי
-          </button>
+          <div className="mt-3 pt-3 border-t border-bg-border">
+            <button
+              onClick={remove}
+              disabled={deleting}
+              className="w-full flex items-center justify-center gap-1.5 text-xs text-red-400/70 active:text-red-400 transition disabled:opacity-50"
+            >
+              <Trash2 size={13} />
+              {deleting ? "מוחק..." : "דיווחתי בטעות - מחיקת הדיווח שלי"}
+            </button>
+            {deleteError && <p className="mt-2 text-center text-[11px] text-red-400">{deleteError}</p>}
+          </div>
         )}
       </div>
     </BottomSheet>
