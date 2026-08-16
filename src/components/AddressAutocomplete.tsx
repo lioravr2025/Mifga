@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Check, Loader2, MapPinned, Mic, MicOff, Search, X } from "lucide-react";
 import { isVoiceInputSupported, listenForAddress } from "../lib/nativeStt";
+import { fetchIsraeliCities } from "../lib/israeliCities";
 import { distanceMeters } from "../lib/geo";
 import type { LatLng } from "../types";
 
@@ -132,6 +133,13 @@ export default function AddressAutocomplete({
   // this skips the debounced effect's redundant re-fetch of the same query.
   const skipNextDebounceRef = useRef(false);
 
+  // Pre-warm the city list (module-level cache) as soon as this field mounts
+  // so it's already available by the time the rider taps the mic, instead of
+  // adding a network round-trip before listening can even start.
+  useEffect(() => {
+    fetchIsraeliCities();
+  }, []);
+
   const clear = () => {
     setQuery("");
     onQueryChange?.("");
@@ -142,27 +150,28 @@ export default function AddressAutocomplete({
   const startVoiceInput = async () => {
     setVoicePhase("listening");
     try {
-      const text = await listenForAddress();
-      if (!text) {
-        setVoicePhase("error");
-        setTimeout(() => setVoicePhase("idle"), ERROR_HOLD_MS);
-        return;
-      }
+      const cities = await fetchIsraeliCities();
+      const candidates = await listenForAddress(cities);
+      setLoading(true);
+      // Search every ranked hypothesis in parallel and use the first one
+      // (in the recognizer's own rank order) that actually matches a real
+      // place - its top guess is often wrong on a street name it has no
+      // vocabulary for, but a lower-ranked guess frequently is the real
+      // word. Falls back to the top guess if none of them matched anything,
+      // so the rider still sees what was heard and can fix it by hand.
+      const resultsByCandidate = await Promise.all(candidates.map((c) => fetchSuggestions(c, biasNear)));
+      const winner = resultsByCandidate.findIndex((r) => r.length > 0);
+      const index = winner === -1 ? 0 : winner;
+      const text = candidates[index];
+      setLoading(false);
+
       setRecognizedText(text);
       setVoicePhase("success");
       skipNextDebounceRef.current = true;
       setQuery(text);
       onQueryChange?.(text);
       setOpen(true);
-      // Search immediately instead of waiting for the debounce delay - the
-      // whole point of voice input is that the text arrived all at once,
-      // not mid-keystroke, so there's nothing to wait for.
-      setLoading(true);
-      try {
-        setSuggestions(await fetchSuggestions(text, biasNear));
-      } finally {
-        setLoading(false);
-      }
+      setSuggestions(resultsByCandidate[index]);
       setTimeout(() => setVoicePhase("idle"), SUCCESS_HOLD_MS);
     } catch {
       setVoicePhase("error");

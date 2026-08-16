@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { Check, Loader2, MapPinned, Mic, MicOff, Search, X } from "lucide-react";
 import { useMapsLibrary } from "@vis.gl/react-google-maps";
 import { isVoiceInputSupported, listenForAddress } from "../lib/nativeStt";
+import { fetchIsraeliCities } from "../lib/israeliCities";
 import type { LatLng } from "../types";
 
 // Google Maps experiment equivalent of AddressAutocomplete.tsx (Nominatim) -
@@ -58,6 +59,13 @@ export default function GoogleAddressAutocomplete({
     sessionToken.current = new placesLib.AutocompleteSessionToken();
   }, [placesLib]);
 
+  // Pre-warm the city list (module-level cache) as soon as this field mounts
+  // so it's already available by the time the rider taps the mic, instead of
+  // adding a network round-trip before listening can even start.
+  useEffect(() => {
+    fetchIsraeliCities();
+  }, []);
+
   const clear = () => {
     setQuery("");
     onQueryChange?.("");
@@ -65,9 +73,10 @@ export default function GoogleAddressAutocomplete({
     setOpen(false);
   };
 
-  const runSearch = async (q: string) => {
-    if (!placesLib) return;
-    setLoading(true);
+  type Pair = { suggestion: Suggestion; prediction: google.maps.places.PlacePrediction };
+
+  const fetchPredictions = async (q: string): Promise<Pair[]> => {
+    if (!placesLib) return [];
     try {
       const { suggestions: results } = await placesLib.AutocompleteSuggestion.fetchAutocompleteSuggestions({
         input: q,
@@ -77,10 +86,18 @@ export default function GoogleAddressAutocomplete({
         language: "he",
       });
       const predictions = results.map((s) => s.placePrediction).filter((p): p is google.maps.places.PlacePrediction => p !== null);
-      predictionsRef.current = new Map(predictions.map((p) => [p.placeId, p]));
-      setSuggestions(predictions.map((p) => ({ placeId: p.placeId, label: p.text.text })));
+      return predictions.map((p) => ({ suggestion: { placeId: p.placeId, label: p.text.text }, prediction: p }));
     } catch {
-      setSuggestions([]);
+      return [];
+    }
+  };
+
+  const runSearch = async (q: string) => {
+    setLoading(true);
+    try {
+      const pairs = await fetchPredictions(q);
+      predictionsRef.current = new Map(pairs.map((p) => [p.suggestion.placeId, p.prediction]));
+      setSuggestions(pairs.map((p) => p.suggestion));
     } finally {
       setLoading(false);
     }
@@ -89,19 +106,30 @@ export default function GoogleAddressAutocomplete({
   const startVoiceInput = async () => {
     setVoicePhase("listening");
     try {
-      const text = await listenForAddress();
-      if (!text) {
-        setVoicePhase("error");
-        setTimeout(() => setVoicePhase("idle"), ERROR_HOLD_MS);
-        return;
-      }
+      const cities = await fetchIsraeliCities();
+      const candidates = await listenForAddress(cities);
+      setLoading(true);
+      // Search every ranked hypothesis in parallel and use the first one
+      // (in the recognizer's own rank order) that actually matches a real
+      // place - its top guess is often wrong on a street name it has no
+      // vocabulary for, but a lower-ranked guess frequently is the real
+      // word. Falls back to the top guess if none of them matched anything,
+      // so the rider still sees what was heard and can fix it by hand.
+      const resultsByCandidate = await Promise.all(candidates.map(fetchPredictions));
+      const winner = resultsByCandidate.findIndex((r) => r.length > 0);
+      const index = winner === -1 ? 0 : winner;
+      const text = candidates[index];
+      const pairs = resultsByCandidate[index];
+      predictionsRef.current = new Map(pairs.map((p) => [p.suggestion.placeId, p.prediction]));
+      setLoading(false);
+
       setRecognizedText(text);
       setVoicePhase("success");
       skipNextDebounceRef.current = true;
       setQuery(text);
       onQueryChange?.(text);
       setOpen(true);
-      await runSearch(text);
+      setSuggestions(pairs.map((p) => p.suggestion));
       setTimeout(() => setVoicePhase("idle"), SUCCESS_HOLD_MS);
     } catch {
       setVoicePhase("error");

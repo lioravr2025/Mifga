@@ -1,31 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Loader2, MapPin } from "lucide-react";
-
-const CITIES_RESOURCE_URL =
-  "https://data.gov.il/api/3/action/datastore_search?resource_id=d4901968-dad3-4845-a9b0-a57d027f11ab&limit=1300";
-
-// One real network call for the whole session (module-level cache, not per
-// mount) - Israel's official settlements registry (Ministry of Interior /
-// data.gov.il), not a hand-typed list. The API's own text search is a poor
-// fit for live-while-typing partial matches (it missed plain substrings in
-// testing), so this fetches the ~1,300-row list once and filters it locally
-// as the user types instead of hitting the API on every keystroke.
-let citiesPromise: Promise<string[]> | null = null;
-
-function fetchCities(): Promise<string[]> {
-  if (!citiesPromise) {
-    citiesPromise = fetch(CITIES_RESOURCE_URL)
-      .then((res) => res.json())
-      .then((data) => {
-        const records = (data?.result?.records ?? []) as { שם_ישוב?: string }[];
-        const names = records.map((r) => (r["שם_ישוב"] ?? "").trim()).filter(Boolean);
-        return Array.from(new Set(names)).sort((a, b) => a.localeCompare(b, "he"));
-      })
-      .catch(() => []);
-  }
-  return citiesPromise;
-}
+import { fetchIsraeliCities } from "../lib/israeliCities";
 
 /** Plain-text autocomplete over Israel's official city/settlement list - no map, just picking a name (used for the out-of-area waitlist form). */
 export default function IsraeliCityAutocomplete({
@@ -43,7 +19,7 @@ export default function IsraeliCityAutocomplete({
   const wrapRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetchCities().then(setAllCities);
+    fetchIsraeliCities().then(setAllCities);
   }, []);
 
   const matches =
